@@ -1,4 +1,4 @@
-// game.js - Fixed Visibility and Timer Logic
+// game.js - GPS Penalty & Ghost Cleanup Version
 const firebaseConfig = {
     apiKey: "AIzaSyCC3-6oLBu7OrhnC5Kh6t-mkuo3v4gYN4Q",
     authDomain: "territory-battle-56887.firebaseapp.com",
@@ -19,13 +19,16 @@ let mockLat = 32.1714;
 let mockLng = 34.9083;
 let thiefPath = []; 
 let trailLayer = null;
+let lastGpsTimestamp = Date.now();
 
 const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([mockLat, mockLng], 18);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
 document.getElementById('players-count').insertAdjacentHTML('afterend', `<div style="font-size:10px; color:#94a3b8">ID: ${playerId}</div>`);
 
+// מעקב GPS עם עדכון זמן אחרון
 navigator.geolocation.watchPosition(() => {
+    lastGpsTimestamp = Date.now();
     const gpsEl = document.getElementById('gps-status');
     if (gpsEl) {
         gpsEl.innerText = "GPS ✅";
@@ -33,10 +36,19 @@ navigator.geolocation.watchPosition(() => {
     }
 }, null, { enableHighAccuracy: true });
 
+// בדיקת "עונש GPS" כל 5 שניות
+setInterval(() => {
+    if (playerRole && (Date.now() - lastGpsTimestamp > 60000)) {
+        alert("נזרקת מהמשחק! אין קליטת GPS מעל דקה (יצאת מהבניין?)");
+        exitGame();
+    }
+}, 5000);
+
 function startAs(role) {
     playerRole = role;
     document.getElementById('ui-container').style.display = 'none';
     document.getElementById('controls-container').style.display = 'block';
+    document.getElementById('exit-btn').style.display = 'flex';
     
     db.ref('players/' + playerId).set({ role: playerRole, lat: mockLat, lng: mockLng, t: Date.now() });
 
@@ -56,10 +68,17 @@ function startAs(role) {
     updateMockPosition();
 }
 
+function exitGame() {
+    db.ref('players/' + playerId).remove().then(() => {
+        location.reload();
+    });
+}
+
 function moveMock(dir) {
     const s = 0.00015;
     if (dir === 'up') mockLat += s; if (dir === 'down') mockLat -= s;
     if (dir === 'left') mockLng -= s; if (dir === 'right') mockLng += s;
+    lastGpsTimestamp = Date.now(); // לצורך בדיקת כפתורי ה-Dev
     updateMockPosition();
 }
 
@@ -125,15 +144,27 @@ function listenToOtherPlayers() {
         const players = snap.val();
         for (let id in playerMarkers) map.removeLayer(playerMarkers[id]);
         playerMarkers = {};
+        
         if (!players) {
             document.getElementById('players-count').innerText = `שחקנים: 0`;
             return;
         }
-        const ids = Object.keys(players);
-        document.getElementById('players-count').innerText = `שחקנים: ${ids.length}`;
-        ids.forEach(id => {
+
+        const now = Date.now();
+        let activeCount = 0;
+
+        Object.keys(players).forEach(id => {
             const p = players[id];
+            
+            // ניקוי שחקנים לא פעילים (מעל דקה)
+            if (now - p.t > 60000) {
+                db.ref('players/' + id).remove();
+                return;
+            }
+
+            activeCount++;
             if (playerRole === 'cop' && p.role === 'thief' && id !== playerId) return;
+            
             const color = p.role === 'cop' ? '#3b82f6' : '#ef4444';
             playerMarkers[id] = L.circleMarker([p.lat, p.lng], { 
                 radius: id === playerId ? 30 : 20, 
@@ -143,9 +174,10 @@ function listenToOtherPlayers() {
                 fillOpacity: 1 
             }).addTo(map);
         });
+
+        document.getElementById('players-count').innerText = `שחקנים: ${activeCount}`;
     });
 }
 
-// הפעלת האזנה כבר בטעינה ראשונית
 listenToOtherPlayers();
 listenToCapturedAreas();
