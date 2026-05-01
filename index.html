@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Territory Battle</title>
+    <title>Urban Heist - Stealth Mode</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #000; color: white; }
@@ -22,8 +22,8 @@
 <body>
 
     <div class="header">
-        <div id="conn-status">מתחבר לשרת אירופה... ⏳</div>
-        <h1 style="margin:0; font-size:16px; color: #38bdf8;">Territory Battle</h1>
+        <div id="conn-status">מתחבר לשרת... ⏳</div>
+        <h1 style="margin:0; font-size:16px; color: #38bdf8;">Urban Heist - Stealth Mode</h1>
         <div id="players-count">שחקנים בשרת: 0</div>
     </div>
 
@@ -41,94 +41,12 @@
         <button class="dev-btn" onclick="moveMock('right')">➡️</button>
     </div>
 
+    <!-- טעינת ספריות -->
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
-    <script>
-        // הקונפיגורציה המעודכנת עם הכתובת הנכונה לאירופה
-        const firebaseConfig = {
-            apiKey: "AIzaSyCC3-6oLBu7OrhnC5Kh6t-mkuo3v4gYN4Q",
-            authDomain: "territory-battle-56887.firebaseapp.com",
-            databaseURL: "https://territory-battle-56887-default-rtdb.europe-west1.firebasedatabase.app",
-            projectId: "territory-battle-56887",
-            storageBucket: "territory-battle-56887.firebasestorage.app",
-            messagingSenderId: "1094082573020",
-            appId: "1:1094082573020:web:b3ba4455f1636437c33a19"
-        };
-        
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
-
-        // בדיקת חיבור
-        db.ref(".info/connected").on("value", (snap) => {
-            const statusEl = document.getElementById('conn-status');
-            if (snap.val() === true) {
-                statusEl.innerText = "מחובר לשרת (אירופה) ✅";
-                statusEl.style.color = "#10b981";
-            } else {
-                statusEl.innerText = "מנסה להתחבר... ❌";
-                statusEl.style.color = "#ef4444";
-            }
-        });
-
-        const playerId = 'p_' + Math.floor(Math.random() * 9999);
-        let playerRole = null;
-        let playerMarkers = {};
-        let mockLat = 32.1714;
-        let mockLng = 34.9083;
-        
-        const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([mockLat, mockLng], 18);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
-
-        function startAs(role) {
-            playerRole = role;
-            document.getElementById('ui-container').style.display = 'none';
-            document.getElementById('dev-controls').style.display = 'block';
-            db.ref('players/' + playerId).onDisconnect().remove();
-            updateMockPosition();
-            listenToOtherPlayers();
-        }
-
-        function moveMock(direction) {
-            const step = 0.00015; 
-            if (direction === 'up') mockLat += step;
-            if (direction === 'down') mockLat -= step;
-            if (direction === 'left') mockLng -= step;
-            if (direction === 'right') mockLng += step;
-            updateMockPosition();
-        }
-
-        function updateMockPosition() {
-            map.panTo([mockLat, mockLng]);
-            db.ref('players/' + playerId).set({
-                role: playerRole, lat: mockLat, lng: mockLng, t: Date.now()
-            });
-        }
-
-        function listenToOtherPlayers() {
-            db.ref('players').on('value', (snapshot) => {
-                const players = snapshot.val();
-                for (let id in playerMarkers) { map.removeLayer(playerMarkers[id]); }
-                playerMarkers = {};
-                if (!players) return;
-
-                const ids = Object.keys(players);
-                document.getElementById('players-count').innerText = `שחקנים בשרת: ${ids.length}`;
-
-                ids.forEach(id => {
-                    const p = players[id];
-                    // חוק ראייה
-                    if (playerRole === 'cop' && p.role === 'thief' && id !== playerId) return;
-                    
-                    const color = p.role === 'cop' ? '#3b82f6' : '#ef4444';
-                    playerMarkers[id] = L.circleMarker([p.lat, p.lng], {
-                        radius: id === playerId ? 30 : 20,
-                        color: '#fff', weight: 3, fillColor: color, fillOpacity: 1
-                    }).addTo(map);
-                });
-            });
-        }
-    </script>
+    <!-- טעינת הלוגיקה של המשחק -->
+    <script src="game.js"></script>
 </body>
 </html>
