@@ -1,4 +1,4 @@
-// game.js - Managed Logic with Visual Cooldown
+// game.js - Fixed Visibility and Timer Logic
 const firebaseConfig = {
     apiKey: "AIzaSyCC3-6oLBu7OrhnC5Kh6t-mkuo3v4gYN4Q",
     authDomain: "territory-battle-56887.firebaseapp.com",
@@ -54,8 +54,6 @@ function startAs(role) {
 
     db.ref('players/' + playerId).onDisconnect().remove();
     updateMockPosition();
-    listenToOtherPlayers();
-    listenToCapturedAreas();
 }
 
 function moveMock(dir) {
@@ -82,22 +80,18 @@ function updateMockPosition() {
     db.ref('players/' + playerId).update({ lat: mockLat, lng: mockLng, t: Date.now() });
 }
 
-// לוגיקת הכפתור החדשה
 function triggerCapture() {
     const btn = document.getElementById('capture-btn');
     const timerText = document.getElementById('cooldown-timer');
     const circle = document.getElementById('cooldown-circle');
-    const circumference = 326.7; // 2 * PI * 52
+    const circumference = 326.7;
 
     if (btn.disabled) return;
 
-    // שלב 1: הפעלת הצליל (10 שניות)
     btn.disabled = true;
-    broadcastCapture(); // הפעלת הסאונד מ-audio.js (שמוגדר ל-10 שניות)
+    broadcastCapture();
 
-    // המתנה לסיום הצליל לפני תחילת הויזואליזציה של הקירור
     setTimeout(() => {
-        // שלב 2: מעבר למצב שקוף ותחילת טיימר 60 שניות
         btn.classList.add('cooldown');
         let timeLeft = 60;
         timerText.innerText = timeLeft;
@@ -105,8 +99,6 @@ function triggerCapture() {
         const cooldownInterval = setInterval(() => {
             timeLeft--;
             timerText.innerText = timeLeft;
-
-            // עדכון המסגרת המתרוקנת
             const offset = circumference - (timeLeft / 60) * circumference;
             circle.style.strokeDashoffset = offset;
 
@@ -117,7 +109,7 @@ function triggerCapture() {
                 circle.style.strokeDashoffset = 0;
             }
         }, 1000);
-    }, 10000); // 10 שניות של צליל פעיל
+    }, 10000);
 }
 
 function listenToCapturedAreas() {
@@ -133,7 +125,10 @@ function listenToOtherPlayers() {
         const players = snap.val();
         for (let id in playerMarkers) map.removeLayer(playerMarkers[id]);
         playerMarkers = {};
-        if (!players) return;
+        if (!players) {
+            document.getElementById('players-count').innerText = `שחקנים: 0`;
+            return;
+        }
         const ids = Object.keys(players);
         document.getElementById('players-count').innerText = `שחקנים: ${ids.length}`;
         ids.forEach(id => {
@@ -150,3 +145,7 @@ function listenToOtherPlayers() {
         });
     });
 }
+
+// הפעלת האזנה כבר בטעינה ראשונית
+listenToOtherPlayers();
+listenToCapturedAreas();
