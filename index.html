@@ -6,19 +6,17 @@
     <title>Territory Battle</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #0f172a; color: white; }
-        #map { height: 100%; width: 100%; background: #000; z-index: 1; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #000; color: white; }
+        #map { height: 100%; width: 100%; position: absolute; top:0; bottom:0; z-index: 1; }
         .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.9); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #38bdf8; }
         #debug-pos { font-size: 11px; color: #facc15; margin-top: 5px; font-family: monospace; }
         .setup-screen { position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
         .btn { padding: 15px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; color: white; cursor: pointer; }
         .btn-blue { background: #1e40af; }
         .btn-red { background: #991b1b; }
-        #dev-controls { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2000; background: rgba(0,0,0,0.85); padding: 10px; border-radius: 15px; text-align: center; border: 1px solid #38bdf8; }
-        .dev-btn { background: #334155; color: white; border: 1px solid #38bdf8; padding: 15px; margin: 2px; border-radius: 5px; font-size: 20px; width: 60px; }
-        /* וידוא שהסמנים תמיד מעל המפה */
-        .leaflet-marker-pane { z-index: 600 !important; }
-        .leaflet-overlay-pane { z-index: 650 !important; }
+        #dev-controls { display: none; position: absolute; bottom: 10px; left: 10px; z-index: 2000; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 15px; text-align: center; }
+        .dev-btn { background: #334155; color: white; border: 1px solid #38bdf8; padding: 12px; margin: 2px; border-radius: 5px; font-size: 18px; width: 50px; }
+        .test-btn { background: #a855f7; color: white; border: none; padding: 10px; margin-top: 5px; border-radius: 5px; font-size: 12px; width: 100%; }
     </style>
 </head>
 <body>
@@ -26,7 +24,7 @@
     <div class="header">
         <h1 style="margin:0; font-size:16px;">Territory Battle</h1>
         <div id="sub-status">בחר תפקיד</div>
-        <div id="debug-pos">מיקום: ממתין...</div>
+        <div id="debug-pos">ממתין למידע...</div>
     </div>
 
     <div id="map"></div>
@@ -41,6 +39,7 @@
         <button class="dev-btn" onclick="moveMock('left')">⬅️</button>
         <button class="dev-btn" onclick="moveMock('down')">⬇️</button>
         <button class="dev-btn" onclick="moveMock('right')">➡️</button>
+        <button class="test-btn" onclick="forceTestCircle()">בדיקת ראייה 👁️</button>
     </div>
 
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -66,7 +65,8 @@
         let mockLat = 32.1714;
         let mockLng = 34.9083;
         
-        const map = L.map('map', { zoomControl: false }).setView([mockLat, mockLng], 18);
+        // יצירת המפה עם הגדרות ודאיות
+        const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([mockLat, mockLng], 18);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
         db.ref('players/' + playerId).onDisconnect().remove();
@@ -75,13 +75,13 @@
             playerRole = role;
             document.getElementById('ui-container').style.display = 'none';
             document.getElementById('dev-controls').style.display = 'block';
-            document.getElementById('sub-status').innerText = role === 'cop' ? 'תפקיד: שריף 👮‍♂️' : 'תפקיד: גנב 🥷';
+            document.getElementById('sub-status').innerText = role === 'cop' ? 'תפקיד: שריף' : 'תפקיד: גנב';
             updateMockPosition();
             listenToOtherPlayers();
         }
 
         function moveMock(direction) {
-            const step = 0.0001; 
+            const step = 0.00015; 
             if (direction === 'up') mockLat += step;
             if (direction === 'down') mockLat -= step;
             if (direction === 'left') mockLng -= step;
@@ -95,9 +95,18 @@
             db.ref('players/' + playerId).set({
                 role: playerRole,
                 lat: mockLat,
-                lng: mockLng,
-                lastUpdate: Date.now()
+                lng: mockLng
             });
+        }
+
+        function forceTestCircle() {
+            L.circleMarker(map.getCenter(), {
+                radius: 60,
+                color: '#a855f7',
+                fillColor: '#a855f7',
+                fillOpacity: 0.7
+            }).addTo(map).bindPopup("בדיקת ראייה עובדת!").openPopup();
+            alert("נוצר עיגול סגול ענק במרכז המפה. אתה רואה אותו?");
         }
 
         function listenToOtherPlayers() {
@@ -110,17 +119,18 @@
 
                 for (let id in players) {
                     const p = players[id];
+                    // שוטר לא רואה גנבים אחרים
                     if (playerRole === 'cop' && p.role === 'thief' && id !== playerId) continue;
 
+                    const isMe = id === playerId;
                     const color = p.role === 'cop' ? '#3b82f6' : '#ef4444';
                     
-                    // שימוש בעיגול גרפי במקום אייקון תמונה
-                    const marker = L.circle([p.lat, p.lng], {
-                        radius: id === playerId ? 8 : 6, // רדיוס במטרים
+                    const marker = L.circleMarker([p.lat, p.lng], {
+                        radius: isMe ? 40 : 25, // רדיוס ענק בפיקסלים
                         color: '#ffffff',
-                        weight: 2,
+                        weight: 4,
                         fillColor: color,
-                        fillOpacity: 0.9
+                        fillOpacity: 1
                     }).addTo(map);
                     
                     playerMarkers[id] = marker;
