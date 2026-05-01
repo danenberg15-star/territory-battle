@@ -4,45 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Territory Battle</title>
-    
-    <link rel="manifest" href="manifest.json">
-    <meta name="theme-color" content="#0f172a">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <link rel="apple-touch-icon" href="LOGO 192.webp">
-
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: -apple-system, system-ui, sans-serif; background-color: #0f172a; color: white; }
-        #map { height: 100%; width: 100%; z-index: 1; }
-        .header { position: absolute; top: 20px; left: 20px; right: 20px; padding: 15px; background: rgba(15, 23, 42, 0.9); backdrop-filter: blur(8px); border-radius: 16px; border: 1px solid rgba(255, 255, 255, 0.1); text-align: center; z-index: 1000; box-shadow: 0 4px 20px rgba(0,0,0,0.5); }
-        .header h1 { margin: 0; font-size: 18px; letter-spacing: 1px; text-transform: uppercase; color: #38bdf8; }
-        #sub-status { font-weight: bold; margin-top: 5px; }
-
-        .setup-screen { position: absolute; bottom: 30px; left: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 12px; }
-        .btn { padding: 18px; border-radius: 14px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.3); transition: transform 0.1s; }
-        .btn:active { transform: scale(0.96); }
-        .btn-blue { background: linear-gradient(135deg, #1e40af, #3b82f6); }
-        .btn-red { background: linear-gradient(135deg, #991b1b, #ef4444); }
-        .leaflet-control-zoom, .leaflet-control-attribution { display: none !important; }
-
-        #dev-controls {
-            display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; background: rgba(15, 23, 42, 0.95); padding: 15px; border-radius: 20px;
-            border: 2px solid #38bdf8; text-align: center; box-shadow: 0 0 20px rgba(56, 189, 248, 0.4);
-        }
-        .dev-btn {
-            background: #1e293b; color: white; border: 1px solid #38bdf8; padding: 15px 25px;
-            margin: 4px; border-radius: 12px; font-size: 24px; cursor: pointer; width: 70px;
-        }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #0f172a; color: white; }
+        #map { height: 100%; width: 100%; background: #000; }
+        .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.9); border-radius: 12px; text-align: center; z-index: 1000; border: 1px solid #38bdf8; }
+        #debug-pos { font-size: 10px; color: #facc15; margin-top: 5px; }
+        .setup-screen { position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
+        .btn { padding: 15px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; color: white; cursor: pointer; }
+        .btn-blue { background: #1e40af; }
+        .btn-red { background: #991b1b; }
+        #dev-controls { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 15px; text-align: center; }
+        .dev-btn { background: #334155; color: white; border: 1px solid #38bdf8; padding: 15px; margin: 2px; border-radius: 5px; font-size: 20px; width: 60px; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <h1>Territory Battle</h1>
-        <div id="sub-status">Cops vs. Thieves</div>
+        <h1 style="margin:0; font-size:16px;">Territory Battle</h1>
+        <div id="sub-status">בחר תפקיד</div>
+        <div id="debug-pos">מיקום: ממתין...</div>
     </div>
 
     <div id="map"></div>
@@ -76,29 +57,28 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        const playerId = 'player_' + Math.random().toString(36).substr(2, 9);
+        const playerId = 'player_' + Math.random().toString(36).substr(2, 5);
         let playerRole = null;
         let playerMarkers = {};
         let mockLat = 32.1714;
         let mockLng = 34.9083;
         
-        const map = L.map('map', { zoomControl: false }).setView([mockLat, mockLng], 18);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
+        const map = L.map('map', { zoomControl: false }).setView([mockLat, mockLng], 17);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
 
         db.ref('players/' + playerId).onDisconnect().remove();
 
         function startAs(role) {
             playerRole = role;
-            document.getElementById('sub-status').innerText = `מחובר | ${role === 'cop' ? 'שריף' : 'חבר כנופיה'}`;
-            document.getElementById('sub-status').style.color = role === 'cop' ? '#38bdf8' : '#ef4444';
             document.getElementById('ui-container').style.display = 'none';
             document.getElementById('dev-controls').style.display = 'block';
+            document.getElementById('sub-status').innerText = role === 'cop' ? 'שריף' : 'גנב';
             updateMockPosition();
             listenToOtherPlayers();
         }
 
         function moveMock(direction) {
-            const step = 0.00015; 
+            const step = 0.0002; 
             if (direction === 'up') mockLat += step;
             if (direction === 'down') mockLat -= step;
             if (direction === 'left') mockLng -= step;
@@ -107,12 +87,12 @@
         }
 
         function updateMockPosition() {
+            document.getElementById('debug-pos').innerText = `מיקום: ${mockLat.toFixed(5)}, ${mockLng.toFixed(5)}`;
             map.panTo([mockLat, mockLng]);
             db.ref('players/' + playerId).set({
                 role: playerRole,
                 lat: mockLat,
-                lng: mockLng,
-                lastSeen: Date.now()
+                lng: mockLng
             });
         }
 
@@ -126,19 +106,14 @@
 
                 for (let id in players) {
                     const p = players[id];
+                    
+                    // חוק ראייה: אם אני שוטר, אל תראה גנבים (אלא אם זה אני)
                     if (playerRole === 'cop' && p.role === 'thief' && id !== playerId) continue;
 
-                    const color = p.role === 'cop' ? '#3b82f6' : '#ef4444';
-                    const isMe = id === playerId;
-
-                    const marker = L.circleMarker([p.lat, p.lng], {
-                        radius: isMe ? 35 : 22, // נקודות ענקיות
-                        fillColor: color,
-                        color: "#ffffff",
-                        weight: isMe ? 5 : 3,
-                        fillOpacity: 0.9
-                    }).addTo(map);
-
+                    const marker = L.marker([p.lat, p.lng]).addTo(map);
+                    // הוספת טקסט מעל הנקודה כדי שנזהה
+                    marker.bindTooltip(id === playerId ? "אני" : p.role, {permanent: true, direction: 'top'}).openTooltip();
+                    
                     playerMarkers[id] = marker;
                 }
             });
