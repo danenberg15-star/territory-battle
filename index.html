@@ -7,15 +7,18 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #0f172a; color: white; }
-        #map { height: 100%; width: 100%; background: #000; }
-        .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.9); border-radius: 12px; text-align: center; z-index: 1000; border: 1px solid #38bdf8; }
-        #debug-pos { font-size: 10px; color: #facc15; margin-top: 5px; }
-        .setup-screen { position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 1000; display: flex; flex-direction: column; gap: 10px; }
+        #map { height: 100%; width: 100%; background: #000; z-index: 1; }
+        .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.9); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #38bdf8; }
+        #debug-pos { font-size: 11px; color: #facc15; margin-top: 5px; font-family: monospace; }
+        .setup-screen { position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
         .btn { padding: 15px; border-radius: 10px; border: none; font-size: 16px; font-weight: bold; color: white; cursor: pointer; }
         .btn-blue { background: #1e40af; }
         .btn-red { background: #991b1b; }
-        #dev-controls { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; background: rgba(0,0,0,0.8); padding: 10px; border-radius: 15px; text-align: center; }
+        #dev-controls { display: none; position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2000; background: rgba(0,0,0,0.85); padding: 10px; border-radius: 15px; text-align: center; border: 1px solid #38bdf8; }
         .dev-btn { background: #334155; color: white; border: 1px solid #38bdf8; padding: 15px; margin: 2px; border-radius: 5px; font-size: 20px; width: 60px; }
+        /* וידוא שהסמנים תמיד מעל המפה */
+        .leaflet-marker-pane { z-index: 600 !important; }
+        .leaflet-overlay-pane { z-index: 650 !important; }
     </style>
 </head>
 <body>
@@ -63,8 +66,8 @@
         let mockLat = 32.1714;
         let mockLng = 34.9083;
         
-        const map = L.map('map', { zoomControl: false }).setView([mockLat, mockLng], 17);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
+        const map = L.map('map', { zoomControl: false }).setView([mockLat, mockLng], 18);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
         db.ref('players/' + playerId).onDisconnect().remove();
 
@@ -72,13 +75,13 @@
             playerRole = role;
             document.getElementById('ui-container').style.display = 'none';
             document.getElementById('dev-controls').style.display = 'block';
-            document.getElementById('sub-status').innerText = role === 'cop' ? 'שריף' : 'גנב';
+            document.getElementById('sub-status').innerText = role === 'cop' ? 'תפקיד: שריף 👮‍♂️' : 'תפקיד: גנב 🥷';
             updateMockPosition();
             listenToOtherPlayers();
         }
 
         function moveMock(direction) {
-            const step = 0.0002; 
+            const step = 0.0001; 
             if (direction === 'up') mockLat += step;
             if (direction === 'down') mockLat -= step;
             if (direction === 'left') mockLng -= step;
@@ -87,12 +90,13 @@
         }
 
         function updateMockPosition() {
-            document.getElementById('debug-pos').innerText = `מיקום: ${mockLat.toFixed(5)}, ${mockLng.toFixed(5)}`;
+            document.getElementById('debug-pos').innerText = `LAT: ${mockLat.toFixed(5)} | LNG: ${mockLng.toFixed(5)}`;
             map.panTo([mockLat, mockLng]);
             db.ref('players/' + playerId).set({
                 role: playerRole,
                 lat: mockLat,
-                lng: mockLng
+                lng: mockLng,
+                lastUpdate: Date.now()
             });
         }
 
@@ -106,13 +110,18 @@
 
                 for (let id in players) {
                     const p = players[id];
-                    
-                    // חוק ראייה: אם אני שוטר, אל תראה גנבים (אלא אם זה אני)
                     if (playerRole === 'cop' && p.role === 'thief' && id !== playerId) continue;
 
-                    const marker = L.marker([p.lat, p.lng]).addTo(map);
-                    // הוספת טקסט מעל הנקודה כדי שנזהה
-                    marker.bindTooltip(id === playerId ? "אני" : p.role, {permanent: true, direction: 'top'}).openTooltip();
+                    const color = p.role === 'cop' ? '#3b82f6' : '#ef4444';
+                    
+                    // שימוש בעיגול גרפי במקום אייקון תמונה
+                    const marker = L.circle([p.lat, p.lng], {
+                        radius: id === playerId ? 8 : 6, // רדיוס במטרים
+                        color: '#ffffff',
+                        weight: 2,
+                        fillColor: color,
+                        fillOpacity: 0.9
+                    }).addTo(map);
                     
                     playerMarkers[id] = marker;
                 }
