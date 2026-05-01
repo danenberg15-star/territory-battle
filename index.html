@@ -14,15 +14,38 @@
         #audio-status { color: #facc15; }
         #players-count { color: #10b981; }
         #signal-meter { font-size: 10px; color: #facc15; margin-top: 5px; display: none; background: rgba(0,0,0,0.5); border-radius: 4px; padding: 2px; }
+        
         .setup-screen { position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
         .btn { padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; }
         .btn-blue { background: #1e40af; }
         .btn-red { background: #991b1b; }
+        
         #controls-container { display: none; position: absolute; bottom: 10px; left: 0; right: 0; z-index: 2000; padding: 10px; pointer-events: none; }
         #dev-controls { background: rgba(0,0,0,0.85); padding: 10px; border-radius: 15px; text-align: center; border: 1px solid #38bdf8; width: fit-content; margin: 0 auto; pointer-events: auto; }
         .dev-btn { background: #334155; color: white; border: 1px solid #38bdf8; padding: 15px; margin: 2px; border-radius: 8px; font-size: 22px; width: 60px; }
-        #capture-btn { display: none; background: #dc2626; color: white; border: 4px solid #fff; padding: 20px; border-radius: 50%; width: 100px; height: 100px; font-weight: bold; margin-bottom: 10px; pointer-events: auto; box-shadow: 0 0 20px rgba(220, 38, 38, 0.6); }
-        #capture-btn:disabled { background: #4b5563; border-color: #9ca3af; opacity: 0.6; }
+
+        /* כפתור תפיסה */
+        #capture-btn-container { position: relative; width: 110px; height: 110px; margin: 0 auto 15px auto; pointer-events: auto; display: none; }
+        
+        #capture-btn { 
+            position: absolute; top: 5px; left: 5px; width: 100px; height: 100px;
+            background: #dc2626; color: white; border: none; border-radius: 50%;
+            font-weight: bold; font-size: 18px; z-index: 5; transition: all 0.3s;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+        }
+
+        #capture-btn.cooldown { background: transparent; color: #dc2626; border: 2px solid rgba(220, 38, 38, 0.2); }
+        #capture-btn .timer-text { display: none; font-size: 24px; }
+        #capture-btn.cooldown .timer-text { display: block; }
+        #capture-btn.cooldown .btn-label { display: none; }
+
+        .progress-ring { position: absolute; top: 0; left: 0; width: 110px; height: 110px; transform: rotate(-90deg); z-index: 1; }
+        .progress-ring__circle {
+            stroke: #dc2626; stroke-width: 6; fill: transparent;
+            stroke-dasharray: 326.7;
+            stroke-dashoffset: 0; transition: stroke-dashoffset 1s linear;
+        }
     </style>
 </head>
 <body>
@@ -44,9 +67,16 @@
     </div>
 
     <div id="controls-container">
-        <div style="text-align: center;">
-            <button id="capture-btn" onclick="triggerCapture()">תפוס!</button>
+        <div id="capture-btn-container">
+            <svg class="progress-ring">
+                <circle class="progress-ring__circle" id="cooldown-circle" cx="55" cy="55" r="52"></circle>
+            </svg>
+            <button id="capture-btn" onclick="triggerCapture()">
+                <span class="btn-label">תפוס!</span>
+                <span class="timer-text" id="cooldown-timer">60</span>
+            </button>
         </div>
+        
         <div id="dev-controls">
             <button class="dev-btn" onclick="moveMock('up')">⬆️</button><br>
             <button class="dev-btn" onclick="moveMock('left')">⬅️</button>
