@@ -9,23 +9,22 @@
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #000; color: white; }
         #map { height: 100%; width: 100%; position: absolute; top:0; z-index: 1; }
         .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.95); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #38bdf8; }
-        #debug-pos { font-size: 11px; color: #facc15; margin-top: 5px; }
+        #conn-status { font-size: 10px; color: #ef4444; margin-bottom: 5px; }
         #players-count { font-size: 12px; color: #10b981; font-weight: bold; }
         .setup-screen { position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
         .btn { padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; }
         .btn-blue { background: #1e40af; }
         .btn-red { background: #991b1b; }
-        #dev-controls { display: none; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 2000; background: rgba(0,0,0,0.85); padding: 10px; border-radius: 15px; text-align: center; white-space: nowrap; }
+        #dev-controls { display: none; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 2000; background: rgba(0,0,0,0.85); padding: 10px; border-radius: 15px; text-align: center; }
         .dev-btn { background: #334155; color: white; border: 1px solid #38bdf8; padding: 15px; margin: 2px; border-radius: 8px; font-size: 22px; width: 60px; }
     </style>
 </head>
 <body>
 
     <div class="header">
+        <div id="conn-status">מנסה להתחבר לשרת... ⏳</div>
         <h1 style="margin:0; font-size:16px;">Territory Battle</h1>
-        <div id="sub-status">ממתין לבחירה...</div>
-        <div id="players-count">שחקנים בשרת: ?</div>
-        <div id="debug-pos">---</div>
+        <div id="players-count">שחקנים: 0</div>
     </div>
 
     <div id="map"></div>
@@ -42,12 +41,11 @@
         <button class="dev-btn" onclick="moveMock('right')">➡️</button>
     </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     
     <script>
-        // קונפיגורציה
         const firebaseConfig = {
             apiKey: "AIzaSyCC3-6oLBu7OrhnC5Kh6t-mkuo3v4gYN4Q",
             authDomain: "territory-battle-56887.firebaseapp.com",
@@ -57,8 +55,21 @@
             messagingSenderId: "1094082573020",
             appId: "1:1094082573020:web:b3ba4455f1636437c33a19"
         };
+        
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
+
+        // בדיקת חיבור מיידית
+        db.ref(".info/connected").on("value", (snap) => {
+            const statusEl = document.getElementById('conn-status');
+            if (snap.val() === true) {
+                statusEl.innerText = "מחובר ל-Firebase ✅";
+                statusEl.style.color = "#10b981";
+            } else {
+                statusEl.innerText = "אין חיבור לשרת ❌";
+                statusEl.style.color = "#ef4444";
+            }
+        });
 
         const playerId = 'p_' + Math.floor(Math.random() * 9999);
         let playerRole = null;
@@ -73,11 +84,7 @@
             playerRole = role;
             document.getElementById('ui-container').style.display = 'none';
             document.getElementById('dev-controls').style.display = 'block';
-            document.getElementById('sub-status').innerText = role === 'cop' ? 'תפקיד: שריף' : 'תפקיד: גנב';
-            
-            // ניקוי שחקן ביציאה
             db.ref('players/' + playerId).onDisconnect().remove();
-            
             updateMockPosition();
             listenToOtherPlayers();
         }
@@ -92,53 +99,31 @@
         }
 
         function updateMockPosition() {
-            document.getElementById('debug-pos').innerText = `LAT: ${mockLat.toFixed(5)} | LNG: ${mockLng.toFixed(5)}`;
             map.panTo([mockLat, mockLng]);
-            
-            // בדיקת כתיבה עם תפיסת שגיאות
             db.ref('players/' + playerId).set({
-                role: playerRole,
-                lat: mockLat,
-                lng: mockLng,
-                t: Date.now()
-            }).catch(err => {
-                alert("שגיאת כתיבה ל-Firebase: " + err.message);
+                role: playerRole, lat: mockLat, lng: mockLng, t: Date.now()
             });
         }
 
         function listenToOtherPlayers() {
             db.ref('players').on('value', (snapshot) => {
                 const players = snapshot.val();
-                
-                // ניקוי
                 for (let id in playerMarkers) { map.removeLayer(playerMarkers[id]); }
                 playerMarkers = {};
-
-                if (!players) {
-                    document.getElementById('players-count').innerText = "שחקנים בשרת: 0";
-                    return;
-                }
+                if (!players) return;
 
                 const ids = Object.keys(players);
-                document.getElementById('players-count').innerText = `שחקנים בשרת: ${ids.length}`;
+                document.getElementById('players-count').innerText = `שחקנים: ${ids.length}`;
 
                 ids.forEach(id => {
                     const p = players[id];
                     if (playerRole === 'cop' && p.role === 'thief' && id !== playerId) return;
-
                     const color = p.role === 'cop' ? '#3b82f6' : '#ef4444';
-                    const marker = L.circleMarker([p.lat, p.lng], {
+                    playerMarkers[id] = L.circleMarker([p.lat, p.lng], {
                         radius: id === playerId ? 30 : 20,
-                        color: '#fff',
-                        weight: 3,
-                        fillColor: color,
-                        fillOpacity: 1
+                        color: '#fff', weight: 3, fillColor: color, fillOpacity: 1
                     }).addTo(map);
-                    
-                    playerMarkers[id] = marker;
                 });
-            }, (err) => {
-                alert("שגיאת קריאה מ-Firebase: " + err.message);
             });
         }
     </script>
