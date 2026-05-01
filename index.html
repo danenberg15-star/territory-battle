@@ -6,49 +6,180 @@
     <title>Territory Battle</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #000; color: white; }
-        #map { height: 100%; width: 100%; position: absolute; top:0; z-index: 1; }
-        .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.95); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #38bdf8; }
-        .status-row { display: flex; justify-content: space-around; font-size: 11px; margin-bottom: 5px; font-weight: bold; }
+        body, html { 
+            margin: 0; 
+            padding: 0; 
+            height: 100%; 
+            width: 100%; 
+            overflow: hidden; 
+            font-family: sans-serif; 
+            background-color: #000; 
+            color: white; 
+        }
+        #map { 
+            height: 100%; 
+            width: 100%; 
+            position: absolute; 
+            top: 0; 
+            z-index: 1; 
+        }
+        .exit-btn { 
+            position: absolute; 
+            top: 15px; 
+            left: 15px; 
+            z-index: 3000; 
+            background: rgba(220, 38, 38, 0.9); 
+            color: white; 
+            border: 2px solid white; 
+            border-radius: 50%; 
+            width: 40px; 
+            height: 40px; 
+            font-weight: bold; 
+            font-size: 20px; 
+            cursor: pointer; 
+            display: none; 
+            align-items: center; 
+            justify-content: center; 
+        }
+        .header { 
+            position: absolute; 
+            top: 10px; 
+            left: 10px; 
+            right: 10px; 
+            padding: 10px; 
+            background: rgba(15, 23, 42, 0.95); 
+            border-radius: 12px; 
+            text-align: center; 
+            z-index: 2000; 
+            border: 1px solid #38bdf8; 
+        }
+        .status-row { 
+            display: flex; 
+            justify-content: space-around; 
+            font-size: 11px; 
+            margin-bottom: 5px; 
+            font-weight: bold; 
+        }
         #gps-status { color: #ef4444; }
         #audio-status { color: #facc15; }
         #players-count { color: #10b981; }
-        #signal-meter { font-size: 10px; color: #facc15; margin-top: 5px; display: none; background: rgba(0,0,0,0.5); border-radius: 4px; padding: 2px; }
-        
-        .setup-screen { position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
-        .btn { padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; }
+        #signal-meter { 
+            font-size: 10px; 
+            color: #facc15; 
+            margin-top: 5px; 
+            display: none; 
+            background: rgba(0, 0, 0, 0.5); 
+            border-radius: 4px; 
+            padding: 2px; 
+        }
+        .setup-screen { 
+            position: absolute; 
+            bottom: 20px; 
+            left: 20px; 
+            right: 20px; 
+            z-index: 2000; 
+            display: flex; 
+            flex-direction: column; 
+            gap: 10px; 
+        }
+        .btn { 
+            padding: 18px; 
+            border-radius: 12px; 
+            border: none; 
+            font-size: 18px; 
+            font-weight: bold; 
+            color: white; 
+            cursor: pointer; 
+        }
         .btn-blue { background: #1e40af; }
         .btn-red { background: #991b1b; }
-        
-        #controls-container { display: none; position: absolute; bottom: 10px; left: 0; right: 0; z-index: 2000; padding: 10px; pointer-events: none; }
-        #dev-controls { background: rgba(0,0,0,0.85); padding: 10px; border-radius: 15px; text-align: center; border: 1px solid #38bdf8; width: fit-content; margin: 0 auto; pointer-events: auto; }
-        .dev-btn { background: #334155; color: white; border: 1px solid #38bdf8; padding: 15px; margin: 2px; border-radius: 8px; font-size: 22px; width: 60px; }
-
-        /* כפתור תפיסה */
-        #capture-btn-container { position: relative; width: 110px; height: 110px; margin: 0 auto 15px auto; pointer-events: auto; display: none; }
-        
-        #capture-btn { 
-            position: absolute; top: 5px; left: 5px; width: 100px; height: 100px;
-            background: #dc2626; color: white; border: none; border-radius: 50%;
-            font-weight: bold; font-size: 18px; z-index: 5; transition: all 0.3s;
-            display: flex; align-items: center; justify-content: center;
-            cursor: pointer;
+        #controls-container { 
+            display: none; 
+            position: absolute; 
+            bottom: 10px; 
+            left: 0; 
+            right: 0; 
+            z-index: 2000; 
+            padding: 10px; 
+            pointer-events: none; 
         }
-
-        #capture-btn.cooldown { background: transparent; color: #dc2626; border: 2px solid rgba(220, 38, 38, 0.2); }
+        #dev-controls { 
+            background: rgba(0, 0, 0, 0.85); 
+            padding: 10px; 
+            border-radius: 15px; 
+            text-align: center; 
+            border: 1px solid #38bdf8; 
+            width: fit-content; 
+            margin: 0 auto; 
+            pointer-events: auto; 
+        }
+        .dev-btn { 
+            background: #334155; 
+            color: white; 
+            border: 1px solid #38bdf8; 
+            padding: 15px; 
+            margin: 2px; 
+            border-radius: 8px; 
+            font-size: 22px; 
+            width: 60px; 
+        }
+        #capture-btn-container { 
+            position: relative; 
+            width: 110px; 
+            height: 110px; 
+            margin: 0 auto 15px auto; 
+            pointer-events: auto; 
+            display: none; 
+        }
+        #capture-btn { 
+            position: absolute; 
+            top: 5px; 
+            left: 5px; 
+            width: 100px; 
+            height: 100px; 
+            background: #dc2626; 
+            color: white; 
+            border: none; 
+            border-radius: 50%; 
+            font-weight: bold; 
+            font-size: 18px; 
+            z-index: 5; 
+            transition: all 0.3s; 
+            display: flex; 
+            align-items: center; 
+            justify-content: center; 
+            cursor: pointer; 
+        }
+        #capture-btn.cooldown { 
+            background: transparent; 
+            color: #dc2626; 
+            border: 2px solid rgba(220, 38, 38, 0.2); 
+        }
         #capture-btn .timer-text { display: none; font-size: 24px; }
         #capture-btn.cooldown .timer-text { display: block; }
         #capture-btn.cooldown .btn-label { display: none; }
-
-        .progress-ring { position: absolute; top: 0; left: 0; width: 110px; height: 110px; transform: rotate(-90deg); z-index: 1; }
-        .progress-ring__circle {
-            stroke: #dc2626; stroke-width: 6; fill: transparent;
-            stroke-dasharray: 326.7;
-            stroke-dashoffset: 0; transition: stroke-dashoffset 1s linear;
+        .progress-ring { 
+            position: absolute; 
+            top: 0; 
+            left: 0; 
+            width: 110px; 
+            height: 110px; 
+            transform: rotate(-90deg); 
+            z-index: 1; 
+        }
+        .progress-ring__circle { 
+            stroke: #dc2626; 
+            stroke-width: 6; 
+            fill: transparent; 
+            stroke-dasharray: 326.7; 
+            stroke-dashoffset: 0; 
+            transition: stroke-dashoffset 1s linear; 
         }
     </style>
 </head>
 <body>
+    <button id="exit-btn" class="exit-btn" onclick="exitGame()">X</button>
+
     <div class="header">
         <div class="status-row">
             <span id="gps-status">GPS ❌</span>
@@ -76,9 +207,8 @@
                 <span class="timer-text" id="cooldown-timer">60</span>
             </button>
         </div>
-        
         <div id="dev-controls">
-            <button class="dev-btn" onclick="moveMock('up')">⬆️</button><br>
+            <button class="dev-btn" onclick="moveMock('up')">⬆️</button><br />
             <button class="dev-btn" onclick="moveMock('left')">⬅️</button>
             <button class="dev-btn" onclick="moveMock('down')">⬇️</button>
             <button class="dev-btn" onclick="moveMock('right')">➡️</button>
