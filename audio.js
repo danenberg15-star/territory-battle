@@ -1,7 +1,8 @@
+// audio.js - Ultrasonic Sonar Logic (19kHz)
 let audioCtx = null;
 let oscillator = null;
 let analyzer = null;
-const TARGET_FREQ = 15000; 
+const TARGET_FREQ = 19000; // תדר בלתי נשמע לאוזן אנושית[cite: 1]
 
 function initAudio() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -16,13 +17,16 @@ function broadcastCapture() {
     
     oscillator.type = 'sine';
     oscillator.frequency.setValueAtTime(TARGET_FREQ, audioCtx.currentTime);
+    
+    // עוצמה מקסימלית לשידור אולטרסוני
     gainNode.gain.setValueAtTime(2, audioCtx.currentTime); 
     
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     
     oscillator.start();
-    setTimeout(() => { oscillator.stop(); }, 5000);
+    // שידור למשך 5 שניות לפי האפיון[cite: 1]
+    setTimeout(() => { oscillator.stop(); }, 5000); 
 }
 
 async function startListeningForCops(onCaught) {
@@ -43,9 +47,7 @@ async function startListeningForCops(onCaught) {
         source.connect(analyzer);
         
         const dataArray = new Uint8Array(analyzer.frequencyBinCount);
-        const meterDiv = document.getElementById('signal-meter');
         const valSpan = document.getElementById('signal-val');
-        meterDiv.style.display = 'block';
 
         let detectionCounter = 0;
 
@@ -54,12 +56,13 @@ async function startListeningForCops(onCaught) {
             const binIndex = Math.round(TARGET_FREQ / (audioCtx.sampleRate / analyzer.fftSize));
             const intensity = dataArray[binIndex];
 
-            // עדכון המד הויזואלי
-            valSpan.innerText = Math.round((intensity / 255) * 100);
+            // עדכון המד הויזואלי במכשיר הגנב
+            if (valSpan) valSpan.innerText = Math.round((intensity / 255) * 100);
 
-            if (intensity > 60) { 
+            if (intensity > 50) { // סף זיהוי רגיש לתדר גבוה
                 detectionCounter++;
-                if (detectionCounter > 25) { 
+                // זיהוי למשך כ-1.5 שניות רצופות לפי האפיון[cite: 1]
+                if (detectionCounter > 45) { 
                     onCaught();
                     detectionCounter = 0;
                 }
