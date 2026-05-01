@@ -1,3 +1,4 @@
+// game.js - Managed Logic (With 1-minute Cooldown)
 const firebaseConfig = {
     apiKey: "AIzaSyCC3-6oLBu7OrhnC5Kh6t-mkuo3v4gYN4Q",
     authDomain: "territory-battle-56887.firebaseapp.com",
@@ -25,8 +26,11 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { m
 document.getElementById('players-count').insertAdjacentHTML('afterend', `<div style="font-size:10px; color:#94a3b8">ID: ${playerId}</div>`);
 
 navigator.geolocation.watchPosition(() => {
-    document.getElementById('gps-status').innerText = "GPS ✅";
-    document.getElementById('gps-status').style.color = "#10b981";
+    const gpsEl = document.getElementById('gps-status');
+    if (gpsEl) {
+        gpsEl.innerText = "GPS ✅";
+        gpsEl.style.color = "#10b981";
+    }
 }, null, { enableHighAccuracy: true });
 
 function startAs(role) {
@@ -64,14 +68,15 @@ function moveMock(dir) {
 function updateMockPosition() {
     map.panTo([mockLat, mockLng]);
     if (playerRole === 'thief') {
-        if (checkCaptureProgress(thiefPath, [mockLat, mockLng])) {
+        if (typeof checkCaptureProgress === "function" && checkCaptureProgress(thiefPath, [mockLat, mockLng])) {
             const areaId = 'area_' + Date.now();
             db.ref('capturedAreas/' + areaId).set({ points: [...thiefPath, thiefPath[0]], capturedBy: playerId });
-            thiefPath = []; trailLayer.setLatLngs([]);
+            thiefPath = []; 
+            if (trailLayer) trailLayer.setLatLngs([]);
             alert("שטח נכבש!");
         } else {
             thiefPath.push([mockLat, mockLng]);
-            trailLayer.setLatLngs(thiefPath);
+            if (trailLayer) trailLayer.setLatLngs(thiefPath);
         }
     }
     db.ref('players/' + playerId).update({ lat: mockLat, lng: mockLng, t: Date.now() });
@@ -79,14 +84,20 @@ function updateMockPosition() {
 
 function triggerCapture() {
     const btn = document.getElementById('capture-btn');
-    btn.disabled = true;
+    if (btn) btn.disabled = true; // נטרול הכפתור
     broadcastCapture();
-    setTimeout(() => { btn.disabled = false; }, 60000); 
+    
+    // החזרת זמן ההמתנה לדקה (60,000 מילישניות)
+    setTimeout(() => { 
+        if (btn) btn.disabled = false; 
+    }, 60000); 
 }
 
 function listenToCapturedAreas() {
     db.ref('capturedAreas').on('value', snap => {
-        areaLayers = renderAreas(map, snap.val(), areaLayers);
+        if (typeof renderAreas === "function") {
+            areaLayers = renderAreas(map, snap.val(), areaLayers);
+        }
     });
 }
 
@@ -102,7 +113,13 @@ function listenToOtherPlayers() {
             const p = players[id];
             if (playerRole === 'cop' && p.role === 'thief' && id !== playerId) return;
             const color = p.role === 'cop' ? '#3b82f6' : '#ef4444';
-            playerMarkers[id] = L.circleMarker([p.lat, p.lng], { radius: id === playerId ? 30 : 20, color: '#fff', weight: 3, fillColor: color, fillOpacity: 1 }).addTo(map);
+            playerMarkers[id] = L.circleMarker([p.lat, p.lng], { 
+                radius: id === playerId ? 30 : 20, 
+                color: '#fff', 
+                weight: 3, 
+                fillColor: color, 
+                fillOpacity: 1 
+            }).addTo(map);
         });
     });
 }
