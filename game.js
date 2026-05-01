@@ -22,7 +22,9 @@ let trailLayer = null;
 const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([mockLat, mockLng], 18);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
-// חיווי GPS
+// הצגת המזהה שלי לצורך בדיקה
+document.getElementById('players-count').insertAdjacentHTML('afterend', `<div style="font-size:10px; color:#94a3b8">מזהה מכשיר: ${playerId}</div>`);
+
 navigator.geolocation.watchPosition(() => {
     document.getElementById('gps-status').innerText = "GPS ✅";
     document.getElementById('gps-status').style.color = "#10b981";
@@ -33,13 +35,21 @@ function startAs(role) {
     document.getElementById('ui-container').style.display = 'none';
     document.getElementById('controls-container').style.display = 'block';
     
+    // רישום כפוי ל-Firebase כדי לוודא שמופיעים ברשת
+    db.ref('players/' + playerId).set({
+        role: playerRole, lat: mockLat, lng: mockLng, t: Date.now()
+    }).then(() => console.log("Registered on Server"));
+
     if (role === 'cop') {
         document.getElementById('capture-btn').style.display = 'inline-block';
+        document.getElementById('audio-status').innerText = "רמקול מוכן 🔊";
+        document.getElementById('audio-status').style.color = "#10b981";
     } else {
         startListeningForCops(() => {
             alert("נתפסת על ידי השריף! 👮‍♂️");
-            db.ref('players/' + playerId).update({ role: 'cop' }); // הפיכת צד לפי האפיון
-            location.reload();
+            db.ref('players/' + playerId).update({ role: 'cop' }).then(() => {
+                location.reload(); 
+            });
         });
         trailLayer = L.polyline([], { color: '#ef4444', weight: 5, opacity: 0.6, dashArray: '10, 10' }).addTo(map);
     }
@@ -70,14 +80,14 @@ function updateMockPosition() {
             trailLayer.setLatLngs(thiefPath);
         }
     }
-    db.ref('players/' + playerId).update({ role: playerRole, lat: mockLat, lng: mockLng, t: Date.now() });
+    db.ref('players/' + playerId).update({ lat: mockLat, lng: mockLng, t: Date.now() });
 }
 
 function triggerCapture() {
     const btn = document.getElementById('capture-btn');
     btn.disabled = true;
-    broadcastCapture(); // שידור סאונד
-    setTimeout(() => { btn.disabled = false; }, 60000); // Cooldown של 60 שניות
+    broadcastCapture(); 
+    setTimeout(() => { btn.disabled = false; }, 60000); 
 }
 
 function listenToCapturedAreas() {
@@ -88,7 +98,7 @@ function listenToCapturedAreas() {
 
 function listenToOtherPlayers() {
     db.ref('players').on('value', snap => {
-        const players = snap.val();
+        const players = snapshot.val();
         for (let id in playerMarkers) map.removeLayer(playerMarkers[id]);
         playerMarkers = {};
         if (!players) return;
