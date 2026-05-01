@@ -1,8 +1,8 @@
-// audio.js - Ultrasonic Sonar Logic (19kHz)
+// audio.js - Ultrasonic Sonar Logic (20kHz - Inaudible Mode)
 let audioCtx = null;
 let oscillator = null;
 let analyzer = null;
-const TARGET_FREQ = 19000; // תדר בלתי נשמע לאוזן אנושית[cite: 1]
+const TARGET_FREQ = 20000; // הגבול העליון המוחלט
 
 function initAudio() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -18,14 +18,13 @@ function broadcastCapture() {
     oscillator.type = 'sine';
     oscillator.frequency.setValueAtTime(TARGET_FREQ, audioCtx.currentTime);
     
-    // עוצמה מקסימלית לשידור אולטרסוני
-    gainNode.gain.setValueAtTime(2, audioCtx.currentTime); 
+    // הפחתנו עוצמה ל-1.2 כדי למנוע עיוותי רמקול שנשמעים לאוזן
+    gainNode.gain.setValueAtTime(1.2, audioCtx.currentTime); 
     
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     
     oscillator.start();
-    // שידור למשך 5 שניות לפי האפיון[cite: 1]
     setTimeout(() => { oscillator.stop(); }, 5000); 
 }
 
@@ -56,13 +55,12 @@ async function startListeningForCops(onCaught) {
             const binIndex = Math.round(TARGET_FREQ / (audioCtx.sampleRate / analyzer.fftSize));
             const intensity = dataArray[binIndex];
 
-            // עדכון המד הויזואלי במכשיר הגנב
             if (valSpan) valSpan.innerText = Math.round((intensity / 255) * 100);
 
-            if (intensity > 50) { // סף זיהוי רגיש לתדר גבוה
+            // בתדר כזה גבוה, רגישות של 40 היא מספיקה[cite: 1]
+            if (intensity > 40) { 
                 detectionCounter++;
-                // זיהוי למשך כ-1.5 שניות רצופות לפי האפיון[cite: 1]
-                if (detectionCounter > 45) { 
+                if (detectionCounter > 40) { 
                     onCaught();
                     detectionCounter = 0;
                 }
