@@ -1,0 +1,21 @@
+{
+    "name": "Territory Battle: Cops Vs. Thieves",
+    "short_name": "Territory Battle",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#0f172a",
+    "description": "A GPS-based territory conquest game.",
+    "theme_color": "#0f172a",
+    "icons": [
+        {
+            "src": "LOGO 192.webp",
+            "sizes": "192x192",
+            "type": "image/webp"
+        },
+        {
+            "src": "LOGO 512.webp",
+            "sizes": "512x512",
+            "type": "image/webp"
+        }
+    ]
+}
