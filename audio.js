@@ -1,7 +1,7 @@
 let audioCtx = null;
 let oscillator = null;
 let analyzer = null;
-const TARGET_FREQ = 17000; // תדר נגיש יותר
+const TARGET_FREQ = 15000; 
 
 function initAudio() {
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -16,26 +16,37 @@ function broadcastCapture() {
     
     oscillator.type = 'sine';
     oscillator.frequency.setValueAtTime(TARGET_FREQ, audioCtx.currentTime);
-    gainNode.gain.setValueAtTime(1, audioCtx.currentTime); 
+    gainNode.gain.setValueAtTime(2, audioCtx.currentTime); 
     
     oscillator.connect(gainNode);
     gainNode.connect(audioCtx.destination);
     
     oscillator.start();
-    setTimeout(() => { oscillator.stop(); }, 5000); // 5 שניות לפי האפיון[cite: 1]
+    setTimeout(() => { oscillator.stop(); }, 5000);
 }
 
 async function startListeningForCops(onCaught) {
     if (!audioCtx) initAudio();
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+            audio: { 
+                echoCancellation: false, 
+                noiseSuppression: false, 
+                autoGainControl: false 
+            } 
+        });
+        
         if (audioCtx.state === 'suspended') audioCtx.resume();
         const source = audioCtx.createMediaStreamSource(stream);
         analyzer = audioCtx.createAnalyser();
-        analyzer.fftSize = 2048;
+        analyzer.fftSize = 4096; 
         source.connect(analyzer);
         
         const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+        const meterDiv = document.getElementById('signal-meter');
+        const valSpan = document.getElementById('signal-val');
+        meterDiv.style.display = 'block';
+
         let detectionCounter = 0;
 
         function checkFrame() {
@@ -43,9 +54,12 @@ async function startListeningForCops(onCaught) {
             const binIndex = Math.round(TARGET_FREQ / (audioCtx.sampleRate / analyzer.fftSize));
             const intensity = dataArray[binIndex];
 
-            if (intensity > 80) { // רגישות מוגברת[cite: 1]
+            // עדכון המד הויזואלי
+            valSpan.innerText = Math.round((intensity / 255) * 100);
+
+            if (intensity > 60) { 
                 detectionCounter++;
-                if (detectionCounter > 20) { // כ-0.7 שניות של זיהוי רציף[cite: 1]
+                if (detectionCounter > 25) { 
                     onCaught();
                     detectionCounter = 0;
                 }
@@ -54,7 +68,7 @@ async function startListeningForCops(onCaught) {
             }
             requestAnimationFrame(checkFrame);
         }
-        document.getElementById('audio-status').innerText = "מיקרופון פעיל ✅";
+        document.getElementById('audio-status').innerText = "מיקרופון ✅";
         document.getElementById('audio-status').style.color = "#10b981";
         checkFrame();
     } catch (err) {

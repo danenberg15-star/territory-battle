@@ -13,6 +13,7 @@
         #gps-status { color: #ef4444; }
         #audio-status { color: #facc15; }
         #players-count { color: #10b981; }
+        #signal-meter { font-size: 10px; color: #facc15; margin-top: 5px; display: none; background: rgba(0,0,0,0.5); border-radius: 4px; padding: 2px; }
         .setup-screen { position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
         .btn { padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; }
         .btn-blue { background: #1e40af; }
@@ -25,13 +26,13 @@
     </style>
 </head>
 <body>
-
     <div class="header">
         <div class="status-row">
             <span id="gps-status">GPS ❌</span>
-            <span id="audio-status">מיקרופון ❌</span>
+            <span id="audio-status">אודיו ⏳</span>
             <span id="players-count">שחקנים: 0</span>
         </div>
+        <div id="signal-meter">עוצמת סיגנל שוטר: <span id="signal-val">0</span>%</div>
         <h1 style="margin:0; font-size:16px; color: #38bdf8;">Territory Battle</h1>
     </div>
 
@@ -59,7 +60,6 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
     
-    <!-- פיצול לקבצים -->
     <script src="audio.js"></script>
     <script src="territory.js"></script>
     <script src="game.js"></script>
