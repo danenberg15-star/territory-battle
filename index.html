@@ -3,13 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Urban Heist - Stealth Mode</title>
+    <title>Territory Battle</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #000; color: white; }
         #map { height: 100%; width: 100%; position: absolute; top:0; z-index: 1; }
         .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.95); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #38bdf8; }
-        #conn-status { font-size: 11px; color: #ef4444; margin-bottom: 5px; font-weight: bold; }
+        #gps-status { font-size: 11px; color: #ef4444; margin-bottom: 5px; font-weight: bold; }
         #players-count { font-size: 13px; color: #10b981; font-weight: bold; }
         .setup-screen { position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
         .btn { padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; }
@@ -22,8 +22,8 @@
 <body>
 
     <div class="header">
-        <div id="conn-status">מתחבר לשרת... ⏳</div>
-        <h1 style="margin:0; font-size:16px; color: #38bdf8;">Urban Heist - Stealth Mode</h1>
+        <div id="gps-status">מחפש אות GPS... 🛰️</div>
+        <h1 style="margin:0; font-size:16px; color: #38bdf8;">Territory Battle</h1>
         <div id="players-count">שחקנים בשרת: 0</div>
     </div>
 
@@ -44,9 +44,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <!-- הוספת Turf.js לחישובי שטחים -->
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
-    
     <script src="game.js"></script>
 </body>
 </html>

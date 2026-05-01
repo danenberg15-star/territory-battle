@@ -14,7 +14,7 @@ const db = firebase.database();
 const playerId = 'p_' + Math.floor(Math.random() * 9999);
 let playerRole = null;
 let playerMarkers = {};
-let areaLayers = []; // שכבות השטחים הכבושים
+let areaLayers = [];
 let mockLat = 32.1714;
 let mockLng = 34.9083;
 let thiefPath = []; 
@@ -23,16 +23,22 @@ let trailLayer = null;
 const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([mockLat, mockLng], 18);
 L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
-db.ref(".info/connected").on("value", (snap) => {
-    const statusEl = document.getElementById('conn-status');
-    if (snap.val() === true) {
-        statusEl.innerText = "מחובר לשרת ✅";
-        statusEl.style.color = "#10b981";
-    } else {
-        statusEl.innerText = "מנסה להתחבר... ❌";
-        statusEl.style.color = "#ef4444";
-    }
-});
+// חיווי קליטת GPS
+if ("geolocation" in navigator) {
+    navigator.geolocation.watchPosition(
+        () => {
+            const statusEl = document.getElementById('gps-status');
+            statusEl.innerText = "קליטת GPS תקינה ✅";
+            statusEl.style.color = "#10b981";
+        },
+        () => {
+            const statusEl = document.getElementById('gps-status');
+            statusEl.innerText = "שגיאת GPS - ודא שמיקום פעיל ❌";
+            statusEl.style.color = "#ef4444";
+        },
+        { enableHighAccuracy: true }
+    );
+}
 
 function startAs(role) {
     playerRole = role;
@@ -46,7 +52,7 @@ function startAs(role) {
 
     updateMockPosition();
     listenToOtherPlayers();
-    listenToCapturedAreas(); // האזנה לשטחים כבושים
+    listenToCapturedAreas();
 }
 
 function moveMock(direction) {
@@ -60,26 +66,20 @@ function moveMock(direction) {
 
 function updateMockPosition() {
     map.panTo([mockLat, mockLng]);
-
     if (playerRole === 'thief') {
         const currentPos = [mockLat, mockLng];
-        
-        // בדיקה אם חזרנו לנקודת ההתחלה לסגירת מעגל
         if (thiefPath.length > 5) {
             const startPoint = turf.point([thiefPath[0][1], thiefPath[0][0]]);
             const endPoint = turf.point([mockLng, mockLat]);
             const distance = turf.distance(startPoint, endPoint, {units: 'meters'});
-
-            if (distance < 15) { // אם הגנב ברדיוס של 15 מטר מההתחלה
+            if (distance < 15) {
                 captureArea();
                 return;
             }
         }
-
         thiefPath.push(currentPos);
         if (trailLayer) trailLayer.setLatLngs(thiefPath);
     }
-
     db.ref('players/' + playerId).set({
         role: playerRole, lat: mockLat, lng: mockLng, t: Date.now()
     });
@@ -87,19 +87,13 @@ function updateMockPosition() {
 
 function captureArea() {
     if (thiefPath.length < 3) return;
-
-    // הוספת נקודת הסגירה
     const finalPath = [...thiefPath, thiefPath[0]];
-    
-    // שליחה ל-Firebase
     const areaId = 'area_' + Date.now();
     db.ref('capturedAreas/' + areaId).set({
         points: finalPath,
         capturedBy: playerId,
         timestamp: Date.now()
     });
-
-    // איפוס המסלול המקומי
     thiefPath = [];
     if (trailLayer) trailLayer.setLatLngs([]);
     alert("שטח נכבש! 🏁");
@@ -108,19 +102,12 @@ function captureArea() {
 function listenToCapturedAreas() {
     db.ref('capturedAreas').on('value', (snapshot) => {
         const areas = snapshot.val();
-        
-        // ניקוי שטחים קיימים
         areaLayers.forEach(layer => map.removeLayer(layer));
         areaLayers = [];
-
         if (!areas) return;
-
         Object.values(areas).forEach(area => {
             const polygon = L.polygon(area.points, {
-                color: '#ef4444',
-                fillColor: '#ef4444',
-                fillOpacity: 0.4,
-                weight: 2
+                color: '#ef4444', fillColor: '#ef4444', fillOpacity: 0.4, weight: 2
             }).addTo(map);
             areaLayers.push(polygon);
         });
@@ -133,10 +120,8 @@ function listenToOtherPlayers() {
         for (let id in playerMarkers) { map.removeLayer(playerMarkers[id]); }
         playerMarkers = {};
         if (!players) return;
-
         const ids = Object.keys(players);
         document.getElementById('players-count').innerText = `שחקנים בשרת: ${ids.length}`;
-
         ids.forEach(id => {
             const p = players[id];
             if (playerRole === 'cop' && p.role === 'thief' && id !== playerId) return;
