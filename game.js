@@ -1,4 +1,4 @@
-// game.js - Managed Logic (With 1-minute Cooldown)
+// game.js - Managed Logic with Visual Cooldown
 const firebaseConfig = {
     apiKey: "AIzaSyCC3-6oLBu7OrhnC5Kh6t-mkuo3v4gYN4Q",
     authDomain: "territory-battle-56887.firebaseapp.com",
@@ -41,7 +41,7 @@ function startAs(role) {
     db.ref('players/' + playerId).set({ role: playerRole, lat: mockLat, lng: mockLng, t: Date.now() });
 
     if (role === 'cop') {
-        document.getElementById('capture-btn').style.display = 'inline-block';
+        document.getElementById('capture-btn-container').style.display = 'block';
         document.getElementById('audio-status').innerText = "רמקול ✅";
         document.getElementById('audio-status').style.color = "#10b981";
     } else {
@@ -82,15 +82,42 @@ function updateMockPosition() {
     db.ref('players/' + playerId).update({ lat: mockLat, lng: mockLng, t: Date.now() });
 }
 
+// לוגיקת הכפתור החדשה
 function triggerCapture() {
     const btn = document.getElementById('capture-btn');
-    if (btn) btn.disabled = true; // נטרול הכפתור
-    broadcastCapture();
-    
-    // החזרת זמן ההמתנה לדקה (60,000 מילישניות)
-    setTimeout(() => { 
-        if (btn) btn.disabled = false; 
-    }, 60000); 
+    const timerText = document.getElementById('cooldown-timer');
+    const circle = document.getElementById('cooldown-circle');
+    const circumference = 326.7; // 2 * PI * 52
+
+    if (btn.disabled) return;
+
+    // שלב 1: הפעלת הצליל (10 שניות)
+    btn.disabled = true;
+    broadcastCapture(); // הפעלת הסאונד מ-audio.js (שמוגדר ל-10 שניות)
+
+    // המתנה לסיום הצליל לפני תחילת הויזואליזציה של הקירור
+    setTimeout(() => {
+        // שלב 2: מעבר למצב שקוף ותחילת טיימר 60 שניות
+        btn.classList.add('cooldown');
+        let timeLeft = 60;
+        timerText.innerText = timeLeft;
+
+        const cooldownInterval = setInterval(() => {
+            timeLeft--;
+            timerText.innerText = timeLeft;
+
+            // עדכון המסגרת המתרוקנת
+            const offset = circumference - (timeLeft / 60) * circumference;
+            circle.style.strokeDashoffset = offset;
+
+            if (timeLeft <= 0) {
+                clearInterval(cooldownInterval);
+                btn.disabled = false;
+                btn.classList.remove('cooldown');
+                circle.style.strokeDashoffset = 0;
+            }
+        }, 1000);
+    }, 10000); // 10 שניות של צליל פעיל
 }
 
 function listenToCapturedAreas() {
