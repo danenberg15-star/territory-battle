@@ -124,16 +124,15 @@
             statusEl.style.color = playerRole === 'cop' ? '#38bdf8' : '#ef4444';
             
             document.getElementById('ui-container').style.display = 'none';
-            document.getElementById('dev-controls').style.display = 'block'; // חשיפת כפתורי פיתוח
+            document.getElementById('dev-controls').style.display = 'block';
 
-            // עדכון ראשוני והאזנה
             updateMockPosition();
             listenToOtherPlayers();
         }
 
         // פונקציית תזוזה וירטואלית
         function moveMock(direction) {
-            const step = 0.0001; // בערך 10 מטר
+            const step = 0.0001;
             if (direction === 'up') mockLat += step;
             if (direction === 'down') mockLat -= step;
             if (direction === 'left') mockLng -= step;
@@ -151,38 +150,37 @@
             });
         }
 
-        // האזנה לשחקנים וחוקי ראייה
+        // האזנה לשחקנים - מתוקן
         function listenToOtherPlayers() {
             db.ref('players').on('value', (snapshot) => {
                 const players = snapshot.val();
                 if (!players) return;
 
+                // ניקוי המפה מכל הסמנים
                 for (let id in playerMarkers) {
                     map.removeLayer(playerMarkers[id]);
                 }
                 playerMarkers = {};
 
+                // ציור מחדש
                 for (let id in players) {
                     const p = players[id];
                     
-                    // חוק ראייה: שוטר לא רואה גנב על המפה
-                    if (playerRole === 'cop' && p.role === 'thief' && id !== playerId) {
-                        continue; // מדלג על ציור הנקודה
+                    // תנאי ראייה מתוקן: אם אני שוטר, והשחקן שאני סורק עכשיו הוא גנב, אל תצייר אותו
+                    if (playerRole === 'cop' && p.role === 'thief') {
+                        continue;
                     }
 
+                    // אם הגענו לכאן, צריך לצייר את השחקן (או שהוא אני, או שאני גנב ורואה את כולם, או שאני שוטר ורואה שוטר אחר)
                     const color = p.role === 'cop' ? '#3b82f6' : '#ef4444'; 
                     
                     const marker = L.circleMarker([p.lat, p.lng], {
-                        radius: 18, 
+                        radius: id === playerId ? 25 : 18, 
                         fillColor: color,
                         color: "#ffffff",
                         weight: 3, 
                         fillOpacity: 1
                     }).addTo(map);
-
-                    if (id === playerId) {
-                        marker.setRadius(25); 
-                    }
 
                     playerMarkers[id] = marker;
                 }
