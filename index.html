@@ -9,22 +9,30 @@
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #000; color: white; }
         #map { height: 100%; width: 100%; position: absolute; top:0; z-index: 1; }
         .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.95); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #38bdf8; }
-        #gps-status { font-size: 11px; color: #ef4444; margin-bottom: 5px; font-weight: bold; }
-        #players-count { font-size: 13px; color: #10b981; font-weight: bold; }
+        .status-row { display: flex; justify-content: space-around; font-size: 11px; margin-bottom: 5px; font-weight: bold; }
+        #gps-status { color: #ef4444; }
+        #audio-status { color: #facc15; }
+        #players-count { color: #10b981; }
         .setup-screen { position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
         .btn { padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; }
         .btn-blue { background: #1e40af; }
         .btn-red { background: #991b1b; }
-        #dev-controls { display: none; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 2000; background: rgba(0,0,0,0.85); padding: 10px; border-radius: 15px; text-align: center; border: 1px solid #38bdf8; }
-        .dev-btn { background: #334155; color: white; border: 1px solid #38bdf8; padding: 15px; margin: 2px; border-radius: 8px; font-size: 22px; width: 65px; }
+        #controls-container { display: none; position: absolute; bottom: 10px; left: 0; right: 0; z-index: 2000; padding: 10px; pointer-events: none; }
+        #dev-controls { background: rgba(0,0,0,0.85); padding: 10px; border-radius: 15px; text-align: center; border: 1px solid #38bdf8; width: fit-content; margin: 0 auto; pointer-events: auto; }
+        .dev-btn { background: #334155; color: white; border: 1px solid #38bdf8; padding: 15px; margin: 2px; border-radius: 8px; font-size: 22px; width: 60px; }
+        #capture-btn { display: none; background: #dc2626; color: white; border: 4px solid #fff; padding: 20px; border-radius: 50%; width: 100px; height: 100px; font-weight: bold; margin-bottom: 10px; pointer-events: auto; box-shadow: 0 0 20px rgba(220, 38, 38, 0.6); }
+        #capture-btn:disabled { background: #4b5563; border-color: #9ca3af; opacity: 0.6; }
     </style>
 </head>
 <body>
 
     <div class="header">
-        <div id="gps-status">מחפש אות GPS... 🛰️</div>
+        <div class="status-row">
+            <span id="gps-status">GPS ❌</span>
+            <span id="audio-status">מיקרופון ❌</span>
+            <span id="players-count">שחקנים: 0</span>
+        </div>
         <h1 style="margin:0; font-size:16px; color: #38bdf8;">Territory Battle</h1>
-        <div id="players-count">שחקנים בשרת: 0</div>
     </div>
 
     <div id="map"></div>
@@ -34,17 +42,26 @@
         <button class="btn btn-red" onclick="startAs('thief')">הצטרף לכנופיה 🥷</button>
     </div>
 
-    <div id="dev-controls">
-        <button class="dev-btn" onclick="moveMock('up')">⬆️</button><br>
-        <button class="dev-btn" onclick="moveMock('left')">⬅️</button>
-        <button class="dev-btn" onclick="moveMock('down')">⬇️</button>
-        <button class="dev-btn" onclick="moveMock('right')">➡️</button>
+    <div id="controls-container">
+        <div style="text-align: center;">
+            <button id="capture-btn" onclick="triggerCapture()">תפוס!</button>
+        </div>
+        <div id="dev-controls">
+            <button class="dev-btn" onclick="moveMock('up')">⬆️</button><br>
+            <button class="dev-btn" onclick="moveMock('left')">⬅️</button>
+            <button class="dev-btn" onclick="moveMock('down')">⬇️</button>
+            <button class="dev-btn" onclick="moveMock('right')">➡️</button>
+        </div>
     </div>
 
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    
+    <!-- פיצול לקבצים -->
+    <script src="audio.js"></script>
+    <script src="territory.js"></script>
     <script src="game.js"></script>
 </body>
 </html>
