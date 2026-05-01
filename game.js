@@ -1,4 +1,4 @@
-// game.js - GPS Penalty & Ghost Cleanup Version
+// game.js - Game Cycle & Auto-Cleanup Logic
 const firebaseConfig = {
     apiKey: "AIzaSyCC3-6oLBu7OrhnC5Kh6t-mkuo3v4gYN4Q",
     authDomain: "territory-battle-56887.firebaseapp.com",
@@ -26,7 +26,7 @@ L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { m
 
 document.getElementById('players-count').insertAdjacentHTML('afterend', `<div style="font-size:10px; color:#94a3b8">ID: ${playerId}</div>`);
 
-// מעקב GPS עם עדכון זמן אחרון
+// מעקב GPS
 navigator.geolocation.watchPosition(() => {
     lastGpsTimestamp = Date.now();
     const gpsEl = document.getElementById('gps-status');
@@ -36,10 +36,10 @@ navigator.geolocation.watchPosition(() => {
     }
 }, null, { enableHighAccuracy: true });
 
-// בדיקת "עונש GPS" כל 5 שניות
+// עונש GPS - יציאה אוטומטית אחרי דקה ללא קליטה
 setInterval(() => {
     if (playerRole && (Date.now() - lastGpsTimestamp > 60000)) {
-        alert("נזרקת מהמשחק! אין קליטת GPS מעל דקה (יצאת מהבניין?)");
+        alert("נזרקת מהמשחק! אין קליטת GPS מעל דקה.");
         exitGame();
     }
 }, 5000);
@@ -65,7 +65,6 @@ function startAs(role) {
     }
 
     db.ref('players/' + playerId).onDisconnect().remove();
-    updateMockPosition();
 }
 
 function exitGame() {
@@ -78,7 +77,7 @@ function moveMock(dir) {
     const s = 0.00015;
     if (dir === 'up') mockLat += s; if (dir === 'down') mockLat -= s;
     if (dir === 'left') mockLng -= s; if (dir === 'right') mockLng += s;
-    lastGpsTimestamp = Date.now(); // לצורך בדיקת כפתורי ה-Dev
+    lastGpsTimestamp = Date.now();
     updateMockPosition();
 }
 
@@ -147,22 +146,28 @@ function listenToOtherPlayers() {
         
         if (!players) {
             document.getElementById('players-count').innerText = `שחקנים: 0`;
+            // אם אין שחקנים - נקה שטחים
+            db.ref('capturedAreas').remove();
             return;
         }
 
         const now = Date.now();
         let activeCount = 0;
+        let thiefCount = 0;
 
         Object.keys(players).forEach(id => {
             const p = players[id];
             
-            // ניקוי שחקנים לא פעילים (מעל דקה)
+            // ניקוי שחקנים שסגרו דפדפן (לא עדכנו דקה)[cite: 2]
             if (now - p.t > 60000) {
                 db.ref('players/' + id).remove();
                 return;
             }
 
             activeCount++;
+            if (p.role === 'thief') thiefCount++;
+
+            // הגבלת ראייה לשוטרים: שוטר לא רואה גנבים אחרים במפה
             if (playerRole === 'cop' && p.role === 'thief' && id !== playerId) return;
             
             const color = p.role === 'cop' ? '#3b82f6' : '#ef4444';
@@ -176,6 +181,11 @@ function listenToOtherPlayers() {
         });
 
         document.getElementById('players-count').innerText = `שחקנים: ${activeCount}`;
+
+        // לוגיקת סיום משחק: אם יש שחקנים אבל 0 גנבים - נקה שטחים[cite: 2]
+        if (activeCount > 0 && thiefCount === 0) {
+            db.ref('capturedAreas').remove();
+        }
     });
 }
 
