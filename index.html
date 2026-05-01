@@ -62,12 +62,22 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
+        // בדיקת חיבור ל-Firebase
+        db.ref('.info/connected').on('value', function(connectedSnap) {
+            if (connectedSnap.val() === true) {
+                console.log("Firebase connected.");
+            } else {
+                console.log("Firebase disconnected.");
+            }
+        });
+
         // 2. הגדרות משחק ומפה
         const playerId = 'player_' + Math.random().toString(36).substr(2, 9);
         let playerRole = null;
         let playerMarkers = {};
         
-        const map = L.map('map').setView([32.0853, 34.7818], 15);
+        // התמקדות ראשונית באזור כפר סבא
+        const map = L.map('map').setView([32.1714, 34.9083], 15);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 19 }).addTo(map);
 
         // מחיקת השחקן מהשרת כשהוא סוגר את האפליקציה
@@ -81,7 +91,12 @@
             document.getElementById('ui-container').style.display = 'none';
 
             if (navigator.geolocation) {
-                navigator.geolocation.watchPosition(updatePosition, (err) => console.error(err), {
+                navigator.geolocation.watchPosition(updatePosition, 
+                (err) => {
+                    console.error(err);
+                    alert("שגיאת GPS: " + err.message);
+                }, 
+                {
                     enableHighAccuracy: true,
                     maximumAge: 0
                 });
@@ -99,15 +114,17 @@
             // מרכוז המפה אלי
             map.setView([lat, lng]);
 
-            // שליחה לשרת
+            // שליחה לשרת עם טיפול בשגיאות
             db.ref('players/' + playerId).set({
                 role: playerRole,
                 lat: lat,
                 lng: lng
+            }).catch((error) => {
+                alert("שגיאת שמירה ב-Firebase: " + error.message);
             });
         }
 
-        // 5. האזנה לשחקנים אחרים וציורם על המפה
+        // 5. האזנה לשחקנים אחרים וציורם על המפה (מוגדל)
         function listenToOtherPlayers() {
             db.ref('players').on('value', (snapshot) => {
                 const players = snapshot.val();
@@ -124,21 +141,24 @@
                     const p = players[id];
                     const color = p.role === 'cop' ? '#3b82f6' : '#ef4444'; // כחול לשוטר, אדום לגנב
                     
+                    // נקודות מוגדלות משמעותית
                     const marker = L.circleMarker([p.lat, p.lng], {
-                        radius: 8,
+                        radius: 18, // הוגדל מ-8 ל-18
                         fillColor: color,
                         color: "#ffffff",
-                        weight: 2,
+                        weight: 3, // מסגרת עבה יותר
                         fillOpacity: 1
                     }).addTo(map);
 
-                    // הוספת הילה שלי (קצת יותר גדולה) אם זה אני
+                    // הוספת הילה ענקית שלי אם זה אני
                     if (id === playerId) {
-                        marker.setRadius(12);
+                        marker.setRadius(25); // הוגדל מ-12 ל-25
                     }
 
                     playerMarkers[id] = marker;
                 }
+            }, (errorObject) => {
+                alert("שגיאת קריאה מ-Firebase: " + errorObject.name);
             });
         }
     </script>
