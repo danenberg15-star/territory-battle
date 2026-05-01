@@ -7,15 +7,15 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #000; color: white; }
-        #map { height: 100%; width: 100%; position: absolute; top:0; bottom:0; z-index: 1; }
-        .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.9); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #38bdf8; }
-        #debug-pos { font-size: 11px; color: #facc15; margin-top: 5px; font-family: monospace; }
-        #players-count { font-size: 11px; color: #10b981; font-weight: bold; }
+        #map { height: 100%; width: 100%; position: absolute; top:0; z-index: 1; }
+        .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.95); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #38bdf8; }
+        #debug-pos { font-size: 11px; color: #facc15; margin-top: 5px; }
+        #players-count { font-size: 12px; color: #10b981; font-weight: bold; }
         .setup-screen { position: absolute; bottom: 20px; left: 20px; right: 20px; z-index: 2000; display: flex; flex-direction: column; gap: 10px; }
-        .btn { padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+        .btn { padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; }
         .btn-blue { background: #1e40af; }
         .btn-red { background: #991b1b; }
-        #dev-controls { display: none; position: absolute; bottom: 10px; left: 10px; z-index: 2000; background: rgba(0,0,0,0.85); padding: 12px; border-radius: 15px; text-align: center; border: 1px solid #38bdf8; }
+        #dev-controls { display: none; position: absolute; bottom: 10px; left: 50%; transform: translateX(-50%); z-index: 2000; background: rgba(0,0,0,0.85); padding: 10px; border-radius: 15px; text-align: center; white-space: nowrap; }
         .dev-btn { background: #334155; color: white; border: 1px solid #38bdf8; padding: 15px; margin: 2px; border-radius: 8px; font-size: 22px; width: 60px; }
     </style>
 </head>
@@ -23,9 +23,9 @@
 
     <div class="header">
         <h1 style="margin:0; font-size:16px;">Territory Battle</h1>
-        <div id="sub-status">בחר תפקיד</div>
-        <div id="debug-pos">ממתין למידע...</div>
-        <div id="players-count">שחקנים בשרת: 0</div>
+        <div id="sub-status">ממתין לבחירה...</div>
+        <div id="players-count">שחקנים בשרת: ?</div>
+        <div id="debug-pos">---</div>
     </div>
 
     <div id="map"></div>
@@ -47,6 +47,7 @@
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
     
     <script>
+        // קונפיגורציה
         const firebaseConfig = {
             apiKey: "AIzaSyCC3-6oLBu7OrhnC5Kh6t-mkuo3v4gYN4Q",
             authDomain: "territory-battle-56887.firebaseapp.com",
@@ -59,8 +60,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // יצירת מזהה ייחודי קבוע לכל כניסה
-        const playerId = 'p' + Math.floor(Math.random() * 10000);
+        const playerId = 'p_' + Math.floor(Math.random() * 9999);
         let playerRole = null;
         let playerMarkers = {};
         let mockLat = 32.1714;
@@ -69,13 +69,14 @@
         const map = L.map('map', { zoomControl: false, attributionControl: false }).setView([mockLat, mockLng], 18);
         L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
-        db.ref('players/' + playerId).onDisconnect().remove();
-
         function startAs(role) {
             playerRole = role;
             document.getElementById('ui-container').style.display = 'none';
             document.getElementById('dev-controls').style.display = 'block';
-            document.getElementById('sub-status').innerText = role === 'cop' ? 'תפקיד: שריף 👮‍♂️' : 'תפקיד: גנב 🥷';
+            document.getElementById('sub-status').innerText = role === 'cop' ? 'תפקיד: שריף' : 'תפקיד: גנב';
+            
+            // ניקוי שחקן ביציאה
+            db.ref('players/' + playerId).onDisconnect().remove();
             
             updateMockPosition();
             listenToOtherPlayers();
@@ -94,11 +95,14 @@
             document.getElementById('debug-pos').innerText = `LAT: ${mockLat.toFixed(5)} | LNG: ${mockLng.toFixed(5)}`;
             map.panTo([mockLat, mockLng]);
             
-            // שליחה פשוטה ל-Firebase
-            db.ref('players/' + playerId).update({
+            // בדיקת כתיבה עם תפיסת שגיאות
+            db.ref('players/' + playerId).set({
                 role: playerRole,
                 lat: mockLat,
-                lng: mockLng
+                lng: mockLng,
+                t: Date.now()
+            }).catch(err => {
+                alert("שגיאת כתיבה ל-Firebase: " + err.message);
             });
         }
 
@@ -106,7 +110,7 @@
             db.ref('players').on('value', (snapshot) => {
                 const players = snapshot.val();
                 
-                // ניקוי המפה
+                // ניקוי
                 for (let id in playerMarkers) { map.removeLayer(playerMarkers[id]); }
                 playerMarkers = {};
 
@@ -115,31 +119,26 @@
                     return;
                 }
 
-                const playerIds = Object.keys(players);
-                document.getElementById('players-count').innerText = `שחקנים בשרת: ${playerIds.length}`;
+                const ids = Object.keys(players);
+                document.getElementById('players-count').innerText = `שחקנים בשרת: ${ids.length}`;
 
-                playerIds.forEach(id => {
+                ids.forEach(id => {
                     const p = players[id];
-                    
-                    // בדיקה שהנתונים קיימים
-                    if (!p.lat || !p.lng) return;
-
-                    // חוק ראייה: שוטר לא רואה גנב (אלא אם זה הוא עצמו)
                     if (playerRole === 'cop' && p.role === 'thief' && id !== playerId) return;
 
                     const color = p.role === 'cop' ? '#3b82f6' : '#ef4444';
-                    const isMe = id === playerId;
-
                     const marker = L.circleMarker([p.lat, p.lng], {
-                        radius: isMe ? 35 : 25,
-                        color: '#ffffff',
-                        weight: 4,
+                        radius: id === playerId ? 30 : 20,
+                        color: '#fff',
+                        weight: 3,
                         fillColor: color,
                         fillOpacity: 1
                     }).addTo(map);
                     
                     playerMarkers[id] = marker;
                 });
+            }, (err) => {
+                alert("שגיאת קריאה מ-Firebase: " + err.message);
             });
         }
     </script>
