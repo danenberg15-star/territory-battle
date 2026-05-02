@@ -1,4 +1,4 @@
-// game.js - Phase 2.1: Arena Setup with Map Lock, Police Station & Game Flow
+// game.js - Phase 2.1: Free-hand Drawing Arena, Auto-Zoom & Game Flow
 
 // ==========================================
 // 1. Game Globals
@@ -20,7 +20,6 @@ let isBriefingComplete = false;
 let arenaData = null;
 let policeStationCircle = null;
 let arenaPolygonLayer = null;
-let isMapLocked = false;
 
 // ==========================================
 // 2. Game Scene Initialization
@@ -31,18 +30,14 @@ function enterGameScene() {
     document.getElementById('map').style.display = 'block';
     document.getElementById('exit-btn').style.display = 'flex';
 
-    // UI Initial State
-    const playersCountEl = document.getElementById('players-count');
-    if (playersCountEl) playersCountEl.innerText = window.currentLang === 'he' ? "שחקנים: 0" : "Players: 0";
-    
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Init Map
+    // Initialize Map with default view
     map = L.map('map', { zoomControl: false, attributionControl: false }).setView([32.0853, 34.7818], 18);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
-    // Sync Start Time
+    // Sync Game Data
     window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
         gameStartTime = snap.val() || Date.now();
         checkArenaStatus();
@@ -55,26 +50,25 @@ function enterGameScene() {
 }
 
 // ==========================================
-// 3. Arena Setup (Host with Map Lock)
+// 3. New Arena Setup (Free-hand Drawing)
 // ==========================================
 function checkArenaStatus() {
     window.db.ref(`game/${window.currentRoom}/arena`).on('value', snap => {
         const data = snap.val();
         if (!data) {
             if (window.isHost) {
-                document.getElementById('setup-ui').style.display = 'flex';
+                setupHostDrawingMode();
             } else {
                 document.getElementById('briefing-overlay').style.display = 'block';
-                document.getElementById('briefing-status').innerText = window.currentLang === 'he' ? "ממתין למנהל שיגדיר את זירת המשחק..." : "Waiting for host to define arena...";
+                const statusMsg = window.currentLang === 'he' ? "ממתין למנהל שיצייר את זירת המשחק..." : "Waiting for host to draw arena...";
+                document.getElementById('briefing-status').innerText = statusMsg;
             }
         } else {
-            // Arena defined! Cleanup Setup UI and unlock map
+            // Arena is ready - Start Game
             arenaData = data;
             document.getElementById('setup-ui').style.display = 'none';
-            if (map) {
-                map.dragging.enable();
-                map.touchZoom.enable();
-            }
+            document.getElementById('drawing-container').style.display = 'none';
+            
             drawArenaOnMap();
             setupPoliceStation();
             listenToBriefing();
@@ -82,10 +76,10 @@ function checkArenaStatus() {
             document.getElementById('controls-container').style.display = 'block';
             if (window.playerRole === 'cop') {
                 document.getElementById('capture-btn-container').style.display = 'block';
-                const audioStatusEl = document.getElementById('audio-status');
-                if (audioStatusEl) {
-                    audioStatusEl.innerText = window.currentLang === 'he' ? "רמקול ✅" : "Speaker ✅";
-                    audioStatusEl.style.color = "#10b981";
+                const audioEl = document.getElementById('audio-status');
+                if (audioEl) {
+                    audioEl.innerText = window.currentLang === 'he' ? "רמקול ✅" : "Speaker ✅";
+                    audioEl.style.color = "#10b981";
                 }
             } else {
                 startThiefMechanics();
@@ -94,43 +88,21 @@ function checkArenaStatus() {
     });
 }
 
-function toggleMapLock() {
-    isMapLocked = !isMapLocked;
-    const btn = document.getElementById('btn-lock-map');
-    const msg = document.getElementById('setup-msg');
-
-    if (isMapLocked) {
-        // Freeze Map for precise marking[cite: 2]
-        map.dragging.disable();
-        map.touchZoom.disable();
-        map.doubleClickZoom.disable();
-        map.scrollWheelZoom.disable();
-        if (map.tap) map.tap.disable();
-        
-        btn.innerText = window.currentLang === 'he' ? "שחרר מפה להזזה" : "Unlock Map to Move";
-        btn.classList.replace('btn-blue', 'btn-red');
-        msg.innerText = window.currentLang === 'he' ? "המפה נעולה. לחץ עליה לסימון גבולות הזירה." : "Map Locked. Tap to mark arena boundaries.";
-        
-        initArenaSetup(map); // Activation from territory.js
-    } else {
-        // Enable Map movement[cite: 2]
-        map.dragging.enable();
-        map.touchZoom.enable();
-        map.doubleClickZoom.enable();
-        map.scrollWheelZoom.enable();
-        if (map.tap) map.tap.enable();
-        
-        btn.innerText = window.currentLang === 'he' ? "נעל מפה לסימון" : "Lock Map to Mark";
-        btn.classList.replace('btn-red', 'btn-blue');
-        msg.innerText = window.currentLang === 'he' ? "סדר את המפה על האזור המבוקש ואז נעל אותה." : "Position the map and then lock it.";
+function setupHostDrawingMode() {
+    // 1. Zoom Out to 4km^2 area (approx Zoom 14)[cite: 1]
+    if (myLat && myLng) {
+        map.setView([myLat, myLng], 14);
     }
+    
+    // 2. Activate Canvas Drawing[cite: 1]
+    document.getElementById('setup-ui').style.display = 'flex';
+    initDrawingCanvas(map); 
 }
 
-function confirmArena() {
-    const results = finalizeArena(); // Logic from territory.js
+function confirmDrawing() {
+    const results = finalizeDrawing(); // Logic from territory.js[cite: 1]
     if (results) {
         window.db.ref(`game/${window.currentRoom}/arena`).set(results);
-        window.arenaDefined = true;
     }
 }
 
@@ -138,7 +110,7 @@ function drawArenaOnMap() {
     if (!arenaData || !map) return;
     if (arenaPolygonLayer) map.removeLayer(arenaPolygonLayer);
     arenaPolygonLayer = L.polygon(arenaData.points, {
-        color: '#38bdf8', weight: 2, fillOpacity: 0.05, dashArray: '5, 10'
+        color: '#38bdf8', weight: 3, fillOpacity: 0.1, dashArray: '5, 10'
     }).addTo(map);
 }
 
@@ -199,7 +171,11 @@ function startRealGpsTracking() {
 
 function updateRealPosition() {
     if(!map || myLat === null) return;
-    map.panTo([myLat, myLng]);
+    
+    // Only follow player if not in drawing mode
+    if (document.getElementById('drawing-container').style.display !== 'block') {
+        map.panTo([myLat, myLng]);
+    }
 
     if (window.playerRole === 'cop' && arenaData) {
         const dist = map.distance([myLat, myLng], [arenaData.policeStation.lat, arenaData.policeStation.lng]);
@@ -271,7 +247,7 @@ function triggerCapture() {
     const btn = document.getElementById('capture-btn');
     if (btn.disabled) return;
     btn.disabled = true;
-    btn.classList.add('active-sonar'); // Visual sonar pulse[cite: 2]
+    btn.classList.add('active-sonar'); 
     broadcastCapture(Date.now());
     setTimeout(() => {
         btn.classList.remove('active-sonar');
@@ -318,8 +294,8 @@ function listenToOtherPlayers() {
         for (let id in playerMarkers) map.removeLayer(playerMarkers[id]);
         playerMarkers = {};
         
+        const playersCountEl = document.getElementById('players-count');
         if (!players) {
-            const playersCountEl = document.getElementById('players-count');
             if (playersCountEl) playersCountEl.innerText = window.currentLang === 'he' ? "שחקנים: 0" : "Players: 0";
             return;
         }
@@ -346,7 +322,6 @@ function listenToOtherPlayers() {
             }).addTo(map);
         });
 
-        const playersCountEl = document.getElementById('players-count');
         if (playersCountEl) playersCountEl.innerText = window.currentLang === 'he' ? `שחקנים: ${activeCount}` : `Players: ${activeCount}`;
         
         if (thievesCount > 0) hasSeenThief = true;

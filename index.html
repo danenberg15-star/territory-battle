@@ -10,16 +10,19 @@
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #0f172a; color: white; user-select: none; -webkit-user-select: none; }
         #map { height: 100%; width: 100%; position: absolute; top: 0; z-index: 1; display: none; }
         
+        /* Drawing Layer */
+        #drawing-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2500; display: none; background: rgba(15, 23, 42, 0.5); touch-action: none; }
+        #drawing-canvas { width: 100%; height: 100%; cursor: crosshair; }
+        
         /* Screens */
         .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; padding: 20px; box-sizing: border-box; }
         #lobby-screen { display: none; justify-content: flex-start; padding-top: 50px; }
         
-        /* Inputs & Typography */
+        /* Components */
         h1 { color: #38bdf8; font-size: 28px; margin-bottom: 30px; text-align: center; }
         h2 { color: #e2e8f0; font-size: 20px; margin-bottom: 15px; }
         input { width: 100%; max-width: 300px; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: 1px solid #38bdf8; background: #1e293b; color: white; font-size: 18px; text-align: center; box-sizing: border-box; user-select: auto; }
         
-        /* Buttons */
         .btn { width: 100%; max-width: 300px; padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; margin-bottom: 15px; transition: 0.2s; text-align: center; }
         .btn-blue { background: #1e40af; }
         .btn-red { background: #991b1b; }
@@ -36,9 +39,9 @@
         .team-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; text-align: center; }
         .player-item { background: #334155; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; text-align: center; touch-action: none; }
 
-        /* Area Setup UI (Host Only) */
-        #setup-ui { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2600; width: 90%; max-width: 400px; display: none; flex-direction: column; gap: 10px; pointer-events: auto; }
-        .setup-msg { background: rgba(30, 41, 59, 0.95); padding: 15px; border-radius: 12px; border: 2px solid #38bdf8; text-align: center; font-size: 14px; color: white; }
+        /* Setup UI Overlay */
+        #setup-ui { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 90%; max-width: 400px; display: none; flex-direction: column; gap: 10px; pointer-events: auto; }
+        .setup-msg { background: rgba(30, 41, 59, 0.95); padding: 15px; border-radius: 12px; border: 2px solid #38bdf8; text-align: center; font-size: 14px; color: white; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
 
         /* In-Game UI */
         .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 3000; background: rgba(220, 38, 38, 0.9); color: white; border: 2px solid white; border-radius: 50%; width: 40px; height: 40px; font-weight: bold; font-size: 20px; cursor: pointer; display: none; align-items: center; justify-content: center; }
@@ -56,12 +59,7 @@
         #controls-container { display: none; position: absolute; bottom: 10px; left: 0; right: 0; z-index: 2000; padding: 10px; pointer-events: none; }
         #capture-btn-container { position: relative; width: 110px; height: 110px; margin: 0 auto 15px auto; pointer-events: auto; display: none; }
         #capture-btn { position: absolute; top: 5px; left: 5px; width: 100px; height: 100px; background: #dc2626; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 18px; z-index: 5; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        #capture-btn.active-sonar { animation: sonar-pulse 1s infinite; border: 4px solid #fff; }
-        @keyframes sonar-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
         
-        .progress-ring { position: absolute; top: 0; left: 0; width: 110px; height: 110px; transform: rotate(-90deg); z-index: 1; }
-        .progress-ring__circle { stroke: #dc2626; stroke-width: 6; fill: transparent; stroke-dasharray: 326.7; stroke-dashoffset: 0; transition: stroke-dashoffset 1s linear; }
-
         /* Victory */
         #victory-screen { display: none; z-index: 4000; text-align: center; justify-content: center; align-items: center; }
     </style>
@@ -102,11 +100,17 @@
         <button class="btn btn-green" id="btn-start-game" style="display: none;" onclick="startGame()">התחל משחק</button>
     </div>
 
-    <!-- 3. Area Setup UI -->
+    <!-- 3. Drawing UI Overlay -->
+    <div id="drawing-container">
+        <canvas id="drawing-canvas"></canvas>
+    </div>
+
     <div id="setup-ui">
-        <button class="btn btn-blue" id="btn-lock-map" onclick="toggleMapLock()">נעל מפה לסימון</button>
-        <div class="setup-msg" id="setup-msg">סדר את המפה על האזור המבוקש ואז נעל אותה.</div>
-        <button class="btn btn-blue" id="btn-confirm-arena" onclick="confirmArena()" style="display:none;">אשר זירה וקבע תחנה</button>
+        <div class="setup-msg" id="setup-msg">צייר על המסך את שטח המשחק הרצוי.</div>
+        <div style="display: flex; gap: 10px; width: 100%;">
+            <button class="btn btn-red" style="flex:1;" onclick="clearDrawing()">נקה ציור</button>
+            <button class="btn btn-blue" id="btn-confirm-drawing" style="flex:2; display:none;" onclick="confirmDrawing()">אשר זירה וקבע תחנה</button>
+        </div>
     </div>
 
     <!-- 4. In-Game UI -->
