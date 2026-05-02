@@ -1,4 +1,4 @@
-// game.js - Phase 1: Lobby (Mobile Touch Drag&Drop + Auto Assign), Persistence, Language & Game Init
+// game.js - Phase 1: Lobby, Real GPS Tracking, Auto Assign & Mobile Drag
 
 // ==========================================
 // 1. Firebase Configuration
@@ -35,12 +35,15 @@ let wakeLock = null;
 // Game logic globals
 let playerMarkers = {};
 let areaLayers = [];
-let mockLat = 32.1714;
-let mockLng = 34.9083;
 let thiefPath = []; 
 let trailLayer = null;
 let lastGpsTimestamp = Date.now();
 let map = null;
+
+// Real GPS tracking variables
+let myLat = null;
+let myLng = null;
+let gpsWatchId = null;
 
 // Mobile Drag Globals
 let activeTouchElement = null;
@@ -57,7 +60,7 @@ const i18n = {
         btnJoin: "הצטרף לחדר", btnCreate: "צור חדר חדש",
         roomCodeLbl: "קוד חדר:",
         copsLbl: "שוטרים 👮‍♂️", thievesLbl: "גנבים 🥷",
-        btnStart: "התחל משחק<br><span style='font-size:12px; font-weight:normal;'>(ללא חיסכון סוללה)</span>",
+        btnStart: "התחל משחק<br><span style='font-size:12px; font-weight:normal;'>(לחוויה מיטבית וודא שאינך במצב חיסכון סוללה)</span>",
         lblCapture: "תפוס!"
     },
     'en': {
@@ -65,7 +68,7 @@ const i18n = {
         btnJoin: "Join Room", btnCreate: "Create Room",
         roomCodeLbl: "Room Code:",
         copsLbl: "Cops 👮‍♂️", thievesLbl: "Thieves 🥷",
-        btnStart: "Start Game<br><span style='font-size:12px; font-weight:normal;'>(No Low Power Mode)</span>",
+        btnStart: "Start Game<br><span style='font-size:12px; font-weight:normal;'>(Turn off Low Power Mode for best experience)</span>",
         lblCapture: "Catch!"
     }
 };
@@ -182,7 +185,6 @@ function joinRoomLogic(roomId) {
     document.getElementById('lobby-screen').style.display = 'flex';
     document.getElementById('display-room-code').innerText = roomId;
     
-    // Auto Assign Logic
     db.ref(`rooms/${roomId}/players`).once('value', snap => {
         const players = snap.val() || {};
         let copsCount = 0;
@@ -204,7 +206,6 @@ function joinRoomLogic(roomId) {
         db.ref(`rooms/${roomId}/players/${playerId}`).onDisconnect().remove();
     });
 
-    // Listen to room state
     db.ref(`rooms/${roomId}`).on('value', snap => {
         const roomData = snap.val();
         if (!roomData) return exitGame(); 
@@ -239,13 +240,10 @@ function renderLobbyPlayers(players) {
         
         if (isHost) {
             div.classList.add('draggable');
-            
-            // Mobile Touch Events
             div.addEventListener('touchstart', (e) => handleTouchStart(e, id, div), { passive: false });
             div.addEventListener('touchmove', handleTouchMove, { passive: false });
             div.addEventListener('touchend', (e) => handleTouchEnd(e, id, div));
             
-            // Desktop Fallback
             div.draggable = true;
             div.ondragstart = (e) => { e.dataTransfer.setData("text/plain", id); };
         }
@@ -276,7 +274,7 @@ function handleTouchStart(e, id, el) {
 
 function handleTouchMove(e) {
     if (!activeTouchElement) return;
-    e.preventDefault(); // Prevent scrolling while dragging
+    e.preventDefault(); 
     const touch = e.touches[0];
     moveTouchElement(touch.clientX, touch.clientY);
 }
@@ -290,12 +288,10 @@ function handleTouchEnd(e, id, el) {
     if (!activeTouchElement) return;
     const touch = e.changedTouches[0];
     
-    // Hide temporarily to find the element underneath
     el.style.display = 'none';
     const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
-    el.style.display = 'flex';
+    el.style.display = 'block';
     
-    // Reset visual styles
     el.style.position = '';
     el.style.zIndex = '';
     el.style.left = '';
@@ -319,7 +315,7 @@ function handleTouchEnd(e, id, el) {
     }
 }
 
-// --- Desktop HTML5 Drag & Drop (Fallback) ---
+// --- Desktop HTML5 Drag & Drop ---
 function allowDrop(event) { event.preventDefault(); }
 function dragEnter(event) { if(isHost) event.currentTarget.classList.add('drag-over'); }
 function dragLeave(event) { if(isHost) event.currentTarget.classList.remove('drag-over'); }
@@ -353,7 +349,7 @@ function exitGame() {
 }
 
 // ==========================================
-// 6. Game Scene (Original Game Logic Wrapper)
+// 6. Game Scene & Real GPS Tracking
 // ==========================================
 function enterGameScene() {
     document.getElementById('lobby-screen').style.display = 'none';
@@ -365,17 +361,9 @@ function enterGameScene() {
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    map = L.map('map', { zoomControl: false, attributionControl: false }).setView([mockLat, mockLng], 18);
+    // Init map with a default location, will flyTo real location on first GPS hit
+    map = L.map('map', { zoomControl: false, attributionControl: false }).setView([32.0853, 34.7818], 18);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
-
-    navigator.geolocation.watchPosition(() => {
-        lastGpsTimestamp = Date.now();
-        const gpsEl = document.getElementById('gps-status');
-        if (gpsEl) {
-            gpsEl.innerText = "GPS ✅";
-            gpsEl.style.color = "#10b981";
-        }
-    }, null, { enableHighAccuracy: true });
 
     if (playerRole === 'cop') {
         document.getElementById('capture-btn-container').style.display = 'block';
@@ -389,37 +377,70 @@ function enterGameScene() {
         trailLayer = L.polyline([], { color: '#ef4444', weight: 5, opacity: 0.6, dashArray: '10, 10' }).addTo(map);
     }
 
-    db.ref(`game/${currentRoom}/players/${playerId}`).set({ role: playerRole, lat: mockLat, lng: mockLng, t: Date.now() });
-    db.ref(`game/${currentRoom}/players/${playerId}`).onDisconnect().remove();
-
+    startRealGpsTracking();
     listenToOtherPlayers();
     listenToCapturedAreas();
 }
 
-function moveMock(dir) {
-    const s = 0.00015;
-    if (dir === 'up') mockLat += s; if (dir === 'down') mockLat -= s;
-    if (dir === 'left') mockLng -= s; if (dir === 'right') mockLng += s;
-    lastGpsTimestamp = Date.now();
-    updateMockPosition();
+function startRealGpsTracking() {
+    if (!navigator.geolocation) {
+        alert("GPS is not supported by your browser");
+        return;
+    }
+
+    gpsWatchId = navigator.geolocation.watchPosition(
+        (position) => {
+            lastGpsTimestamp = Date.now();
+            const gpsEl = document.getElementById('gps-status');
+            if (gpsEl) {
+                gpsEl.innerText = "GPS ✅";
+                gpsEl.style.color = "#10b981";
+            }
+
+            const isFirstLoad = (myLat === null);
+            myLat = position.coords.latitude;
+            myLng = position.coords.longitude;
+
+            if (isFirstLoad) {
+                map.setView([myLat, myLng], 18);
+                // First write to DB
+                db.ref(`game/${currentRoom}/players/${playerId}`).set({ role: playerRole, lat: myLat, lng: myLng, t: Date.now() });
+                db.ref(`game/${currentRoom}/players/${playerId}`).onDisconnect().remove();
+            } else {
+                updateRealPosition();
+            }
+        },
+        (error) => {
+            console.error("GPS Error: ", error);
+            const gpsEl = document.getElementById('gps-status');
+            if (gpsEl) {
+                gpsEl.innerText = "GPS ❌";
+                gpsEl.style.color = "#ef4444";
+            }
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
+    );
 }
 
-function updateMockPosition() {
-    if(!map) return;
-    map.panTo([mockLat, mockLng]);
+function updateRealPosition() {
+    if(!map || myLat === null) return;
+    map.panTo([myLat, myLng]);
+    
     if (playerRole === 'thief') {
-        if (typeof checkCaptureProgress === "function" && checkCaptureProgress(thiefPath, [mockLat, mockLng])) {
+        if (typeof checkCaptureProgress === "function" && checkCaptureProgress(thiefPath, [myLat, myLng])) {
             const areaId = 'area_' + Date.now();
             db.ref(`game/${currentRoom}/capturedAreas/` + areaId).set({ points: [...thiefPath, thiefPath[0]], capturedBy: playerId });
             thiefPath = []; 
             if (trailLayer) trailLayer.setLatLngs([]);
             alert(currentLang === 'he' ? "שטח נכבש!" : "Area Captured!");
         } else {
-            thiefPath.push([mockLat, mockLng]);
+            thiefPath.push([myLat, myLng]);
             if (trailLayer) trailLayer.setLatLngs(thiefPath);
         }
     }
-    db.ref(`game/${currentRoom}/players/${playerId}`).update({ lat: mockLat, lng: mockLng, t: Date.now() });
+    
+    // Update Firebase with new real location
+    db.ref(`game/${currentRoom}/players/${playerId}`).update({ lat: myLat, lng: myLng, t: Date.now() });
 }
 
 function triggerCapture() {
