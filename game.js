@@ -1,4 +1,4 @@
-// game.js - Phase 2.1: Arena Definition, Police Station & Game Flow
+// game.js - Phase 2.1: Arena Setup with Map Lock, Police Station & Game Flow
 
 // ==========================================
 // 1. Game Globals
@@ -20,6 +20,7 @@ let isBriefingComplete = false;
 let arenaData = null;
 let policeStationCircle = null;
 let arenaPolygonLayer = null;
+let isMapLocked = false;
 
 // ==========================================
 // 2. Game Scene Initialization
@@ -30,6 +31,9 @@ function enterGameScene() {
     document.getElementById('map').style.display = 'block';
     document.getElementById('exit-btn').style.display = 'flex';
 
+    // UI Initial State
+    document.getElementById('players-count').innerText = window.currentLang === 'he' ? "שחקנים: 0" : "Players: 0";
+    
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
@@ -50,37 +54,86 @@ function enterGameScene() {
 }
 
 // ==========================================
-// 3. Arena Setup & Logic
+// 3. Arena Setup (Host with Map Lock)
 // ==========================================
 function checkArenaStatus() {
     window.db.ref(`game/${window.currentRoom}/arena`).on('value', snap => {
         const data = snap.val();
         if (!data) {
             if (window.isHost) {
-                // Host defines the arena
-                initArenaSetup(map); 
+                showHostSetupUI();
             } else {
-                // Others wait for host
                 document.getElementById('briefing-overlay').style.display = 'block';
                 document.getElementById('briefing-status').innerText = window.currentLang === 'he' ? "ממתין למנהל שיגדיר את זירת המשחק..." : "Waiting for host to define arena...";
             }
         } else {
-            // Arena defined! Start game mechanics
+            // Arena defined!
             arenaData = data;
             document.getElementById('setup-ui').style.display = 'none';
+            if (map) {
+                map.dragging.enable();
+                map.touchZoom.enable();
+            }
             drawArenaOnMap();
             setupPoliceStation();
             listenToBriefing();
             
-            // Activate Controls
             document.getElementById('controls-container').style.display = 'block';
             if (window.playerRole === 'cop') {
                 document.getElementById('capture-btn-container').style.display = 'block';
+                document.getElementById('audio-status').innerText = window.currentLang === 'he' ? "רמקול ✅" : "Speaker ✅";
+                document.getElementById('audio-status').style.color = "#10b981";
             } else {
                 startThiefMechanics();
             }
         }
     });
+}
+
+function showHostSetupUI() {
+    const setupUI = document.getElementById('setup-ui');
+    setupUI.style.display = 'flex';
+    
+    // Add Lock/Unlock Button if it doesn't exist
+    if (!document.getElementById('btn-lock-map')) {
+        const lockBtn = document.createElement('button');
+        lockBtn.id = 'btn-lock-map';
+        lockBtn.className = 'btn btn-blue';
+        lockBtn.style.marginBottom = '10px';
+        lockBtn.innerText = window.currentLang === 'he' ? "נעל מפה לסימון" : "Lock Map to Mark";
+        lockBtn.onclick = toggleMapLock;
+        setupUI.insertBefore(lockBtn, document.getElementById('btn-confirm-arena'));
+    }
+}
+
+function toggleMapLock() {
+    isMapLocked = !isMapLocked;
+    const btn = document.getElementById('btn-lock-map');
+    const msg = document.getElementById('setup-msg');
+
+    if (isMapLocked) {
+        map.dragging.disable();
+        map.touchZoom.disable();
+        map.doubleClickZoom.disable();
+        map.scrollWheelZoom.disable();
+        if (map.tap) map.tap.disable();
+        
+        btn.innerText = window.currentLang === 'he' ? "שחרר מפה להזזה" : "Unlock Map to Move";
+        btn.classList.replace('btn-blue', 'btn-red');
+        msg.innerText = window.currentLang === 'he' ? "המפה נעולה. לחץ עליה לסימון גבולות הזירה." : "Map Locked. Tap to mark arena boundaries.";
+        
+        initArenaSetup(map); // From territory.js
+    } else {
+        map.dragging.enable();
+        map.touchZoom.enable();
+        map.doubleClickZoom.enable();
+        map.scrollWheelZoom.enable();
+        if (map.tap) map.tap.enable();
+        
+        btn.innerText = window.currentLang === 'he' ? "נעל מפה לסימון" : "Lock Map to Mark";
+        btn.classList.replace('btn-red', 'btn-blue');
+        msg.innerText = window.currentLang === 'he' ? "סדר את המפה על האזור המבוקש ואז נעל אותה." : "Position the map and then lock it.";
+    }
 }
 
 function confirmArena() {
@@ -139,8 +192,10 @@ function startRealGpsTracking() {
     gpsWatchId = navigator.geolocation.watchPosition((pos) => {
         myLat = pos.coords.latitude;
         myLng = pos.coords.longitude;
-        document.getElementById('gps-status').innerText = "GPS ✅";
-        document.getElementById('gps-status').style.color = "#10b981";
+        
+        const gpsEl = document.getElementById('gps-status');
+        gpsEl.innerText = "GPS ✅";
+        gpsEl.style.color = "#10b981";
 
         if (map && !window.firstLoadDone) {
             map.setView([myLat, myLng], 18);
@@ -154,20 +209,12 @@ function updateRealPosition() {
     if(!map || myLat === null) return;
     map.panTo([myLat, myLng]);
 
-    // Check Station Bound
     if (window.playerRole === 'cop' && arenaData) {
         const dist = map.distance([myLat, myLng], [arenaData.policeStation.lat, arenaData.policeStation.lng]);
         const inStation = dist <= arenaData.policeStation.radius;
         window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/inStation`).set(inStation);
     }
 
-    // Check Arena Bound (Penalty Logic)[cite: 3]
-    if (arenaData && !isPointInArena(myLat, myLng, arenaData.points)) {
-        console.warn("Out of bounds!");
-        // Future: Add 10s return timer here[cite: 3]
-    }
-    
-    // Thief Logic
     if (window.playerRole === 'thief' && isBriefingComplete) {
         handleThiefPath();
     }
@@ -182,13 +229,15 @@ function updateRealPosition() {
 function handleThiefPath() {
     if (thiefPath.length > 0) {
         const last = thiefPath[thiefPath.length - 1];
-        if (map.distance([myLat, myLng], last) < 3) return; // Min 3m distance[cite: 3]
+        if (map.distance([myLat, myLng], last) < 3) return;
     }
 
     if (typeof checkCaptureProgress === "function" && checkCaptureProgress(thiefPath, [myLat, myLng])) {
-        // Area Capture logic... (Same as before, checks min 20sqm)
         const areaId = 'area_' + Date.now();
-        window.db.ref(`game/${window.currentRoom}/capturedAreas/${areaId}`).set({ points: [...thiefPath, [myLat, myLng]] });
+        window.db.ref(`game/${window.currentRoom}/capturedAreas/${areaId}`).set({ 
+            points: [...thiefPath, [myLat, myLng]],
+            capturedBy: window.playerId
+        });
         thiefPath = [];
         if (trailLayer) trailLayer.setLatLngs([]);
     } else {
@@ -230,7 +279,7 @@ function triggerCapture() {
     const btn = document.getElementById('capture-btn');
     if (btn.disabled) return;
     btn.disabled = true;
-    btn.classList.add('active-sonar'); // Visual sonar pulse[cite: 3]
+    btn.classList.add('active-sonar'); 
     broadcastCapture(Date.now());
     setTimeout(() => {
         btn.classList.remove('active-sonar');
@@ -268,7 +317,6 @@ function listenToCapturedAreas() {
     window.db.ref(`game/${window.currentRoom}/capturedAreas`).on('value', snap => {
         const areas = snap.val();
         if (typeof renderAreas === "function") areaLayers = renderAreas(map, areas, areaLayers);
-        // Victory check logic (51% of arenaData.totalArea)...[cite: 3]
     });
 }
 
@@ -277,16 +325,39 @@ function listenToOtherPlayers() {
         const players = snap.val();
         for (let id in playerMarkers) map.removeLayer(playerMarkers[id]);
         playerMarkers = {};
-        if (!players) return;
+        
+        if (!players) {
+            document.getElementById('players-count').innerText = window.currentLang === 'he' ? "שחקנים: 0" : "Players: 0";
+            return;
+        }
+
+        const now = Date.now();
+        let activeCount = 0;
+        let thievesCount = 0;
+
         Object.keys(players).forEach(id => {
             const p = players[id];
+            if (now - p.t > 60000) {
+                window.db.ref(`game/${window.currentRoom}/players/` + id).remove();
+                return;
+            }
+            activeCount++;
+            if (p.role === 'thief') thievesCount++;
+            
             if (window.playerRole === 'cop' && p.role === 'thief' && id !== window.playerId) return;
+            
             playerMarkers[id] = L.circleMarker([p.lat, p.lng], { 
                 radius: id === window.playerId ? 25 : 15, 
                 fillColor: p.role === 'cop' ? '#3b82f6' : '#ef4444', 
                 fillOpacity: 1, color: '#fff', weight: 2 
             }).addTo(map);
         });
+
+        document.getElementById('players-count').innerText = window.currentLang === 'he' ? `שחקנים: ${activeCount}` : `Players: ${activeCount}`;
+        if (thievesCount > 0) hasSeenThief = true;
+        if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
+            window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
+        }
     });
 }
 
