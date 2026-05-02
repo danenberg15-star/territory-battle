@@ -1,4 +1,4 @@
-// game.js - Phase 1: Real GPS Tracking & Game Scene Logic Only
+// game.js - Phase 1: Real GPS Tracking, Game Scene Logic & Victory Conditions
 
 // ==========================================
 // 1. Game Globals
@@ -49,6 +49,7 @@ function enterGameScene() {
     startRealGpsTracking();
     listenToOtherPlayers();
     listenToCapturedAreas();
+    listenToVictory(); // New listener for victory state
 }
 
 // ==========================================
@@ -163,12 +164,48 @@ function triggerCapture() {
 }
 
 // ==========================================
-// 5. Firebase Listeners (Map Data)
+// 5. Firebase Listeners & Victory Conditions
 // ==========================================
+function listenToVictory() {
+    window.db.ref(`game/${window.currentRoom}/winner`).on('value', snap => {
+        const winner = snap.val();
+        if (winner) {
+            if (typeof showVictoryScreen === 'function') {
+                showVictoryScreen(winner);
+            }
+        }
+    });
+}
+
 function listenToCapturedAreas() {
     window.db.ref(`game/${window.currentRoom}/capturedAreas`).on('value', snap => {
+        const areas = snap.val();
         if (typeof renderAreas === "function") {
-            areaLayers = renderAreas(map, snap.val(), areaLayers);
+            areaLayers = renderAreas(map, areas, areaLayers);
+        }
+        
+        // Check Thief Victory Condition: Captured Area > 5000 sq meters
+        if (areas) {
+            let totalAreaSqMeters = 0;
+            Object.values(areas).forEach(area => {
+                if (area.points && area.points.length >= 3) {
+                    try {
+                        const coords = area.points.map(p => [p[1], p[0]]); // Turf needs [lng, lat]
+                        // Ensure polygon is closed
+                        if (coords[0][0] !== coords[coords.length-1][0] || coords[0][1] !== coords[coords.length-1][1]) {
+                            coords.push([...coords[0]]); 
+                        }
+                        const polygon = turf.polygon([coords]);
+                        totalAreaSqMeters += turf.area(polygon);
+                    } catch (err) { console.error("Turf Area Error:", err); }
+                }
+            });
+            
+            if (totalAreaSqMeters > 5000) {
+                window.db.ref(`game/${window.currentRoom}/winner`).once('value', s => {
+                    if (!s.exists()) window.db.ref(`game/${window.currentRoom}/winner`).set('thieves');
+                });
+            }
         }
     });
 }
@@ -188,6 +225,7 @@ function listenToOtherPlayers() {
 
         const now = Date.now();
         let activeCount = 0;
+        let thievesCount = 0;
 
         Object.keys(players).forEach(id => {
             const p = players[id];
@@ -199,6 +237,7 @@ function listenToOtherPlayers() {
             }
 
             activeCount++;
+            if (p.role === 'thief') thievesCount++;
 
             // Visibility Logic: Cops can't see thieves
             if (window.playerRole === 'cop' && p.role === 'thief' && id !== window.playerId) return;
@@ -214,5 +253,12 @@ function listenToOtherPlayers() {
         });
 
         document.getElementById('players-count').innerText = window.currentLang === 'he' ? `שחקנים: ${activeCount}` : `Players: ${activeCount}`;
+
+        // Check Cop Victory Condition: All active thieves caught/removed
+        if (activeCount > 0 && thievesCount === 0) {
+            window.db.ref(`game/${window.currentRoom}/winner`).once('value', s => {
+                if (!s.exists()) window.db.ref(`game/${window.currentRoom}/winner`).set('cops');
+            });
+        }
     });
 }

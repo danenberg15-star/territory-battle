@@ -68,6 +68,13 @@
         #capture-btn.cooldown .btn-label { display: none; }
         .progress-ring { position: absolute; top: 0; left: 0; width: 110px; height: 110px; transform: rotate(-90deg); z-index: 1; }
         .progress-ring__circle { stroke: #dc2626; stroke-width: 6; fill: transparent; stroke-dasharray: 326.7; stroke-dashoffset: 0; transition: stroke-dashoffset 1s linear; }
+
+        /* --- Victory Screen Styles --- */
+        #victory-screen { display: none; z-index: 4000; flex-direction: column; text-align: center; justify-content: center; align-items: center; }
+        .trophy-icon { font-size: 100px; margin-bottom: 20px; animation: bounce 2s infinite; }
+        .team-victory-icon { font-size: 70px; margin-bottom: 10px; }
+        #victory-title { font-size: 36px; text-shadow: 0 4px 6px rgba(0,0,0,0.5); }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-20px); } }
     </style>
 </head>
 <body>
@@ -140,7 +147,18 @@
         </div>
     </div>
 
+    <!-- 4. Victory Screen -->
+    <div id="victory-screen" class="screen">
+        <div class="trophy-icon">🏆</div>
+        <div class="team-victory-icon" id="victory-icon">👮‍♂️</div>
+        <h1 id="victory-title">השוטרים ניצחו!</h1>
+        <button class="btn btn-blue" onclick="location.reload()" style="max-width: 200px; margin-top: 30px;" id="btn-back-lobby">חזור ללובי</button>
+    </div>
+
     <!-- Scripts -->
+    <!-- Confetti Library -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -150,6 +168,8 @@
     <script src="territory.js"></script>
     <script src="firebase-init.js"></script>
     <script src="lobby.js"></script>
+    <!-- New Victory File -->
+    <script src="victory.js"></script>
     <script src="game.js"></script>
 </body>
 </html>
