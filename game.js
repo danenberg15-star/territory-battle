@@ -14,7 +14,7 @@ let myLat = null;
 let myLng = null;
 let gpsWatchId = null;
 
-let hasSeenThief = false; // Fix for early win race condition
+let hasSeenThief = false; 
 
 // ==========================================
 // 2. Game Scene Initialization
@@ -51,7 +51,7 @@ function enterGameScene() {
     startRealGpsTracking();
     listenToOtherPlayers();
     listenToCapturedAreas();
-    listenToVictory(); // New listener for victory state
+    listenToVictory(); 
 }
 
 // ==========================================
@@ -107,18 +107,51 @@ function updateRealPosition() {
     
     // Thief Capture Logic ("Stealing the Block")
     if (window.playerRole === 'thief') {
-        if (typeof checkCaptureProgress === "function" && checkCaptureProgress(thiefPath, [myLat, myLng])) {
-            const areaId = 'area_' + Date.now();
-            window.db.ref(`game/${window.currentRoom}/capturedAreas/` + areaId).set({ 
-                points: [...thiefPath, thiefPath[0]], 
-                capturedBy: window.playerId 
-            });
-            thiefPath = []; 
-            if (trailLayer) trailLayer.setLatLngs([]);
-            alert(window.currentLang === 'he' ? "שטח נכבש!" : "Area Captured!");
-        } else {
-            thiefPath.push([myLat, myLng]);
-            if (trailLayer) trailLayer.setLatLngs(thiefPath);
+        let movedEnough = true;
+        
+        // Anti-Jitter Filter 1: Minimum distance of 3 meters
+        if (thiefPath.length > 0) {
+            const lastPoint = thiefPath[thiefPath.length - 1];
+            const from = turf.point([lastPoint[1], lastPoint[0]]);
+            const to = turf.point([myLng, myLat]);
+            const distance = turf.distance(from, to, {units: 'meters'});
+            if (distance < 3) movedEnough = false; 
+        }
+
+        if (movedEnough) {
+            if (typeof checkCaptureProgress === "function" && checkCaptureProgress(thiefPath, [myLat, myLng])) {
+                
+                // Anti-Jitter Filter 2: Minimum area of 20 sq meters
+                let isValidPolygon = true;
+                try {
+                    const coords = [...thiefPath, [myLat, myLng]].map(p => [p[1], p[0]]);
+                    coords.push([...coords[0]]); // close for Turf
+                    const polygon = turf.polygon([coords]);
+                    const area = turf.area(polygon);
+                    
+                    if (area < 20) {
+                        isValidPolygon = false; // Too small, just a GPS glitch
+                    }
+                } catch(err) {
+                    isValidPolygon = false;
+                }
+
+                if (isValidPolygon) {
+                    const areaId = 'area_' + Date.now();
+                    window.db.ref(`game/${window.currentRoom}/capturedAreas/` + areaId).set({ 
+                        points: [...thiefPath, [myLat, myLng]], 
+                        capturedBy: window.playerId 
+                    });
+                    alert(window.currentLang === 'he' ? "שטח נכבש!" : "Area Captured!");
+                }
+                
+                // Clear the path whether it was a valid polygon or a jitter-glitch
+                thiefPath = []; 
+                if (trailLayer) trailLayer.setLatLngs([]);
+            } else {
+                thiefPath.push([myLat, myLng]);
+                if (trailLayer) trailLayer.setLatLngs(thiefPath);
+            }
         }
     }
     
