@@ -15,6 +15,7 @@ let myLng = null;
 let gpsWatchId = null;
 
 let hasSeenThief = false; 
+let gameStartTime = 0;
 
 // ==========================================
 // 2. Game Scene Initialization
@@ -35,18 +36,26 @@ function enterGameScene() {
     map = L.map('map', { zoomControl: false, attributionControl: false }).setView([32.0853, 34.7818], 18);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
-    // Setup Role Specifics
-    if (window.playerRole === 'cop') {
-        document.getElementById('capture-btn-container').style.display = 'block';
-        document.getElementById('audio-status').innerText = window.currentLang === 'he' ? "רמקול ✅" : "Speaker ✅";
-        document.getElementById('audio-status').style.color = "#10b981";
-    } else {
-        startListeningForCops(() => {
-            alert(window.currentLang === 'he' ? "נתפסת! 👮‍♂️" : "Busted! 👮‍♂️");
-            window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'cop' }).then(() => location.reload());
-        });
-        trailLayer = L.polyline([], { color: '#ef4444', weight: 5, opacity: 0.6, dashArray: '10, 10' }).addTo(map);
-    }
+    // Get Game Start Time from Room Data to prevent stale signals
+    window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
+        gameStartTime = snap.val() || Date.now();
+        
+        // Setup Role Specifics
+        if (window.playerRole === 'cop') {
+            document.getElementById('capture-btn-container').style.display = 'block';
+            document.getElementById('audio-status').innerText = window.currentLang === 'he' ? "רמקול ✅" : "Speaker ✅";
+            document.getElementById('audio-status').style.color = "#10b981";
+        } else {
+            // Listen for capture signals only if they happened AFTER game started
+            startListeningForCops((signalTimestamp) => {
+                if (signalTimestamp && signalTimestamp < gameStartTime) return;
+
+                alert(window.currentLang === 'he' ? "נתפסת! 👮‍♂️" : "Busted! 👮‍♂️");
+                window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'cop' }).then(() => location.reload());
+            });
+            trailLayer = L.polyline([], { color: '#ef4444', weight: 5, opacity: 0.6, dashArray: '10, 10' }).addTo(map);
+        }
+    });
 
     startRealGpsTracking();
     listenToOtherPlayers();
@@ -58,10 +67,7 @@ function enterGameScene() {
 // 3. Real GPS Tracking Logic
 // ==========================================
 function startRealGpsTracking() {
-    if (!navigator.geolocation) {
-        alert("GPS is not supported by your browser");
-        return;
-    }
+    if (!navigator.geolocation) return;
 
     gpsWatchId = navigator.geolocation.watchPosition(
         (position) => {
@@ -89,14 +95,7 @@ function startRealGpsTracking() {
                 updateRealPosition();
             }
         },
-        (error) => {
-            console.error("GPS Error: ", error);
-            const gpsEl = document.getElementById('gps-status');
-            if (gpsEl) {
-                gpsEl.innerText = "GPS ❌";
-                gpsEl.style.color = "#ef4444";
-            }
-        },
+        null,
         { enableHighAccuracy: true, maximumAge: 0, timeout: 5000 }
     );
 }
@@ -108,8 +107,6 @@ function updateRealPosition() {
     // Thief Capture Logic ("Stealing the Block")
     if (window.playerRole === 'thief') {
         let movedEnough = true;
-        
-        // Anti-Jitter Filter 1: Minimum distance of 3 meters
         if (thiefPath.length > 0) {
             const lastPoint = thiefPath[thiefPath.length - 1];
             const from = turf.point([lastPoint[1], lastPoint[0]]);
@@ -120,21 +117,14 @@ function updateRealPosition() {
 
         if (movedEnough) {
             if (typeof checkCaptureProgress === "function" && checkCaptureProgress(thiefPath, [myLat, myLng])) {
-                
-                // Anti-Jitter Filter 2: Minimum area of 20 sq meters
                 let isValidPolygon = true;
                 try {
                     const coords = [...thiefPath, [myLat, myLng]].map(p => [p[1], p[0]]);
-                    coords.push([...coords[0]]); // close for Turf
+                    coords.push([...coords[0]]); 
                     const polygon = turf.polygon([coords]);
                     const area = turf.area(polygon);
-                    
-                    if (area < 20) {
-                        isValidPolygon = false; // Too small, just a GPS glitch
-                    }
-                } catch(err) {
-                    isValidPolygon = false;
-                }
+                    if (area < 20) isValidPolygon = false;
+                } catch(err) { isValidPolygon = false; }
 
                 if (isValidPolygon) {
                     const areaId = 'area_' + Date.now();
@@ -144,8 +134,6 @@ function updateRealPosition() {
                     });
                     alert(window.currentLang === 'he' ? "שטח נכבש!" : "Area Captured!");
                 }
-                
-                // Clear the path whether it was a valid polygon or a jitter-glitch
                 thiefPath = []; 
                 if (trailLayer) trailLayer.setLatLngs([]);
             } else {
@@ -155,7 +143,6 @@ function updateRealPosition() {
         }
     }
     
-    // Update Firebase
     window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({ 
         lat: myLat, 
         lng: myLng, 
@@ -175,7 +162,10 @@ function triggerCapture() {
     if (btn.disabled) return;
 
     btn.disabled = true;
-    broadcastCapture(); // From audio.js
+    
+    // Send capture signal with current timestamp
+    const captureTime = Date.now();
+    broadcastCapture(captureTime); 
 
     setTimeout(() => {
         btn.classList.add('cooldown');
@@ -193,9 +183,11 @@ function triggerCapture() {
                 btn.disabled = false;
                 btn.classList.remove('cooldown');
                 circle.style.strokeDashoffset = 0;
+                // Clean up capture signal after cooldown
+                window.db.ref(`game/${window.currentRoom}/captureSignal`).remove();
             }
         }, 1000);
-    }, 10000); // 10 seconds active sonar time
+    }, 10000); 
 }
 
 // ==========================================
@@ -219,26 +211,25 @@ function listenToCapturedAreas() {
             areaLayers = renderAreas(map, areas, areaLayers);
         }
         
-        // Check Thief Victory Condition: Captured Area > 5000 sq meters
         if (areas) {
             let totalAreaSqMeters = 0;
             Object.values(areas).forEach(area => {
                 if (area.points && area.points.length >= 3) {
                     try {
-                        const coords = area.points.map(p => [p[1], p[0]]); // Turf needs [lng, lat]
-                        // Ensure polygon is closed
+                        const coords = area.points.map(p => [p[1], p[0]]);
                         if (coords[0][0] !== coords[coords.length-1][0] || coords[0][1] !== coords[coords.length-1][1]) {
                             coords.push([...coords[0]]); 
                         }
                         const polygon = turf.polygon([coords]);
                         totalAreaSqMeters += turf.area(polygon);
-                    } catch (err) { console.error("Turf Area Error:", err); }
+                    } catch (err) { }
                 }
             });
             
+            // Victory Threshold: 5000 sq meters
             if (totalAreaSqMeters > 5000) {
-                window.db.ref(`game/${window.currentRoom}/winner`).once('value', s => {
-                    if (!s.exists()) window.db.ref(`game/${window.currentRoom}/winner`).set('thieves');
+                window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => {
+                    return current || 'thieves';
                 });
             }
         }
@@ -248,8 +239,6 @@ function listenToCapturedAreas() {
 function listenToOtherPlayers() {
     window.db.ref(`game/${window.currentRoom}/players`).on('value', snap => {
         const players = snap.val();
-        
-        // Clear existing markers
         for (let id in playerMarkers) map.removeLayer(playerMarkers[id]);
         playerMarkers = {};
         
@@ -264,8 +253,6 @@ function listenToOtherPlayers() {
 
         Object.keys(players).forEach(id => {
             const p = players[id];
-            
-            // Remove inactive players (Offline > 1min)
             if (now - p.t > 60000) {
                 window.db.ref(`game/${window.currentRoom}/players/` + id).remove();
                 return;
@@ -274,7 +261,6 @@ function listenToOtherPlayers() {
             activeCount++;
             if (p.role === 'thief') thievesCount++;
 
-            // Visibility Logic: Cops can't see thieves
             if (window.playerRole === 'cop' && p.role === 'thief' && id !== window.playerId) return;
             
             const color = p.role === 'cop' ? '#3b82f6' : '#ef4444';
@@ -289,15 +275,12 @@ function listenToOtherPlayers() {
 
         document.getElementById('players-count').innerText = window.currentLang === 'he' ? `שחקנים: ${activeCount}` : `Players: ${activeCount}`;
 
-        // Flag update - prevents initial race condition
-        if (thievesCount > 0) {
-            hasSeenThief = true;
-        }
+        if (thievesCount > 0) hasSeenThief = true;
 
-        // Check Cop Victory Condition: All active thieves caught/removed (only triggers after a thief has been detected)
+        // Cop Victory: No active thieves left
         if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
-            window.db.ref(`game/${window.currentRoom}/winner`).once('value', s => {
-                if (!s.exists()) window.db.ref(`game/${window.currentRoom}/winner`).set('cops');
+            window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => {
+                return current || 'cops';
             });
         }
     });

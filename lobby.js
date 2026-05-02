@@ -184,13 +184,11 @@ function joinRoomLogic(roomId) {
         
         if (roomData.status === 'playing') {
             window.db.ref(`rooms/${roomId}`).off(); 
-            // Save final role to global window object so game.js can read it
             window.playerRole = roomData.players[playerId]?.role || 'cop';
             window.currentRoom = currentRoom;
             window.playerId = playerId;
             window.currentLang = currentLang;
             
-            // Call the function from game.js
             if(typeof enterGameScene === 'function') {
                 enterGameScene();
             }
@@ -319,7 +317,13 @@ function shareWhatsApp() {
 }
 
 function startGame() {
-    window.db.ref(`rooms/${currentRoom}`).update({ status: 'playing' });
+    // Clean old game data and set absolute start time for this round
+    window.db.ref(`game/${currentRoom}`).remove().then(() => {
+        window.db.ref(`rooms/${currentRoom}`).update({ 
+            status: 'playing',
+            gameStartTime: Date.now() 
+        });
+    });
 }
 
 function exitGame() {
