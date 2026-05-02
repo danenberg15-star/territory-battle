@@ -6,196 +6,120 @@
     <title>Territory Battle</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        body, html { 
-            margin: 0; 
-            padding: 0; 
-            height: 100%; 
-            width: 100%; 
-            overflow: hidden; 
-            font-family: sans-serif; 
-            background-color: #000; 
-            color: white; 
-        }
-        #map { 
-            height: 100%; 
-            width: 100%; 
-            position: absolute; 
-            top: 0; 
-            z-index: 1; 
-        }
-        .exit-btn { 
-            position: absolute; 
-            top: 15px; 
-            left: 15px; 
-            z-index: 3000; 
-            background: rgba(220, 38, 38, 0.9); 
-            color: white; 
-            border: 2px solid white; 
-            border-radius: 50%; 
-            width: 40px; 
-            height: 40px; 
-            font-weight: bold; 
-            font-size: 20px; 
-            cursor: pointer; 
-            display: none; 
-            align-items: center; 
-            justify-content: center; 
-        }
-        .header { 
-            position: absolute; 
-            top: 10px; 
-            left: 10px; 
-            right: 10px; 
-            padding: 10px; 
-            background: rgba(15, 23, 42, 0.95); 
-            border-radius: 12px; 
-            text-align: center; 
-            z-index: 2000; 
-            border: 1px solid #38bdf8; 
-        }
-        .status-row { 
-            display: flex; 
-            justify-content: space-around; 
-            font-size: 11px; 
-            margin-bottom: 5px; 
-            font-weight: bold; 
-        }
+        /* Base */
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #0f172a; color: white; }
+        #map { height: 100%; width: 100%; position: absolute; top: 0; z-index: 1; display: none; }
+        
+        /* Screens */
+        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; padding: 20px; box-sizing: border-box; }
+        #lobby-screen { display: none; justify-content: flex-start; padding-top: 50px; }
+        
+        /* Typography & Inputs */
+        h1 { color: #38bdf8; font-size: 28px; margin-bottom: 30px; text-align: center; }
+        h2 { color: #e2e8f0; font-size: 20px; margin-bottom: 15px; }
+        input { width: 100%; max-width: 300px; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: 1px solid #38bdf8; background: #1e293b; color: white; font-size: 18px; text-align: center; box-sizing: border-box; }
+        input::placeholder { color: #94a3b8; }
+        
+        /* Buttons */
+        .btn { width: 100%; max-width: 300px; padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; margin-bottom: 15px; transition: 0.2s; }
+        .btn-blue { background: #1e40af; }
+        .btn-red { background: #991b1b; }
+        .btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; }
+        .btn-share { background: #25D366; margin-top: 10px; }
+        
+        /* Lobby Elements */
+        .room-code-box { background: #1e293b; border: 2px dashed #38bdf8; padding: 15px; border-radius: 12px; font-size: 24px; font-weight: bold; letter-spacing: 2px; margin-bottom: 20px; text-align: center; width: 100%; max-width: 300px; }
+        .lists-container { display: flex; flex-direction: column; width: 100%; max-width: 300px; gap: 15px; flex-grow: 1; overflow-y: auto; margin-bottom: 20px; }
+        .team-list { background: #1e293b; border-radius: 12px; padding: 15px; min-height: 80px; }
+        .team-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 5px; }
+        .player-item { background: #334155; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid transparent;}
+        .player-item:active { border-color: #38bdf8; }
+        
+        /* Lang Toggle */
+        #lang-toggle { position: absolute; top: 15px; right: 15px; background: #1e293b; border: 1px solid #38bdf8; color: white; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 3000; display: flex; align-items: center; justify-content: center;}
+        
+        /* In-Game UI Elements (Hidden initially) */
+        .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 3000; background: rgba(220, 38, 38, 0.9); color: white; border: 2px solid white; border-radius: 50%; width: 40px; height: 40px; font-weight: bold; font-size: 20px; cursor: pointer; display: none; align-items: center; justify-content: center; }
+        .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.95); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #38bdf8; display: none; }
+        .status-row { display: flex; justify-content: space-around; font-size: 11px; margin-bottom: 5px; font-weight: bold; }
         #gps-status { color: #ef4444; }
         #audio-status { color: #facc15; }
         #players-count { color: #10b981; }
-        #signal-meter { 
-            font-size: 10px; 
-            color: #facc15; 
-            margin-top: 5px; 
-            display: none; 
-            background: rgba(0, 0, 0, 0.5); 
-            border-radius: 4px; 
-            padding: 2px; 
-        }
-        .setup-screen { 
-            position: absolute; 
-            bottom: 20px; 
-            left: 20px; 
-            right: 20px; 
-            z-index: 2000; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 10px; 
-        }
-        .btn { 
-            padding: 18px; 
-            border-radius: 12px; 
-            border: none; 
-            font-size: 18px; 
-            font-weight: bold; 
-            color: white; 
-            cursor: pointer; 
-        }
-        .btn-blue { background: #1e40af; }
-        .btn-red { background: #991b1b; }
-        #controls-container { 
-            display: none; 
-            position: absolute; 
-            bottom: 10px; 
-            left: 0; 
-            right: 0; 
-            z-index: 2000; 
-            padding: 10px; 
-            pointer-events: none; 
-        }
-        #dev-controls { 
-            background: rgba(0, 0, 0, 0.85); 
-            padding: 10px; 
-            border-radius: 15px; 
-            text-align: center; 
-            border: 1px solid #38bdf8; 
-            width: fit-content; 
-            margin: 0 auto; 
-            pointer-events: auto; 
-        }
-        .dev-btn { 
-            background: #334155; 
-            color: white; 
-            border: 1px solid #38bdf8; 
-            padding: 15px; 
-            margin: 2px; 
-            border-radius: 8px; 
-            font-size: 22px; 
-            width: 60px; 
-        }
-        #capture-btn-container { 
-            position: relative; 
-            width: 110px; 
-            height: 110px; 
-            margin: 0 auto 15px auto; 
-            pointer-events: auto; 
-            display: none; 
-        }
-        #capture-btn { 
-            position: absolute; 
-            top: 5px; 
-            left: 5px; 
-            width: 100px; 
-            height: 100px; 
-            background: #dc2626; 
-            color: white; 
-            border: none; 
-            border-radius: 50%; 
-            font-weight: bold; 
-            font-size: 18px; 
-            z-index: 5; 
-            transition: all 0.3s; 
-            display: flex; 
-            align-items: center; 
-            justify-content: center; 
-            cursor: pointer; 
-        }
-        #capture-btn.cooldown { 
-            background: transparent; 
-            color: #dc2626; 
-            border: 2px solid rgba(220, 38, 38, 0.2); 
-        }
+        #signal-meter { font-size: 10px; color: #facc15; margin-top: 5px; display: none; background: rgba(0, 0, 0, 0.5); border-radius: 4px; padding: 2px; }
+        
+        /* Controls */
+        #controls-container { display: none; position: absolute; bottom: 10px; left: 0; right: 0; z-index: 2000; padding: 10px; pointer-events: none; }
+        #dev-controls { background: rgba(0, 0, 0, 0.85); padding: 10px; border-radius: 15px; text-align: center; border: 1px solid #38bdf8; width: fit-content; margin: 0 auto; pointer-events: auto; }
+        .dev-btn { background: #334155; color: white; border: 1px solid #38bdf8; padding: 15px; margin: 2px; border-radius: 8px; font-size: 22px; width: 60px; }
+        
+        /* Capture Button */
+        #capture-btn-container { position: relative; width: 110px; height: 110px; margin: 0 auto 15px auto; pointer-events: auto; display: none; }
+        #capture-btn { position: absolute; top: 5px; left: 5px; width: 100px; height: 100px; background: #dc2626; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 18px; z-index: 5; transition: all 0.3s; display: flex; align-items: center; justify-content: center; cursor: pointer; }
+        #capture-btn.cooldown { background: transparent; color: #dc2626; border: 2px solid rgba(220, 38, 38, 0.2); }
         #capture-btn .timer-text { display: none; font-size: 24px; }
         #capture-btn.cooldown .timer-text { display: block; }
         #capture-btn.cooldown .btn-label { display: none; }
-        .progress-ring { 
-            position: absolute; 
-            top: 0; 
-            left: 0; 
-            width: 110px; 
-            height: 110px; 
-            transform: rotate(-90deg); 
-            z-index: 1; 
-        }
-        .progress-ring__circle { 
-            stroke: #dc2626; 
-            stroke-width: 6; 
-            fill: transparent; 
-            stroke-dasharray: 326.7; 
-            stroke-dashoffset: 0; 
-            transition: stroke-dashoffset 1s linear; 
-        }
+        .progress-ring { position: absolute; top: 0; left: 0; width: 110px; height: 110px; transform: rotate(-90deg); z-index: 1; }
+        .progress-ring__circle { stroke: #dc2626; stroke-width: 6; fill: transparent; stroke-dasharray: 326.7; stroke-dashoffset: 0; transition: stroke-dashoffset 1s linear; }
     </style>
 </head>
 <body>
+    <!-- Language Toggle -->
+    <button id="lang-toggle" onclick="toggleLanguage()">🌐</button>
+
+    <!-- 1. Login Screen -->
+    <div id="login-screen" class="screen">
+        <h1 id="lbl-main-title">Territory Battle</h1>
+        <input type="text" id="player-name" placeholder="הכנס שם שחקן" maxlength="15" />
+        <input type="number" id="room-code-input" placeholder="קוד חדר (4 ספרות)" maxlength="4" />
+        <button class="btn btn-blue" id="btn-join" onclick="joinRoom()">הצטרף לחדר</button>
+        <button class="btn btn-red" id="btn-create" onclick="createRoom()">צור חדר חדש</button>
+    </div>
+
+    <!-- 2. Lobby Screen -->
+    <div id="lobby-screen" class="screen">
+        <h2 id="lbl-lobby-title">לובי המתנה</h2>
+        <div class="room-code-box">
+            <span id="lbl-room-code">קוד חדר:</span> <span id="display-room-code">----</span>
+        </div>
+        
+        <div class="lists-container">
+            <div class="team-list" id="list-unassigned">
+                <div class="team-title" id="lbl-unassigned">ממתינים לשיבוץ</div>
+                <div id="players-unassigned"></div>
+            </div>
+            <div class="team-list" id="list-cops" style="border: 1px solid #3b82f6;">
+                <div class="team-title" id="lbl-cops" style="color: #3b82f6;">שוטרים 👮‍♂️</div>
+                <div id="players-cops"></div>
+            </div>
+            <div class="team-list" id="list-thieves" style="border: 1px solid #ef4444;">
+                <div class="team-title" id="lbl-thieves" style="color: #ef4444;">גנבים 🥷</div>
+                <div id="players-thieves"></div>
+            </div>
+        </div>
+
+        <button class="btn btn-share" id="btn-share" onclick="shareWhatsApp()">📱 שתף בוואטסאפ</button>
+        
+        <!-- Start button exactly as specified -->
+        <button class="btn btn-green" id="btn-start-game" style="display: none;" onclick="startGame()">
+            התחל משחק<br><span style="font-size:12px; font-weight:normal;">(לחוויה מיטבית וודא שאינך במצב חיסכון סוללה)</span>
+        </button>
+    </div>
+
+    <!-- 3. In-Game UI -->
     <button id="exit-btn" class="exit-btn" onclick="exitGame()">X</button>
 
-    <div class="header">
+    <div class="header" id="game-header">
         <div class="status-row">
             <span id="gps-status">GPS ❌</span>
             <span id="audio-status">אודיו ⏳</span>
             <span id="players-count">שחקנים: 0</span>
         </div>
         <div id="signal-meter">עוצמת סיגנל שוטר: <span id="signal-val">0</span>%</div>
-        <h1 style="margin:0; font-size:16px; color: #38bdf8;">Territory Battle</h1>
+        <h1 style="margin:0; font-size:16px; color: #38bdf8;" id="lbl-game-title">Territory Battle</h1>
     </div>
 
     <div id="map"></div>
-
-    <div class="setup-screen" id="ui-container">
-        <button class="btn btn-blue" onclick="startAs('cop')">הצטרף לשריפים 👮‍♂️</button>
-        <button class="btn btn-red" onclick="startAs('thief')">הצטרף לכנופיה 🥷</button>
-    </div>
 
     <div id="controls-container">
         <div id="capture-btn-container">
@@ -203,10 +127,11 @@
                 <circle class="progress-ring__circle" id="cooldown-circle" cx="55" cy="55" r="52"></circle>
             </svg>
             <button id="capture-btn" onclick="triggerCapture()">
-                <span class="btn-label">תפוס!</span>
+                <span class="btn-label" id="lbl-capture">תפוס!</span>
                 <span class="timer-text" id="cooldown-timer">60</span>
             </button>
         </div>
+        
         <div id="dev-controls">
             <button class="dev-btn" onclick="moveMock('up')">⬆️</button><br />
             <button class="dev-btn" onclick="moveMock('left')">⬅️</button>
@@ -215,6 +140,7 @@
         </div>
     </div>
 
+    <!-- Scripts -->
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
