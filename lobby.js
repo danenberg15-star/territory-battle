@@ -1,4 +1,4 @@
-// lobby.js - Language, Persistence, Wake Lock & Lobby Management
+// lobby.js - Language, Persistence, Wake Lock, Drag & Drop & Lobby Management
 
 // ==========================================
 // 1. Globals & Persistence
@@ -37,7 +37,7 @@ const i18n = {
         btnJoin: "Join Room", btnCreate: "Create Room",
         roomCodeLbl: "Room Code:",
         copsLbl: "Cops 👮‍♂️", thievesLbl: "Thieves 🥷",
-        btnStart: "Start Game<br><span style='font-size:12px; font-weight:normal;'>(Turn off Low Power Mode for best experience)</span>",
+        btnStart: "Start Game<br><span style='font-size:12px; font-weight:normal;'>(Turn off Low Power Mode)</span>",
         lblCapture: "Catch!"
     }
 };
@@ -77,8 +77,6 @@ function setLanguage(lang) {
     document.getElementById('lbl-cops').innerHTML = t.copsLbl;
     document.getElementById('lbl-thieves').innerHTML = t.thievesLbl;
     document.getElementById('btn-start-game').innerHTML = t.btnStart;
-    document.getElementById('lbl-capture').innerHTML = t.lblCapture;
-    document.getElementById('lbl-game-title').innerHTML = t.mainTitle;
     
     document.getElementById('player-name').placeholder = lang === 'he' ? "הכנס שם שחקן" : "Enter Player Name";
     document.getElementById('room-code-input').placeholder = lang === 'he' ? "קוד חדר (4 ספרות)" : "Room Code (4 digits)";
@@ -101,7 +99,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ==========================================
-// 4. Lobby & Auto-Assign
+// 4. Lobby Actions
 // ==========================================
 function getPlayerName() {
     const inputName = document.getElementById('player-name').value.trim();
@@ -154,37 +152,26 @@ function joinRoomLogic(roomId) {
     document.getElementById('lobby-screen').style.display = 'flex';
     document.getElementById('display-room-code').innerText = roomId;
     
-    window.db.ref(`rooms/${roomId}/players`).once('value', snap => {
-        const players = snap.val() || {};
-        let copsCount = 0;
-        let thievesCount = 0;
-        
-        Object.values(players).forEach(p => {
-            if (p.role === 'cop') copsCount++;
-            if (p.role === 'thief') thievesCount++;
-        });
-        
-        let assignedRole = copsCount <= thievesCount ? 'cop' : 'thief';
-        
-        window.db.ref(`rooms/${roomId}/players/${playerId}`).set({
-            name: playerName,
-            role: assignedRole,
-            t: Date.now()
-        });
-
-        window.db.ref(`rooms/${roomId}/players/${playerId}`).onDisconnect().remove();
+    window.db.ref(`rooms/${roomId}/players/${playerId}`).set({
+        name: playerName,
+        role: 'thief',
+        t: Date.now()
     });
+
+    window.db.ref(`rooms/${roomId}/players/${playerId}`).onDisconnect().remove();
 
     window.db.ref(`rooms/${roomId}`).on('value', snap => {
         const roomData = snap.val();
-        if (!roomData) return exitGame(); 
+        if (!roomData) return; 
         
         isHost = (roomData.host === playerId);
         if (isHost) document.getElementById('btn-start-game').style.display = 'block';
         
         if (roomData.status === 'playing') {
             window.db.ref(`rooms/${roomId}`).off(); 
-            window.playerRole = roomData.players[playerId]?.role || 'cop';
+            // Fix: Export host status and variables to game scene
+            window.isHost = isHost;
+            window.playerRole = roomData.players[playerId]?.role || 'thief';
             window.currentRoom = currentRoom;
             window.playerId = playerId;
             window.currentLang = currentLang;
@@ -227,7 +214,7 @@ function renderLobbyPlayers(players) {
         }
 
         if (p.role === 'cop') copsDiv.appendChild(div);
-        else if (p.role === 'thief') thievesDiv.appendChild(div);
+        else thievesDiv.appendChild(div);
     });
 }
 
@@ -317,7 +304,6 @@ function shareWhatsApp() {
 }
 
 function startGame() {
-    // Clean old game data and set absolute start time for this round
     window.db.ref(`game/${currentRoom}`).remove().then(() => {
         window.db.ref(`rooms/${currentRoom}`).update({ 
             status: 'playing',
@@ -327,8 +313,5 @@ function startGame() {
 }
 
 function exitGame() {
-    if (currentRoom) {
-        window.db.ref(`rooms/${currentRoom}/players/${playerId}`).remove();
-    }
     location.reload();
 }
