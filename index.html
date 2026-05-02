@@ -30,15 +30,18 @@
         /* Lobby Elements */
         .room-code-box { background: #1e293b; border: 2px dashed #38bdf8; padding: 15px; border-radius: 12px; font-size: 24px; font-weight: bold; letter-spacing: 2px; margin-bottom: 20px; text-align: center; width: 100%; max-width: 300px; }
         .lists-container { display: flex; flex-direction: column; width: 100%; max-width: 300px; gap: 15px; flex-grow: 1; overflow-y: auto; margin-bottom: 20px; }
-        .team-list { background: #1e293b; border-radius: 12px; padding: 15px; min-height: 80px; }
-        .team-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 5px; }
-        .player-item { background: #334155; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border: 1px solid transparent;}
-        .player-item:active { border-color: #38bdf8; }
+        .team-list { background: #1e293b; border-radius: 12px; padding: 15px; min-height: 120px; transition: background 0.2s; }
+        .team-list.drag-over { background: #334155; border: 2px dashed #38bdf8 !important; }
+        .team-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 5px; pointer-events: none; }
+        .drop-zone { min-height: 80px; }
+        .player-item { background: #334155; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; display: flex; justify-content: space-between; align-items: center; border: 1px solid transparent; user-select: none; }
+        .player-item.draggable { cursor: grab; }
+        .player-item.draggable:active { cursor: grabbing; }
         
         /* Lang Toggle */
         #lang-toggle { position: absolute; top: 15px; right: 15px; background: #1e293b; border: 1px solid #38bdf8; color: white; border-radius: 50%; width: 40px; height: 40px; font-size: 20px; cursor: pointer; z-index: 3000; display: flex; align-items: center; justify-content: center;}
         
-        /* In-Game UI Elements (Hidden initially) */
+        /* In-Game UI Elements */
         .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 3000; background: rgba(220, 38, 38, 0.9); color: white; border: 2px solid white; border-radius: 50%; width: 40px; height: 40px; font-weight: bold; font-size: 20px; cursor: pointer; display: none; align-items: center; justify-content: center; }
         .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.95); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #38bdf8; display: none; }
         .status-row { display: flex; justify-content: space-around; font-size: 11px; margin-bottom: 5px; font-weight: bold; }
@@ -64,7 +67,6 @@
     </style>
 </head>
 <body>
-    <!-- Language Toggle -->
     <button id="lang-toggle" onclick="toggleLanguage()">🌐</button>
 
     <!-- 1. Login Screen -->
@@ -84,23 +86,18 @@
         </div>
         
         <div class="lists-container">
-            <div class="team-list" id="list-unassigned">
-                <div class="team-title" id="lbl-unassigned">ממתינים לשיבוץ</div>
-                <div id="players-unassigned"></div>
-            </div>
-            <div class="team-list" id="list-cops" style="border: 1px solid #3b82f6;">
+            <div class="team-list" id="list-cops" style="border: 1px solid #3b82f6;" ondragover="allowDrop(event)" ondrop="drop(event, 'cop')" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)">
                 <div class="team-title" id="lbl-cops" style="color: #3b82f6;">שוטרים 👮‍♂️</div>
-                <div id="players-cops"></div>
+                <div id="players-cops" class="drop-zone"></div>
             </div>
-            <div class="team-list" id="list-thieves" style="border: 1px solid #ef4444;">
+            <div class="team-list" id="list-thieves" style="border: 1px solid #ef4444;" ondragover="allowDrop(event)" ondrop="drop(event, 'thief')" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)">
                 <div class="team-title" id="lbl-thieves" style="color: #ef4444;">גנבים 🥷</div>
-                <div id="players-thieves"></div>
+                <div id="players-thieves" class="drop-zone"></div>
             </div>
         </div>
 
         <button class="btn btn-share" id="btn-share" onclick="shareWhatsApp()">📱 שתף בוואטסאפ</button>
         
-        <!-- Start button exactly as specified -->
         <button class="btn btn-green" id="btn-start-game" style="display: none;" onclick="startGame()">
             התחל משחק<br><span style="font-size:12px; font-weight:normal;">(לחוויה מיטבית וודא שאינך במצב חיסכון סוללה)</span>
         </button>

@@ -1,7 +1,7 @@
-// game.js - Phase 1: Lobby, Persistence, Language & Game Init
+// game.js - Phase 1: Lobby (Drag&Drop + Auto Assign), Persistence, Language & Game Init
 
 // ==========================================
-// 1. Firebase Configuration (ללא שינוי)
+// 1. Firebase Configuration
 // ==========================================
 const firebaseConfig = {
     apiKey: "AIzaSyCC3-6oLBu7OrhnC5Kh6t-mkuo3v4gYN4Q",
@@ -29,10 +29,10 @@ if (!playerId) {
 let playerName = localStorage.getItem('tb_name') || "";
 let currentRoom = null;
 let isHost = false;
-let playerRole = 'unassigned';
+let playerRole = 'cop'; // Default fallback
 let wakeLock = null;
 
-// Game logic globals (from original code)
+// Game logic globals
 let playerMarkers = {};
 let areaLayers = [];
 let mockLat = 32.1714;
@@ -45,12 +45,12 @@ let map = null;
 // ==========================================
 // 3. Language & Initialization
 // ==========================================
-let currentLang = 'he'; // Default
+let currentLang = 'he'; 
 const i18n = {
     'he': {
         mainTitle: "Territory Battle", lobbyTitle: "לובי המתנה",
         btnJoin: "הצטרף לחדר", btnCreate: "צור חדר חדש",
-        roomCodeLbl: "קוד חדר:", unassignedLbl: "ממתינים לשיבוץ",
+        roomCodeLbl: "קוד חדר:",
         copsLbl: "שוטרים 👮‍♂️", thievesLbl: "גנבים 🥷",
         btnShare: "📱 שתף בוואטסאפ", 
         btnStart: "התחל משחק<br><span style='font-size:12px; font-weight:normal;'>(לחוויה מיטבית וודא שאינך במצב חיסכון סוללה)</span>",
@@ -59,7 +59,7 @@ const i18n = {
     'en': {
         mainTitle: "Territory Battle", lobbyTitle: "Waiting Lobby",
         btnJoin: "Join Room", btnCreate: "Create Room",
-        roomCodeLbl: "Room Code:", unassignedLbl: "Unassigned",
+        roomCodeLbl: "Room Code:",
         copsLbl: "Cops 👮‍♂️", thievesLbl: "Thieves 🥷",
         btnShare: "📱 Share on WhatsApp", 
         btnStart: "Start Game<br><span style='font-size:12px; font-weight:normal;'>(Turn off Low Power Mode for best experience)</span>",
@@ -68,13 +68,11 @@ const i18n = {
 };
 
 window.onload = () => {
-    // Check for Deep Link
     const urlParams = new URLSearchParams(window.location.search);
     if(urlParams.has('room')) {
         document.getElementById('room-code-input').value = urlParams.get('room');
     }
     
-    // Auto-detect Language based on GPS (Israel bounding box approx)
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition(pos => {
             const lat = pos.coords.latitude;
@@ -84,7 +82,7 @@ window.onload = () => {
             } else {
                 setLanguage('en');
             }
-        }, () => setLanguage('he')); // Fallback
+        }, () => setLanguage('he'));
     }
 };
 
@@ -101,7 +99,6 @@ function setLanguage(lang) {
     document.getElementById('btn-join').innerHTML = t.btnJoin;
     document.getElementById('btn-create').innerHTML = t.btnCreate;
     document.getElementById('lbl-room-code').innerHTML = t.roomCodeLbl;
-    document.getElementById('lbl-unassigned').innerHTML = t.unassignedLbl;
     document.getElementById('lbl-cops').innerHTML = t.copsLbl;
     document.getElementById('lbl-thieves').innerHTML = t.thievesLbl;
     document.getElementById('btn-share').innerHTML = t.btnShare;
@@ -130,7 +127,7 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ==========================================
-// 5. Lobby & Room Management
+// 5. Lobby & Drag-and-Drop Management
 // ==========================================
 function getPlayerName() {
     const inputName = document.getElementById('player-name').value.trim();
@@ -174,27 +171,40 @@ function joinRoomLogic(roomId) {
     document.getElementById('lobby-screen').style.display = 'flex';
     document.getElementById('display-room-code').innerText = roomId;
     
-    // Add player to room
-    db.ref(`rooms/${roomId}/players/${playerId}`).set({
-        name: playerName,
-        role: 'unassigned',
-        t: Date.now()
-    });
+    // Auto-assign logic based on current room balance
+    db.ref(`rooms/${roomId}/players`).once('value', snap => {
+        const players = snap.val() || {};
+        let copsCount = 0;
+        let thievesCount = 0;
+        
+        Object.values(players).forEach(p => {
+            if (p.role === 'cop') copsCount++;
+            if (p.role === 'thief') thievesCount++;
+        });
+        
+        // Auto-assign to the team with fewer players, default to cop if equal
+        let assignedRole = copsCount <= thievesCount ? 'cop' : 'thief';
+        
+        db.ref(`rooms/${roomId}/players/${playerId}`).set({
+            name: playerName,
+            role: assignedRole,
+            t: Date.now()
+        });
 
-    db.ref(`rooms/${roomId}/players/${playerId}`).onDisconnect().remove();
+        db.ref(`rooms/${roomId}/players/${playerId}`).onDisconnect().remove();
+    });
 
     // Listen to room changes
     db.ref(`rooms/${roomId}`).on('value', snap => {
         const roomData = snap.val();
-        if (!roomData) return exitGame(); // Room closed
+        if (!roomData) return exitGame(); 
         
         isHost = (roomData.host === playerId);
         if (isHost) document.getElementById('btn-start-game').style.display = 'block';
         
-        // Handle Game Start
         if (roomData.status === 'playing') {
-            db.ref(`rooms/${roomId}`).off(); // Stop listening to lobby
-            playerRole = roomData.players[playerId]?.role || 'unassigned';
+            db.ref(`rooms/${roomId}`).off(); 
+            playerRole = roomData.players[playerId]?.role || 'cop';
             enterGameScene();
             return;
         }
@@ -205,11 +215,11 @@ function joinRoomLogic(roomId) {
 
 function renderLobbyPlayers(players) {
     if (!players) return;
-    const unassignedDiv = document.getElementById('players-unassigned');
     const copsDiv = document.getElementById('players-cops');
     const thievesDiv = document.getElementById('players-thieves');
     
-    unassignedDiv.innerHTML = copsDiv.innerHTML = thievesDiv.innerHTML = "";
+    copsDiv.innerHTML = "";
+    thievesDiv.innerHTML = "";
     
     Object.keys(players).forEach(id => {
         const p = players[id];
@@ -217,18 +227,46 @@ function renderLobbyPlayers(players) {
         div.className = 'player-item';
         div.innerText = p.name + (id === playerId ? " (אתה)" : "");
         
-        // Host can click players to cycle roles
+        // Make draggable only if this client is the host
         if (isHost) {
-            div.onclick = () => {
-                let nextRole = p.role === 'unassigned' ? 'cop' : (p.role === 'cop' ? 'thief' : 'unassigned');
-                db.ref(`rooms/${currentRoom}/players/${id}`).update({ role: nextRole });
-            };
+            div.draggable = true;
+            div.classList.add('draggable');
+            div.ondragstart = (e) => dragStart(e, id);
         }
 
         if (p.role === 'cop') copsDiv.appendChild(div);
         else if (p.role === 'thief') thievesDiv.appendChild(div);
-        else unassignedDiv.appendChild(div);
     });
+}
+
+// Drag and Drop Handlers
+function dragStart(event, id) {
+    if (!isHost) return;
+    event.dataTransfer.setData("text/plain", id);
+}
+
+function allowDrop(event) {
+    event.preventDefault();
+}
+
+function dragEnter(event) {
+    event.preventDefault();
+    if(isHost) event.currentTarget.classList.add('drag-over');
+}
+
+function dragLeave(event) {
+    if(isHost) event.currentTarget.classList.remove('drag-over');
+}
+
+function drop(event, newRole) {
+    event.preventDefault();
+    if(isHost) event.currentTarget.classList.remove('drag-over');
+    if (!isHost) return;
+    
+    const targetPlayerId = event.dataTransfer.getData("text/plain");
+    if (targetPlayerId && currentRoom) {
+        db.ref(`rooms/${currentRoom}/players/${targetPlayerId}`).update({ role: newRole });
+    }
 }
 
 function shareWhatsApp() {
@@ -254,22 +292,18 @@ function exitGame() {
 // 6. Game Scene (Original Game Logic Wrapper)
 // ==========================================
 function enterGameScene() {
-    // Hide Lobby, Show Game
     document.getElementById('lobby-screen').style.display = 'none';
     document.getElementById('game-header').style.display = 'block';
     document.getElementById('map').style.display = 'block';
     document.getElementById('controls-container').style.display = 'block';
     document.getElementById('exit-btn').style.display = 'flex';
 
-    // Wake AudioContext for Autoplay bypass
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Map Setup (Original)
     map = L.map('map', { zoomControl: false, attributionControl: false }).setView([mockLat, mockLng], 18);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
 
-    // Initial GPS Watch
     navigator.geolocation.watchPosition(() => {
         lastGpsTimestamp = Date.now();
         const gpsEl = document.getElementById('gps-status');
@@ -279,7 +313,6 @@ function enterGameScene() {
         }
     }, null, { enableHighAccuracy: true });
 
-    // Role specific UI
     if (playerRole === 'cop') {
         document.getElementById('capture-btn-container').style.display = 'block';
         document.getElementById('audio-status').innerText = "רמקול ✅";
@@ -292,7 +325,6 @@ function enterGameScene() {
         trailLayer = L.polyline([], { color: '#ef4444', weight: 5, opacity: 0.6, dashArray: '10, 10' }).addTo(map);
     }
 
-    // Write initial location to game branch
     db.ref(`game/${currentRoom}/players/${playerId}`).set({ role: playerRole, lat: mockLat, lng: mockLng, t: Date.now() });
     db.ref(`game/${currentRoom}/players/${playerId}`).onDisconnect().remove();
 
@@ -392,7 +424,6 @@ function listenToOtherPlayers() {
 
             activeCount++;
 
-            // Limit visibility for cops
             if (playerRole === 'cop' && p.role === 'thief' && id !== playerId) return;
             
             const color = p.role === 'cop' ? '#3b82f6' : '#ef4444';
