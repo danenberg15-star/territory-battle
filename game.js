@@ -1,4 +1,4 @@
-// game.js - Phase 1: Lobby (Drag&Drop + Auto Assign), Persistence, Language & Game Init
+// game.js - Phase 1: Lobby (Mobile Touch Drag&Drop + Auto Assign), Persistence, Language & Game Init
 
 // ==========================================
 // 1. Firebase Configuration
@@ -29,7 +29,7 @@ if (!playerId) {
 let playerName = localStorage.getItem('tb_name') || "";
 let currentRoom = null;
 let isHost = false;
-let playerRole = 'cop'; // Default fallback
+let playerRole = 'cop'; 
 let wakeLock = null;
 
 // Game logic globals
@@ -42,6 +42,11 @@ let trailLayer = null;
 let lastGpsTimestamp = Date.now();
 let map = null;
 
+// Mobile Drag Globals
+let activeTouchElement = null;
+let initialX = 0;
+let initialY = 0;
+
 // ==========================================
 // 3. Language & Initialization
 // ==========================================
@@ -52,8 +57,7 @@ const i18n = {
         btnJoin: "הצטרף לחדר", btnCreate: "צור חדר חדש",
         roomCodeLbl: "קוד חדר:",
         copsLbl: "שוטרים 👮‍♂️", thievesLbl: "גנבים 🥷",
-        btnShare: "📱 שתף בוואטסאפ", 
-        btnStart: "התחל משחק<br><span style='font-size:12px; font-weight:normal;'>(לחוויה מיטבית וודא שאינך במצב חיסכון סוללה)</span>",
+        btnStart: "התחל משחק<br><span style='font-size:12px; font-weight:normal;'>(ללא חיסכון סוללה)</span>",
         lblCapture: "תפוס!"
     },
     'en': {
@@ -61,8 +65,7 @@ const i18n = {
         btnJoin: "Join Room", btnCreate: "Create Room",
         roomCodeLbl: "Room Code:",
         copsLbl: "Cops 👮‍♂️", thievesLbl: "Thieves 🥷",
-        btnShare: "📱 Share on WhatsApp", 
-        btnStart: "Start Game<br><span style='font-size:12px; font-weight:normal;'>(Turn off Low Power Mode for best experience)</span>",
+        btnStart: "Start Game<br><span style='font-size:12px; font-weight:normal;'>(No Low Power Mode)</span>",
         lblCapture: "Catch!"
     }
 };
@@ -101,7 +104,6 @@ function setLanguage(lang) {
     document.getElementById('lbl-room-code').innerHTML = t.roomCodeLbl;
     document.getElementById('lbl-cops').innerHTML = t.copsLbl;
     document.getElementById('lbl-thieves').innerHTML = t.thievesLbl;
-    document.getElementById('btn-share').innerHTML = t.btnShare;
     document.getElementById('btn-start-game').innerHTML = t.btnStart;
     document.getElementById('lbl-capture').innerHTML = t.lblCapture;
     document.getElementById('lbl-game-title').innerHTML = t.mainTitle;
@@ -127,11 +129,14 @@ document.addEventListener('visibilitychange', () => {
 });
 
 // ==========================================
-// 5. Lobby & Drag-and-Drop Management
+// 5. Lobby, Auto-Assign & Mobile Drag
 // ==========================================
 function getPlayerName() {
     const inputName = document.getElementById('player-name').value.trim();
-    if (!inputName) return alert(currentLang === 'he' ? "אנא הכנס שם שחקן" : "Please enter a name");
+    if (!inputName) {
+        alert(currentLang === 'he' ? "אנא הכנס שם שחקן" : "Please enter a name");
+        return false;
+    }
     localStorage.setItem('tb_name', inputName);
     playerName = inputName;
     return true;
@@ -156,11 +161,17 @@ function createRoom() {
 function joinRoom() {
     if (!getPlayerName()) return;
     const roomId = document.getElementById('room-code-input').value.trim();
-    if (roomId.length !== 4) return alert(currentLang === 'he' ? "קוד חדר חייב להיות 4 ספרות" : "Room code must be 4 digits");
+    if (roomId.length !== 4) {
+        alert(currentLang === 'he' ? "קוד חדר חייב להיות 4 ספרות" : "Room code must be 4 digits");
+        return;
+    }
     enableWakeLock();
     
     db.ref(`rooms/${roomId}/status`).once('value', snap => {
-        if (!snap.exists()) return alert(currentLang === 'he' ? "החדר לא קיים" : "Room not found");
+        if (!snap.exists()) {
+            alert(currentLang === 'he' ? "החדר לא קיים" : "Room not found");
+            return;
+        }
         currentRoom = roomId;
         joinRoomLogic(roomId);
     });
@@ -171,7 +182,7 @@ function joinRoomLogic(roomId) {
     document.getElementById('lobby-screen').style.display = 'flex';
     document.getElementById('display-room-code').innerText = roomId;
     
-    // Auto-assign logic based on current room balance
+    // Auto Assign Logic
     db.ref(`rooms/${roomId}/players`).once('value', snap => {
         const players = snap.val() || {};
         let copsCount = 0;
@@ -182,7 +193,6 @@ function joinRoomLogic(roomId) {
             if (p.role === 'thief') thievesCount++;
         });
         
-        // Auto-assign to the team with fewer players, default to cop if equal
         let assignedRole = copsCount <= thievesCount ? 'cop' : 'thief';
         
         db.ref(`rooms/${roomId}/players/${playerId}`).set({
@@ -194,7 +204,7 @@ function joinRoomLogic(roomId) {
         db.ref(`rooms/${roomId}/players/${playerId}`).onDisconnect().remove();
     });
 
-    // Listen to room changes
+    // Listen to room state
     db.ref(`rooms/${roomId}`).on('value', snap => {
         const roomData = snap.val();
         if (!roomData) return exitGame(); 
@@ -227,11 +237,17 @@ function renderLobbyPlayers(players) {
         div.className = 'player-item';
         div.innerText = p.name + (id === playerId ? " (אתה)" : "");
         
-        // Make draggable only if this client is the host
         if (isHost) {
-            div.draggable = true;
             div.classList.add('draggable');
-            div.ondragstart = (e) => dragStart(e, id);
+            
+            // Mobile Touch Events
+            div.addEventListener('touchstart', (e) => handleTouchStart(e, id, div), { passive: false });
+            div.addEventListener('touchmove', handleTouchMove, { passive: false });
+            div.addEventListener('touchend', (e) => handleTouchEnd(e, id, div));
+            
+            // Desktop Fallback
+            div.draggable = true;
+            div.ondragstart = (e) => { e.dataTransfer.setData("text/plain", id); };
         }
 
         if (p.role === 'cop') copsDiv.appendChild(div);
@@ -239,30 +255,78 @@ function renderLobbyPlayers(players) {
     });
 }
 
-// Drag and Drop Handlers
-function dragStart(event, id) {
-    if (!isHost) return;
-    event.dataTransfer.setData("text/plain", id);
+// --- Mobile Touch Drag & Drop Handlers ---
+function handleTouchStart(e, id, el) {
+    activeTouchElement = el;
+    activeTouchElement.dataset.playerId = id;
+    const touch = e.touches[0];
+    const rect = el.getBoundingClientRect();
+    
+    initialX = touch.clientX - rect.left;
+    initialY = touch.clientY - rect.top;
+    
+    el.style.position = 'fixed';
+    el.style.zIndex = '9999';
+    el.style.width = rect.width + 'px';
+    el.style.opacity = '0.8';
+    el.style.border = '2px solid #38bdf8';
+    
+    moveTouchElement(touch.clientX, touch.clientY);
 }
 
-function allowDrop(event) {
-    event.preventDefault();
+function handleTouchMove(e) {
+    if (!activeTouchElement) return;
+    e.preventDefault(); // Prevent scrolling while dragging
+    const touch = e.touches[0];
+    moveTouchElement(touch.clientX, touch.clientY);
 }
 
-function dragEnter(event) {
-    event.preventDefault();
-    if(isHost) event.currentTarget.classList.add('drag-over');
+function moveTouchElement(clientX, clientY) {
+    activeTouchElement.style.left = (clientX - initialX) + 'px';
+    activeTouchElement.style.top = (clientY - initialY) + 'px';
 }
 
-function dragLeave(event) {
-    if(isHost) event.currentTarget.classList.remove('drag-over');
+function handleTouchEnd(e, id, el) {
+    if (!activeTouchElement) return;
+    const touch = e.changedTouches[0];
+    
+    // Hide temporarily to find the element underneath
+    el.style.display = 'none';
+    const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
+    el.style.display = 'flex';
+    
+    // Reset visual styles
+    el.style.position = '';
+    el.style.zIndex = '';
+    el.style.left = '';
+    el.style.top = '';
+    el.style.width = '';
+    el.style.opacity = '';
+    el.style.border = '1px solid transparent';
+    
+    activeTouchElement = null;
+
+    if (dropTarget) {
+        const copsList = document.getElementById('list-cops');
+        const thievesList = document.getElementById('list-thieves');
+        const pId = el.dataset.playerId;
+        
+        if (copsList.contains(dropTarget)) {
+            db.ref(`rooms/${currentRoom}/players/${pId}`).update({ role: 'cop' });
+        } else if (thievesList.contains(dropTarget)) {
+            db.ref(`rooms/${currentRoom}/players/${pId}`).update({ role: 'thief' });
+        }
+    }
 }
 
+// --- Desktop HTML5 Drag & Drop (Fallback) ---
+function allowDrop(event) { event.preventDefault(); }
+function dragEnter(event) { if(isHost) event.currentTarget.classList.add('drag-over'); }
+function dragLeave(event) { if(isHost) event.currentTarget.classList.remove('drag-over'); }
 function drop(event, newRole) {
     event.preventDefault();
     if(isHost) event.currentTarget.classList.remove('drag-over');
     if (!isHost) return;
-    
     const targetPlayerId = event.dataTransfer.getData("text/plain");
     if (targetPlayerId && currentRoom) {
         db.ref(`rooms/${currentRoom}/players/${targetPlayerId}`).update({ role: newRole });
@@ -332,9 +396,6 @@ function enterGameScene() {
     listenToCapturedAreas();
 }
 
-// ----------------------------------------------------
-// Original Map functions adapted to room node
-// ----------------------------------------------------
 function moveMock(dir) {
     const s = 0.00015;
     if (dir === 'up') mockLat += s; if (dir === 'down') mockLat -= s;
