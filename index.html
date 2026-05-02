@@ -56,20 +56,30 @@
         #players-count { color: #10b981; }
         #signal-meter { font-size: 10px; color: #facc15; margin-top: 5px; display: none; background: rgba(0, 0, 0, 0.5); border-radius: 4px; padding: 2px; }
         
+        /* Opening Briefing UI */
+        #briefing-overlay { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 2500; background: rgba(30, 41, 59, 0.9); padding: 15px 25px; border-radius: 50px; border: 2px solid #facc15; display: none; text-align: center; width: 80%; max-width: 300px; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        #briefing-timer-text { font-size: 22px; font-weight: bold; color: #facc15; }
+        #briefing-status { font-size: 12px; margin-top: 5px; color: #cbd5e1; }
+
         /* Controls */
         #controls-container { display: none; position: absolute; bottom: 10px; left: 0; right: 0; z-index: 2000; padding: 10px; pointer-events: none; }
         
         /* Capture Button */
         #capture-btn-container { position: relative; width: 110px; height: 110px; margin: 0 auto 15px auto; pointer-events: auto; display: none; }
-        #capture-btn { position: absolute; top: 5px; left: 5px; width: 100px; height: 100px; background: #dc2626; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 18px; z-index: 5; transition: all 0.3s; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        #capture-btn.cooldown { background: transparent; color: #dc2626; border: 2px solid rgba(220, 38, 38, 0.2); }
+        #capture-btn { position: absolute; top: 5px; left: 5px; width: 100px; height: 100px; background: #dc2626; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 18px; z-index: 5; transition: all 0.3s; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 0 10px rgba(220, 38, 38, 0.5); }
+        
+        /* Visual Indication when Catch is active (10s) */
+        #capture-btn.active-sonar { animation: sonar-pulse 1s infinite; border: 4px solid #fff; box-shadow: 0 0 30px #ef4444; background: #ef4444; }
+        @keyframes sonar-pulse { 0% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.1); opacity: 0.8; } 100% { transform: scale(1); opacity: 1; } }
+
+        #capture-btn.cooldown { background: transparent; color: #dc2626; border: 2px solid rgba(220, 38, 38, 0.2); animation: none; }
         #capture-btn .timer-text { display: none; font-size: 24px; }
         #capture-btn.cooldown .timer-text { display: block; }
         #capture-btn.cooldown .btn-label { display: none; }
         .progress-ring { position: absolute; top: 0; left: 0; width: 110px; height: 110px; transform: rotate(-90deg); z-index: 1; }
         .progress-ring__circle { stroke: #dc2626; stroke-width: 6; fill: transparent; stroke-dasharray: 326.7; stroke-dashoffset: 0; transition: stroke-dashoffset 1s linear; }
 
-        /* --- Victory Screen Styles --- */
+        /* Victory Screen Styles */
         #victory-screen { display: none; z-index: 4000; flex-direction: column; text-align: center; justify-content: center; align-items: center; }
         .trophy-icon { font-size: 100px; margin-bottom: 20px; animation: bounce 2s infinite; }
         .team-victory-icon { font-size: 70px; margin-bottom: 10px; }
@@ -133,6 +143,12 @@
         <h1 style="margin:0; font-size:16px; color: #38bdf8;" id="lbl-game-title">Territory Battle</h1>
     </div>
 
+    <!-- Opening Ceremony Overlay -->
+    <div id="briefing-overlay">
+        <div id="briefing-timer-text">00:30</div>
+        <div id="briefing-status">ממתין לכל השוטרים בתחנה...</div>
+    </div>
+
     <div id="map"></div>
 
     <div id="controls-container">
@@ -156,9 +172,7 @@
     </div>
 
     <!-- Scripts -->
-    <!-- Confetti Library -->
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
-    
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -168,7 +182,6 @@
     <script src="territory.js"></script>
     <script src="firebase-init.js"></script>
     <script src="lobby.js"></script>
-    <!-- New Victory File -->
     <script src="victory.js"></script>
     <script src="game.js"></script>
 </body>
