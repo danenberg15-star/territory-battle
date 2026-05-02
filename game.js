@@ -14,6 +14,8 @@ let myLat = null;
 let myLng = null;
 let gpsWatchId = null;
 
+let hasSeenThief = false; // Fix for early win race condition
+
 // ==========================================
 // 2. Game Scene Initialization
 // ==========================================
@@ -254,8 +256,13 @@ function listenToOtherPlayers() {
 
         document.getElementById('players-count').innerText = window.currentLang === 'he' ? `שחקנים: ${activeCount}` : `Players: ${activeCount}`;
 
-        // Check Cop Victory Condition: All active thieves caught/removed
-        if (activeCount > 0 && thievesCount === 0) {
+        // Flag update - prevents initial race condition
+        if (thievesCount > 0) {
+            hasSeenThief = true;
+        }
+
+        // Check Cop Victory Condition: All active thieves caught/removed (only triggers after a thief has been detected)
+        if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
             window.db.ref(`game/${window.currentRoom}/winner`).once('value', s => {
                 if (!s.exists()) window.db.ref(`game/${window.currentRoom}/winner`).set('cops');
             });
