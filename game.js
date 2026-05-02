@@ -32,7 +32,8 @@ function enterGameScene() {
     document.getElementById('exit-btn').style.display = 'flex';
 
     // UI Initial State
-    document.getElementById('players-count').innerText = window.currentLang === 'he' ? "שחקנים: 0" : "Players: 0";
+    const playersCountEl = document.getElementById('players-count');
+    if (playersCountEl) playersCountEl.innerText = window.currentLang === 'he' ? "שחקנים: 0" : "Players: 0";
     
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
@@ -61,13 +62,13 @@ function checkArenaStatus() {
         const data = snap.val();
         if (!data) {
             if (window.isHost) {
-                showHostSetupUI();
+                document.getElementById('setup-ui').style.display = 'flex';
             } else {
                 document.getElementById('briefing-overlay').style.display = 'block';
                 document.getElementById('briefing-status').innerText = window.currentLang === 'he' ? "ממתין למנהל שיגדיר את זירת המשחק..." : "Waiting for host to define arena...";
             }
         } else {
-            // Arena defined!
+            // Arena defined! Cleanup Setup UI and unlock map
             arenaData = data;
             document.getElementById('setup-ui').style.display = 'none';
             if (map) {
@@ -81,29 +82,16 @@ function checkArenaStatus() {
             document.getElementById('controls-container').style.display = 'block';
             if (window.playerRole === 'cop') {
                 document.getElementById('capture-btn-container').style.display = 'block';
-                document.getElementById('audio-status').innerText = window.currentLang === 'he' ? "רמקול ✅" : "Speaker ✅";
-                document.getElementById('audio-status').style.color = "#10b981";
+                const audioStatusEl = document.getElementById('audio-status');
+                if (audioStatusEl) {
+                    audioStatusEl.innerText = window.currentLang === 'he' ? "רמקול ✅" : "Speaker ✅";
+                    audioStatusEl.style.color = "#10b981";
+                }
             } else {
                 startThiefMechanics();
             }
         }
     });
-}
-
-function showHostSetupUI() {
-    const setupUI = document.getElementById('setup-ui');
-    setupUI.style.display = 'flex';
-    
-    // Add Lock/Unlock Button if it doesn't exist
-    if (!document.getElementById('btn-lock-map')) {
-        const lockBtn = document.createElement('button');
-        lockBtn.id = 'btn-lock-map';
-        lockBtn.className = 'btn btn-blue';
-        lockBtn.style.marginBottom = '10px';
-        lockBtn.innerText = window.currentLang === 'he' ? "נעל מפה לסימון" : "Lock Map to Mark";
-        lockBtn.onclick = toggleMapLock;
-        setupUI.insertBefore(lockBtn, document.getElementById('btn-confirm-arena'));
-    }
 }
 
 function toggleMapLock() {
@@ -112,6 +100,7 @@ function toggleMapLock() {
     const msg = document.getElementById('setup-msg');
 
     if (isMapLocked) {
+        // Freeze Map for precise marking[cite: 2]
         map.dragging.disable();
         map.touchZoom.disable();
         map.doubleClickZoom.disable();
@@ -122,8 +111,9 @@ function toggleMapLock() {
         btn.classList.replace('btn-blue', 'btn-red');
         msg.innerText = window.currentLang === 'he' ? "המפה נעולה. לחץ עליה לסימון גבולות הזירה." : "Map Locked. Tap to mark arena boundaries.";
         
-        initArenaSetup(map); // From territory.js
+        initArenaSetup(map); // Activation from territory.js
     } else {
+        // Enable Map movement[cite: 2]
         map.dragging.enable();
         map.touchZoom.enable();
         map.doubleClickZoom.enable();
@@ -137,7 +127,7 @@ function toggleMapLock() {
 }
 
 function confirmArena() {
-    const results = finalizeArena(); // From territory.js
+    const results = finalizeArena(); // Logic from territory.js
     if (results) {
         window.db.ref(`game/${window.currentRoom}/arena`).set(results);
         window.arenaDefined = true;
@@ -194,8 +184,10 @@ function startRealGpsTracking() {
         myLng = pos.coords.longitude;
         
         const gpsEl = document.getElementById('gps-status');
-        gpsEl.innerText = "GPS ✅";
-        gpsEl.style.color = "#10b981";
+        if (gpsEl) {
+            gpsEl.innerText = "GPS ✅";
+            gpsEl.style.color = "#10b981";
+        }
 
         if (map && !window.firstLoadDone) {
             map.setView([myLat, myLng], 18);
@@ -279,7 +271,7 @@ function triggerCapture() {
     const btn = document.getElementById('capture-btn');
     if (btn.disabled) return;
     btn.disabled = true;
-    btn.classList.add('active-sonar'); 
+    btn.classList.add('active-sonar'); // Visual sonar pulse[cite: 2]
     broadcastCapture(Date.now());
     setTimeout(() => {
         btn.classList.remove('active-sonar');
@@ -294,12 +286,12 @@ function startCooldown(seconds) {
     const circle = document.getElementById('cooldown-circle');
     const interval = setInterval(() => {
         left--;
-        timerText.innerText = left;
-        circle.style.strokeDashoffset = 326.7 - (left/seconds)*326.7;
+        if (timerText) timerText.innerText = left;
+        if (circle) circle.style.strokeDashoffset = 326.7 - (left/seconds)*326.7;
         if (left <= 0) {
             clearInterval(interval);
             const btn = document.getElementById('capture-btn');
-            btn.disabled = false; btn.classList.remove('cooldown');
+            if (btn) { btn.disabled = false; btn.classList.remove('cooldown'); }
         }
     }, 1000);
 }
@@ -327,7 +319,8 @@ function listenToOtherPlayers() {
         playerMarkers = {};
         
         if (!players) {
-            document.getElementById('players-count').innerText = window.currentLang === 'he' ? "שחקנים: 0" : "Players: 0";
+            const playersCountEl = document.getElementById('players-count');
+            if (playersCountEl) playersCountEl.innerText = window.currentLang === 'he' ? "שחקנים: 0" : "Players: 0";
             return;
         }
 
@@ -353,7 +346,9 @@ function listenToOtherPlayers() {
             }).addTo(map);
         });
 
-        document.getElementById('players-count').innerText = window.currentLang === 'he' ? `שחקנים: ${activeCount}` : `Players: ${activeCount}`;
+        const playersCountEl = document.getElementById('players-count');
+        if (playersCountEl) playersCountEl.innerText = window.currentLang === 'he' ? `שחקנים: ${activeCount}` : `Players: ${activeCount}`;
+        
         if (thievesCount > 0) hasSeenThief = true;
         if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
             window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');

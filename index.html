@@ -6,7 +6,7 @@
     <title>Territory Battle</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* Base - Prevent text selection across the app */
+        /* Base Styles */
         body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #0f172a; color: white; user-select: none; -webkit-user-select: none; }
         #map { height: 100%; width: 100%; position: absolute; top: 0; z-index: 1; display: none; }
         
@@ -14,14 +14,13 @@
         .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; padding: 20px; box-sizing: border-box; }
         #lobby-screen { display: none; justify-content: flex-start; padding-top: 50px; }
         
-        /* Typography & Inputs */
+        /* Inputs & Typography */
         h1 { color: #38bdf8; font-size: 28px; margin-bottom: 30px; text-align: center; }
         h2 { color: #e2e8f0; font-size: 20px; margin-bottom: 15px; }
         input { width: 100%; max-width: 300px; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: 1px solid #38bdf8; background: #1e293b; color: white; font-size: 18px; text-align: center; box-sizing: border-box; user-select: auto; }
-        input::placeholder { color: #94a3b8; }
         
         /* Buttons */
-        .btn { width: 100%; max-width: 300px; padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; margin-bottom: 15px; transition: 0.2s; }
+        .btn { width: 100%; max-width: 300px; padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; margin-bottom: 15px; transition: 0.2s; text-align: center; }
         .btn-blue { background: #1e40af; }
         .btn-red { background: #991b1b; }
         .btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; max-width: 350px; width: 100%; margin: 15px 0 0 0; }
@@ -29,23 +28,17 @@
         /* Lobby Elements */
         .room-header-container { display: flex; flex-direction: row; align-items: center; justify-content: center; width: 100%; max-width: 350px; margin-bottom: 20px; }
         .room-code-box { background: #1e293b; border: 2px dashed #38bdf8; padding: 15px; border-radius: 12px; font-size: 24px; font-weight: bold; letter-spacing: 2px; text-align: center; flex-grow: 1; }
-        
-        /* WhatsApp Icon Button */
-        .btn-whatsapp-icon { background: #25D366; border: none; border-radius: 50%; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; cursor: pointer; box-shadow: 0 4px 6px rgba(0,0,0,0.3); flex-shrink: 0; margin-right: 15px; }
+        .btn-whatsapp-icon { background: #25D366; border: none; border-radius: 50%; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-right: 15px; flex-shrink: 0; }
         .btn-whatsapp-icon svg { width: 30px; height: 30px; fill: white; }
         
-        /* Teams Side-by-Side */
         .lists-container { display: flex; flex-direction: row; width: 100%; max-width: 350px; gap: 10px; flex-grow: 1; overflow-y: auto; align-items: stretch; }
-        .team-list { background: #1e293b; border-radius: 12px; padding: 10px; flex: 1; display: flex; flex-direction: column; transition: background 0.2s; }
-        .team-list.drag-over { background: #334155; border: 2px dashed #38bdf8 !important; }
-        .team-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; border-bottom: 1px solid #334155; padding-bottom: 5px; pointer-events: none; text-align: center; }
-        .drop-zone { flex-grow: 1; min-height: 100px; }
-        .player-item { background: #334155; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; text-align: center; border: 1px solid transparent; touch-action: none; }
-        .player-item.draggable { cursor: grab; }
+        .team-list { background: #1e293b; border-radius: 12px; padding: 10px; flex: 1; display: flex; flex-direction: column; }
+        .team-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; text-align: center; }
+        .player-item { background: #334155; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; text-align: center; touch-action: none; }
 
-        /* Setup Territory UI (Host Only) */
+        /* Area Setup UI (Host Only) */
         #setup-ui { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 2600; width: 90%; max-width: 400px; display: none; flex-direction: column; gap: 10px; pointer-events: auto; }
-        .setup-msg { background: rgba(30, 41, 59, 0.95); padding: 15px; border-radius: 12px; border: 2px solid #38bdf8; text-align: center; font-size: 14px; color: white; box-shadow: 0 0 15px rgba(56, 189, 248, 0.4); }
+        .setup-msg { background: rgba(30, 41, 59, 0.95); padding: 15px; border-radius: 12px; border: 2px solid #38bdf8; text-align: center; font-size: 14px; color: white; }
 
         /* In-Game UI */
         .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 3000; background: rgba(220, 38, 38, 0.9); color: white; border: 2px solid white; border-radius: 50%; width: 40px; height: 40px; font-weight: bold; font-size: 20px; cursor: pointer; display: none; align-items: center; justify-content: center; }
@@ -58,37 +51,34 @@
         /* Briefing UI */
         #briefing-overlay { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 2500; background: rgba(30, 41, 59, 0.9); padding: 15px 25px; border-radius: 50px; border: 2px solid #facc15; display: none; text-align: center; width: 80%; max-width: 300px; }
         #briefing-timer-text { font-size: 22px; font-weight: bold; color: #facc15; }
-        #briefing-status { font-size: 12px; margin-top: 5px; color: #cbd5e1; }
 
         /* Controls */
         #controls-container { display: none; position: absolute; bottom: 10px; left: 0; right: 0; z-index: 2000; padding: 10px; pointer-events: none; }
         #capture-btn-container { position: relative; width: 110px; height: 110px; margin: 0 auto 15px auto; pointer-events: auto; display: none; }
         #capture-btn { position: absolute; top: 5px; left: 5px; width: 100px; height: 100px; background: #dc2626; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 18px; z-index: 5; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        #capture-btn.active-sonar { animation: sonar-pulse 1s infinite; border: 4px solid #fff; box-shadow: 0 0 30px #ef4444; }
+        #capture-btn.active-sonar { animation: sonar-pulse 1s infinite; border: 4px solid #fff; }
         @keyframes sonar-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
         
-        #capture-btn.cooldown { background: transparent; color: #dc2626; border: 2px solid rgba(220, 38, 38, 0.2); }
         .progress-ring { position: absolute; top: 0; left: 0; width: 110px; height: 110px; transform: rotate(-90deg); z-index: 1; }
         .progress-ring__circle { stroke: #dc2626; stroke-width: 6; fill: transparent; stroke-dasharray: 326.7; stroke-dashoffset: 0; transition: stroke-dashoffset 1s linear; }
 
-        /* Victory Screen */
+        /* Victory */
         #victory-screen { display: none; z-index: 4000; text-align: center; justify-content: center; align-items: center; }
-        .trophy-icon { font-size: 100px; margin-bottom: 20px; animation: bounce 2s infinite; }
     </style>
 </head>
 <body>
     <button id="lang-toggle" onclick="toggleLanguage()" style="position:absolute; top:15px; right:15px; z-index:3001; background:#1e293b; color:white; border-radius:50%; width:40px; height:40px; border:1px solid #38bdf8;">🌐</button>
 
-    <!-- 1. Login Screen -->
+    <!-- 1. Login -->
     <div id="login-screen" class="screen">
         <h1 id="lbl-main-title">Territory Battle</h1>
         <input type="text" id="player-name" placeholder="הכנס שם שחקן" />
         <input type="number" id="room-code-input" placeholder="קוד חדר" />
-        <button class="btn btn-blue" id="btn-join" onclick="joinRoom()">הצטרף</button>
-        <button class="btn btn-red" id="btn-create" onclick="createRoom()">צור חדר</button>
+        <button class="btn btn-blue" onclick="joinRoom()">הצטרף</button>
+        <button class="btn btn-red" onclick="createRoom()">צור חדר</button>
     </div>
 
-    <!-- 2. Lobby Screen -->
+    <!-- 2. Lobby -->
     <div id="lobby-screen" class="screen">
         <h2 id="lbl-lobby-title">לובי המתנה</h2>
         <div class="room-header-container">
@@ -100,24 +90,23 @@
             </button>
         </div>
         <div class="lists-container">
-            <div class="team-list" id="list-cops" ondrop="drop(event, 'cop')" ondragover="allowDrop(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" style="border: 1px solid #3b82f6;">
-                <div class="team-title" id="lbl-cops" style="color: #3b82f6;">שוטרים 👮‍♂️</div>
+            <div class="team-list" id="list-cops" style="border: 1px solid #3b82f6;">
+                <div class="team-title" style="color: #3b82f6;">שוטרים 👮‍♂️</div>
                 <div id="players-cops" class="drop-zone"></div>
             </div>
-            <div class="team-list" id="list-thieves" ondrop="drop(event, 'thief')" ondragover="allowDrop(event)" ondragenter="dragEnter(event)" ondragleave="dragLeave(event)" style="border: 1px solid #ef4444;">
-                <div class="team-title" id="lbl-thieves" style="color: #ef4444;">גנבים 🥷</div>
+            <div class="team-list" id="list-thieves" style="border: 1px solid #ef4444;">
+                <div class="team-title" style="color: #ef4444;">גנבים 🥷</div>
                 <div id="players-thieves" class="drop-zone"></div>
             </div>
         </div>
-        <button class="btn btn-green" id="btn-start-game" style="display: none;" onclick="startGame()">
-            התחל משחק<br><span style="font-size:12px; font-weight:normal;">(לחוויה מיטבית וודא שאינך במצב חיסכון סוללה)</span>
-        </button>
+        <button class="btn btn-green" id="btn-start-game" style="display: none;" onclick="startGame()">התחל משחק</button>
     </div>
 
-    <!-- 3. Area Setup UI (Host Only) -->
+    <!-- 3. Area Setup UI -->
     <div id="setup-ui">
-        <div class="setup-msg" id="setup-msg">סמן לפחות 3 נקודות על המפה כדי להגדיר את זירת המשחק</div>
-        <button class="btn btn-blue" id="btn-confirm-arena" onclick="confirmArena()" style="display:none; margin: 0 auto;">אשר זירה וקבע תחנה</button>
+        <button class="btn btn-blue" id="btn-lock-map" onclick="toggleMapLock()">נעל מפה לסימון</button>
+        <div class="setup-msg" id="setup-msg">סדר את המפה על האזור המבוקש ואז נעל אותה.</div>
+        <button class="btn btn-blue" id="btn-confirm-arena" onclick="confirmArena()" style="display:none;">אשר זירה וקבע תחנה</button>
     </div>
 
     <!-- 4. In-Game UI -->
@@ -128,7 +117,7 @@
             <span id="audio-status">אודיו ⏳</span>
             <span id="players-count">שחקנים: 0</span>
         </div>
-        <h1 style="margin:0; font-size:16px; color: #38bdf8;" id="lbl-game-title">Territory Battle</h1>
+        <h1 style="margin:0; font-size:16px; color: #38bdf8;">Territory Battle</h1>
     </div>
 
     <div id="briefing-overlay">
@@ -141,18 +130,11 @@
     <div id="controls-container">
         <div id="capture-btn-container">
             <svg class="progress-ring"><circle class="progress-ring__circle" id="cooldown-circle" cx="55" cy="55" r="52"></circle></svg>
-            <button id="capture-btn" onclick="triggerCapture()">
-                <span class="btn-label" id="lbl-capture">תפוס!</span>
-                <span class="timer-text" id="cooldown-timer">60</span>
-            </button>
+            <button id="capture-btn" onclick="triggerCapture()">תפוס!</button>
         </div>
     </div>
 
-    <div id="victory-screen" class="screen">
-        <div class="trophy-icon">🏆</div>
-        <h1 id="victory-title">ניצחון!</h1>
-        <button class="btn btn-blue" onclick="location.reload()">חזור ללובי</button>
-    </div>
+    <div id="victory-screen" class="screen"><h1>ניצחון!</h1></div>
 
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
