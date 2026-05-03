@@ -1,4 +1,4 @@
-// game.js - Phase 1.6: Button-Controlled Map & Free-hand Drawing Arena
+// game.js - Phase 1.6: Button-Controlled Map & Free-hand Drawing Arena (Light Theme)
 
 // ==========================================
 // 1. Game Globals
@@ -33,19 +33,22 @@ function enterGameScene() {
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Initialize Map with Touch Interactions Disabled for Host Drawing[cite: 1]
+    // Initialize Map with Touch Interactions Disabled for Host Drawing
     map = L.map('map', { 
         zoomControl: false, 
         attributionControl: false,
-        dragging: false,      // Disable touch pan[cite: 1]
-        touchZoom: false,     // Disable pinch zoom[cite: 1]
+        dragging: false,      
+        touchZoom: false,     
         doubleClickZoom: false,
         scrollWheelZoom: false,
         boxZoom: false,
         keyboard: false
     }).setView([32.0853, 34.7818], 18);
 
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(map);
+    // מפה בהירה - CartoDB Voyager
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { 
+        maxZoom: 20 
+    }).addTo(map);
 
     // Sync Game Data
     window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
@@ -60,11 +63,11 @@ function enterGameScene() {
 }
 
 // ==========================================
-// 3. Map Control Functions (Buttons Only)[cite: 1]
+// 3. Map Control Functions (Buttons Only)
 // ==========================================
 function panMap(direction) {
     if (!map) return;
-    const offset = 100; // Pixels to move
+    const offset = 100; 
     switch (direction) {
         case 'up': map.panBy([0, -offset]); break;
         case 'down': map.panBy([0, offset]); break;
@@ -94,13 +97,11 @@ function checkArenaStatus() {
                 document.getElementById('briefing-status').innerText = statusMsg;
             }
         } else {
-            // Arena is ready - Cleanup Setup UI and Resume Normal Map Interaction
             arenaData = data;
             document.getElementById('setup-ui').style.display = 'none';
             document.getElementById('drawing-container').style.display = 'none';
             document.getElementById('map-controls').style.display = 'none';
             
-            // Enable map interaction for gameplay[cite: 1]
             map.dragging.enable();
             map.touchZoom.enable();
 
@@ -119,19 +120,17 @@ function checkArenaStatus() {
 }
 
 function setupHostDrawingMode() {
-    // 1. Set initial view to 4km^2 (approx zoom 14)[cite: 1]
     if (myLat && myLng) {
         map.setView([myLat, myLng], 14);
     }
     
-    // 2. Show Drawing Canvas and Map Controls[cite: 1]
     document.getElementById('setup-ui').style.display = 'flex';
     document.getElementById('map-controls').style.display = 'flex';
     initDrawingCanvas(map); 
 }
 
 function confirmDrawing() {
-    const results = finalizeDrawing(); // Logic from territory.js
+    const results = finalizeDrawing(); 
     if (results) {
         window.db.ref(`game/${window.currentRoom}/arena`).set(results);
     }
@@ -141,7 +140,7 @@ function drawArenaOnMap() {
     if (!arenaData || !map) return;
     if (arenaPolygonLayer) map.removeLayer(arenaPolygonLayer);
     arenaPolygonLayer = L.polygon(arenaData.points, {
-        color: '#38bdf8', weight: 3, fillOpacity: 0.1, dashArray: '5, 10'
+        color: '#1d4ed8', weight: 4, fillOpacity: 0.1, dashArray: '5, 10'
     }).addTo(map);
 }
 
@@ -150,7 +149,7 @@ function setupPoliceStation() {
     if (policeStationCircle) map.removeLayer(policeStationCircle);
     policeStationCircle = L.circle([data.lat, data.lng], {
         radius: data.radius,
-        color: '#3b82f6', fillColor: '#3b82f6', fillOpacity: 0.2
+        color: '#1e40af', fillColor: '#3b82f6', fillOpacity: 0.3
     }).addTo(map);
 }
 
@@ -180,7 +179,6 @@ function startRealGpsTracking() {
 function updateRealPosition() {
     if(!map || myLat === null) return;
     
-    // Only pan map to player during active gameplay (not drawing)[cite: 1]
     const isDrawingMode = document.getElementById('drawing-container').style.display === 'block';
     if (!isDrawingMode) {
         map.panTo([myLat, myLng]);
@@ -239,7 +237,6 @@ function triggerCapture() {
 
 function startCooldown(seconds) {
     let left = seconds;
-    const timerText = document.getElementById('cooldown-timer');
     const interval = setInterval(() => {
         left--;
         if (left <= 0) {
@@ -290,8 +287,8 @@ function listenToOtherPlayers() {
             
             playerMarkers[id] = L.circleMarker([p.lat, p.lng], { 
                 radius: id === window.playerId ? 25 : 15, 
-                fillColor: p.role === 'cop' ? '#3b82f6' : '#ef4444', 
-                fillOpacity: 1, color: '#fff', weight: 2 
+                fillColor: p.role === 'cop' ? '#2563eb' : '#dc2626', 
+                fillOpacity: 1, color: '#fff', weight: 3 
             }).addTo(map);
         });
 
@@ -323,13 +320,13 @@ function manageBriefingLogic() {
         const cops = Object.values(players).filter(p => p.role === 'cop');
         const ready = cops.length > 0 && cops.every(c => c.inStation);
         if (ready) {
-            // Start briefing timer in Firebase logic
+            // Timer logic in DB
         }
     });
 }
 
 function startThiefMechanics() {
-    trailLayer = L.polyline([], { color: '#ef4444', weight: 4, dashArray: '5, 10' }).addTo(map);
+    trailLayer = L.polyline([], { color: '#dc2626', weight: 4, dashArray: '5, 10' }).addTo(map);
     startListeningForCops((ts) => {
         if (ts && ts >= gameStartTime) {
             alert("נתפסת!");
