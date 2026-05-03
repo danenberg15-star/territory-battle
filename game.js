@@ -1,4 +1,4 @@
-// game.js - Phase 1.8: Security, Privacy, and Offline Rules (3 Minutes Rule)
+// game.js - Phase 1.8.1: Police Station Briefing Logic (Refactored)
 
 // ==========================================
 // 1. Game Globals
@@ -238,7 +238,7 @@ function handleThiefPath() {
 // 6. Gameplay Mechanics & Offline Rules
 // ==========================================
 
-// בדיקת ניתוקים - פועלת בשרת (על ידי המנהל) כל 10 שניות[cite: 9]
+// בדיקת ניתוקים - פועלת בשרת (על ידי המנהל) כל 10 שניות
 function checkOfflinePlayers() {
     if (!window.isHost || !window.currentRoom) return;
     const now = Date.now();
@@ -325,7 +325,7 @@ function listenToOtherPlayers() {
                 const gp = gamePlayers[id];
                 const rp = roomPlayers[id] || {}; 
                 const role = rp.role || gp.role;
-                const isOffline = rp.isOffline || false; // בדיקת סטטוס מנותק[cite: 9]
+                const isOffline = rp.isOffline || false; // בדיקת סטטוס מנותק
                 
                 // ספירה רק של שחקנים מחוברים לניצחון
                 if (!isOffline) {
@@ -336,7 +336,7 @@ function listenToOtherPlayers() {
                 // שוטר לא רואה גנבים
                 if (window.playerRole === 'cop' && role === 'thief' && id !== window.playerId) return;
                 
-                // קביעת צבע הסמן - אפור אם מנותק, אחרת כחול/אדום[cite: 9]
+                // קביעת צבע הסמן - אפור אם מנותק, אחרת כחול/אדום
                 let markerColor = '#dc2626'; // אדום גנב
                 if (role === 'cop') markerColor = '#2563eb'; // כחול שוטר
                 if (isOffline) markerColor = '#6b7280'; // אפור אם מנותק 
@@ -358,31 +358,6 @@ function listenToOtherPlayers() {
                 window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
             }
         });
-    });
-}
-
-function listenToBriefing() {
-    window.db.ref(`game/${window.currentRoom}/briefing`).on('value', snap => {
-        const b = snap.val() || { active: false, timeLeft: 30, complete: false };
-        isBriefingComplete = b.complete;
-        if (isBriefingComplete) {
-            document.getElementById('briefing-overlay').style.display = 'none';
-        } else {
-            document.getElementById('briefing-overlay').style.display = 'block';
-            document.getElementById('briefing-timer-text').innerText = `00:${b.timeLeft < 10 ? '0' : ''}${b.timeLeft}`;
-        }
-    });
-}
-
-function manageBriefingLogic() {
-    if (!window.isHost || isBriefingComplete || !arenaData) return;
-    window.db.ref(`game/${window.currentRoom}/players`).once('value', snap => {
-        const players = snap.val() || {};
-        const cops = Object.values(players).filter(p => p.role === 'cop');
-        const ready = cops.length > 0 && cops.every(c => c.inStation);
-        if (ready) {
-            // Timer logic in DB
-        }
     });
 }
 
