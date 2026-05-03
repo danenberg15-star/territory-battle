@@ -1,4 +1,4 @@
-// game.js - Phase 1.6.2: Setup UI Refinement
+// game.js - Phase 1.8: Security, Privacy, and Offline Rules (3 Minutes Rule)
 
 // ==========================================
 // 1. Game Globals
@@ -33,7 +33,7 @@ function enterGameScene() {
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Initialize Map with Touch Interactions Disabled for Host Drawing[cite: 1]
+    // Initialize Map with Touch Interactions Disabled for Host Drawing
     map = L.map('map', { 
         zoomControl: false, 
         attributionControl: false,
@@ -45,12 +45,12 @@ function enterGameScene() {
         keyboard: false
     }).setView([32.0853, 34.7818], 18);
 
-    // מפה בהירה - CartoDB Voyager[cite: 1]
+    // מפה בהירה - CartoDB Voyager
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { 
         maxZoom: 20 
     }).addTo(map);
 
-    // Sync Game Data[cite: 1]
+    // Sync Game Data
     window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
         gameStartTime = snap.val() || Date.now();
         checkArenaStatus();
@@ -60,10 +60,15 @@ function enterGameScene() {
     listenToOtherPlayers();
     listenToCapturedAreas();
     listenToVictory(); 
+    
+    // הפעלת בדיקת 3 הדקות לניתוקים (רק למנהל כדי למנוע כפילויות)
+    if (window.isHost) {
+        setInterval(checkOfflinePlayers, 10000); 
+    }
 }
 
 // ==========================================
-// 3. Map Control Functions (Buttons Only)[cite: 1]
+// 3. Map Control Functions (Buttons Only)
 // ==========================================
 function panMap(direction) {
     if (!map) return;
@@ -83,7 +88,7 @@ function zoomMap(delta) {
 }
 
 // ==========================================
-// 4. Arena Setup (Drawing Mode)[cite: 1]
+// 4. Arena Setup (Drawing Mode)
 // ==========================================
 function checkArenaStatus() {
     window.db.ref(`game/${window.currentRoom}/arena`).on('value', snap => {
@@ -162,7 +167,7 @@ function setupPoliceStation() {
 }
 
 // ==========================================
-// 5. GPS & Movement Logic[cite: 1]
+// 5. GPS & Movement Logic
 // ==========================================
 function startRealGpsTracking() {
     if (!navigator.geolocation) return;
@@ -230,8 +235,34 @@ function handleThiefPath() {
 }
 
 // ==========================================
-// 6. Gameplay Mechanics[cite: 1]
+// 6. Gameplay Mechanics & Offline Rules
 // ==========================================
+
+// בדיקת ניתוקים - פועלת בשרת (על ידי המנהל) כל 10 שניות[cite: 9]
+function checkOfflinePlayers() {
+    if (!window.isHost || !window.currentRoom) return;
+    const now = Date.now();
+    
+    window.db.ref(`rooms/${window.currentRoom}/players`).once('value', snap => {
+        const players = snap.val();
+        if (!players) return;
+        
+        Object.keys(players).forEach(id => {
+            const p = players[id];
+            // חוק 3 הדקות (180,000 מילישניות)
+            if (p.isOffline && p.disconnectedAt && (now - p.disconnectedAt > 180000)) {
+                console.log(`Player ${p.name} disconnected for over 3 minutes. Removing from game.`);
+                
+                // מחיקת השחקן מהחדר
+                window.db.ref(`rooms/${window.currentRoom}/players/${id}`).remove();
+                
+                // במידה ויש שובל פעיל (יוטמע בשלבים הבאים), יש למחוק אותו כאן
+                // window.db.ref(`game/${window.currentRoom}/activeTrails/${id}`).remove();
+            }
+        });
+    });
+}
+
 function triggerCapture() {
     if (!isBriefingComplete) return;
     const btn = document.getElementById('capture-btn');
@@ -256,7 +287,7 @@ function startCooldown(seconds) {
 }
 
 // ==========================================
-// 7. Firebase Listeners[cite: 1]
+// 7. Firebase Listeners
 // ==========================================
 function listenToVictory() {
     window.db.ref(`game/${window.currentRoom}/winner`).on('value', snap => {
@@ -272,39 +303,61 @@ function listenToCapturedAreas() {
 }
 
 function listenToOtherPlayers() {
-    window.db.ref(`game/${window.currentRoom}/players`).on('value', snap => {
-        const players = snap.val();
-        for (let id in playerMarkers) map.removeLayer(playerMarkers[id]);
-        playerMarkers = {};
+    window.db.ref(`rooms/${window.currentRoom}/players`).on('value', snapRooms => {
+        const roomPlayers = snapRooms.val() || {};
         
-        const playersCountEl = document.getElementById('players-count');
-        if (!players) {
-            if (playersCountEl) playersCountEl.innerText = "שחקנים: 0";
-            return;
-        }
-
-        let activeCount = 0;
-        let thievesCount = 0;
-
-        Object.keys(players).forEach(id => {
-            const p = players[id];
-            activeCount++;
-            if (p.role === 'thief') thievesCount++;
+        window.db.ref(`game/${window.currentRoom}/players`).on('value', snapGame => {
+            const gamePlayers = snapGame.val();
             
-            if (window.playerRole === 'cop' && p.role === 'thief' && id !== window.playerId) return;
+            for (let id in playerMarkers) map.removeLayer(playerMarkers[id]);
+            playerMarkers = {};
             
-            playerMarkers[id] = L.circleMarker([p.lat, p.lng], { 
-                radius: id === window.playerId ? 25 : 15, 
-                fillColor: p.role === 'cop' ? '#2563eb' : '#dc2626', 
-                fillOpacity: 1, color: '#fff', weight: 3 
-            }).addTo(map);
+            const playersCountEl = document.getElementById('players-count');
+            if (!gamePlayers) {
+                if (playersCountEl) playersCountEl.innerText = "שחקנים: 0";
+                return;
+            }
+
+            let activeCount = 0;
+            let thievesCount = 0;
+
+            Object.keys(gamePlayers).forEach(id => {
+                const gp = gamePlayers[id];
+                const rp = roomPlayers[id] || {}; 
+                const role = rp.role || gp.role;
+                const isOffline = rp.isOffline || false; // בדיקת סטטוס מנותק[cite: 9]
+                
+                // ספירה רק של שחקנים מחוברים לניצחון
+                if (!isOffline) {
+                    activeCount++;
+                    if (role === 'thief') thievesCount++;
+                }
+                
+                // שוטר לא רואה גנבים
+                if (window.playerRole === 'cop' && role === 'thief' && id !== window.playerId) return;
+                
+                // קביעת צבע הסמן - אפור אם מנותק, אחרת כחול/אדום[cite: 9]
+                let markerColor = '#dc2626'; // אדום גנב
+                if (role === 'cop') markerColor = '#2563eb'; // כחול שוטר
+                if (isOffline) markerColor = '#6b7280'; // אפור אם מנותק 
+
+                playerMarkers[id] = L.circleMarker([gp.lat, gp.lng], { 
+                    radius: id === window.playerId ? 25 : 15, 
+                    fillColor: markerColor, 
+                    fillOpacity: isOffline ? 0.5 : 1, // חצי שקוף אם מנותק
+                    color: '#fff', 
+                    weight: 3 
+                }).addTo(map);
+            });
+
+            if (playersCountEl) playersCountEl.innerText = `שחקנים: ${activeCount}`;
+            if (thievesCount > 0) hasSeenThief = true;
+            
+            // תנאי ניצחון קיים - הוספת וידוא שרק שחקנים פעילים נספרים
+            if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
+                window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
+            }
         });
-
-        if (playersCountEl) playersCountEl.innerText = `שחקנים: ${activeCount}`;
-        if (thievesCount > 0) hasSeenThief = true;
-        if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
-            window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
-        }
     });
 }
 

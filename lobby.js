@@ -1,4 +1,4 @@
-// lobby.js - Full Version with Drag & Drop & Persistence + QA Interceptor
+// lobby.js - Full Version with Drag & Drop & Persistence + QA Interceptor + Offline Persistence
 
 // ==========================================
 // 1. Globals & Persistence
@@ -123,27 +123,57 @@ function joinRoomLogic(roomId) {
     document.getElementById('lobby-screen').style.display = 'flex';
     document.getElementById('display-room-code').innerText = roomId;
     
-    window.db.ref(`rooms/${roomId}/players/${playerId}`).set({ name: playerName, role: 'thief', t: Date.now() });
-    window.db.ref(`rooms/${roomId}/players/${playerId}`).onDisconnect().remove();
-
-    window.db.ref(`rooms/${roomId}`).on('value', snap => {
+    // קריאה מקדימה כדי למנוע דריסת נתוני שחקן בחיבור מחדש למשחק פעיל[cite: 9]
+    window.db.ref(`rooms/${roomId}`).once('value', snap => {
         const roomData = snap.val();
         if (!roomData) return;
-        
-        isHost = (roomData.host === playerId);
-        if (isHost) document.getElementById('btn-start-game').style.display = 'block';
-        
-        if (roomData.status === 'playing') {
-            window.db.ref(`rooms/${roomId}`).off(); 
-            window.isHost = isHost; 
-            window.playerRole = roomData.players[playerId]?.role || 'thief';
-            window.currentRoom = currentRoom;
-            window.playerId = playerId;
-            window.currentLang = currentLang;
-            if(typeof enterGameScene === 'function') enterGameScene();
-            return;
+
+        const isReconnecting = roomData.status === 'playing' && roomData.players && roomData.players[playerId];
+
+        if (!isReconnecting) {
+            // התחברות לראשונה או ללובי
+            window.db.ref(`rooms/${roomId}/players/${playerId}`).set({ 
+                name: playerName, 
+                role: 'thief', 
+                t: Date.now(),
+                isOffline: false,
+                disconnectedAt: null
+            });
+        } else {
+            // התחברות מחדש (Reconnect) - עדכון סטטוס חיבור בלבד[cite: 9]
+            window.db.ref(`rooms/${roomId}/players/${playerId}`).update({ 
+                isOffline: false,
+                disconnectedAt: null,
+                t: Date.now()
+            });
         }
-        renderLobbyPlayers(roomData.players);
+
+        // במקום מחיקה מיידית, מסמנים כלא מקוון לטובת חוק ה-3 דקות[cite: 9]
+        window.db.ref(`rooms/${roomId}/players/${playerId}`).onDisconnect().update({
+            isOffline: true,
+            disconnectedAt: firebase.database.ServerValue.TIMESTAMP
+        });
+
+        // האזנה לשינויים בחדר
+        window.db.ref(`rooms/${roomId}`).on('value', snap => {
+            const updatedRoom = snap.val();
+            if (!updatedRoom) return;
+            
+            isHost = (updatedRoom.host === playerId);
+            if (isHost) document.getElementById('btn-start-game').style.display = 'block';
+            
+            if (updatedRoom.status === 'playing') {
+                window.db.ref(`rooms/${roomId}`).off(); 
+                window.isHost = isHost; 
+                window.playerRole = updatedRoom.players[playerId]?.role || 'thief';
+                window.currentRoom = currentRoom;
+                window.playerId = playerId;
+                window.currentLang = currentLang;
+                if(typeof enterGameScene === 'function') enterGameScene();
+                return;
+            }
+            renderLobbyPlayers(updatedRoom.players || {});
+        });
     });
 }
 

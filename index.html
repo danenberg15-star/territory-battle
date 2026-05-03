@@ -75,9 +75,17 @@
 
         /* Victory */
         #victory-screen { display: none; z-index: 4000; text-align: center; justify-content: center; align-items: center; }
+
+        /* Security Overlay */
+        #security-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 5000; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: none; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.4); pointer-events: none; }
+        .watermark-text { font-size: 2.5rem; font-weight: bold; transform: rotate(-45deg); text-align: center; white-space: nowrap; user-select: none; line-height: 1.5; }
     </style>
 </head>
 <body>
+    <div id="security-overlay">
+        <div class="watermark-text" id="watermark-content">Territory Battle</div>
+    </div>
+
     <button id="lang-toggle" onclick="toggleLanguage()" style="position:absolute; top:15px; right:15px; z-index:3101; background:#1e293b; color:white; border-radius:50%; width:40px; height:40px; border:1px solid #38bdf8;">🌐</button>
 
     <!-- 1. Login -->
@@ -173,6 +181,10 @@
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    
+    <!-- Security Module Loaded Early -->
+    <script src="security.js"></script>
+    
     <script src="audio.js"></script>
     <script src="territory.js"></script>
     <script src="firebase-init.js"></script>
