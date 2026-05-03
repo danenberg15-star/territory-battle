@@ -1,4 +1,4 @@
-// lobby.js - Language, Persistence, Wake Lock, Drag & Drop & Lobby Management
+// lobby.js - Full Version with Drag & Drop & Persistence + QA Interceptor
 
 // ==========================================
 // 1. Globals & Persistence
@@ -29,41 +29,22 @@ const i18n = {
         btnJoin: "הצטרף לחדר", btnCreate: "צור חדר חדש",
         roomCodeLbl: "קוד חדר:",
         copsLbl: "שוטרים 👮‍♂️", thievesLbl: "גנבים 🥷",
-        btnStart: "התחל משחק<br><span style='font-size:12px; font-weight:normal;'>(לחוויה מיטבית וודא שאינך במצב חיסכון סוללה)</span>",
-        lblCapture: "תפוס!"
+        btnStart: "התחל משחק<br><span style='font-size:12px; font-weight:normal;'>(לחוויה מיטבית וודא שאינך במצב חיסכון סוללה)</span>"
     },
     'en': {
         mainTitle: "Territory Battle", lobbyTitle: "Waiting Lobby",
         btnJoin: "Join Room", btnCreate: "Create Room",
         roomCodeLbl: "Room Code:",
         copsLbl: "Cops 👮‍♂️", thievesLbl: "Thieves 🥷",
-        btnStart: "Start Game<br><span style='font-size:12px; font-weight:normal;'>(Turn off Low Power Mode)</span>",
-        lblCapture: "Catch!"
+        btnStart: "Start Game<br><span style='font-size:12px; font-weight:normal;'>(Turn off Low Power Mode)</span>"
     }
 };
 
 window.onload = () => {
     const urlParams = new URLSearchParams(window.location.search);
-    if(urlParams.has('room')) {
-        document.getElementById('room-code-input').value = urlParams.get('room');
-    }
-    
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition(pos => {
-            const lat = pos.coords.latitude;
-            const lng = pos.coords.longitude;
-            if (lat > 29.4 && lat < 33.4 && lng > 34.2 && lng < 35.9) {
-                setLanguage('he');
-            } else {
-                setLanguage('en');
-            }
-        }, () => setLanguage('he'));
-    }
+    if(urlParams.has('room')) document.getElementById('room-code-input').value = urlParams.get('room');
+    setLanguage('he'); 
 };
-
-function toggleLanguage() {
-    setLanguage(currentLang === 'he' ? 'en' : 'he');
-}
 
 function setLanguage(lang) {
     currentLang = lang;
@@ -77,72 +58,62 @@ function setLanguage(lang) {
     document.getElementById('lbl-cops').innerHTML = t.copsLbl;
     document.getElementById('lbl-thieves').innerHTML = t.thievesLbl;
     document.getElementById('btn-start-game').innerHTML = t.btnStart;
-    
-    document.getElementById('player-name').placeholder = lang === 'he' ? "הכנס שם שחקן" : "Enter Player Name";
-    document.getElementById('room-code-input').placeholder = lang === 'he' ? "קוד חדר (4 ספרות)" : "Room Code (4 digits)";
 }
+
+function toggleLanguage() { setLanguage(currentLang === 'he' ? 'en' : 'he'); }
 
 // ==========================================
 // 3. Wake Lock Logic
 // ==========================================
 async function enableWakeLock() {
-    try {
-        if ('wakeLock' in navigator) {
-            wakeLock = await navigator.wakeLock.request('screen');
-        }
-    } catch (err) {
-        console.warn('Wake Lock error:', err);
-    }
+    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
 }
-document.addEventListener('visibilitychange', () => {
-    if (wakeLock !== null && document.visibilityState === 'visible') enableWakeLock();
-});
 
 // ==========================================
 // 4. Lobby Actions
 // ==========================================
-function getPlayerName() {
-    const inputName = document.getElementById('player-name').value.trim();
-    if (!inputName) {
-        alert(currentLang === 'he' ? "אנא הכנס שם שחקן" : "Please enter a name");
-        return false;
-    }
-    localStorage.setItem('tb_name', inputName);
-    playerName = inputName;
-    return true;
-}
-
 function createRoom() {
-    if (!getPlayerName()) return;
-    enableWakeLock();
+    const inputName = document.getElementById('player-name').value.trim();
+    if (!inputName) return alert("הכנס שם");
+    playerName = inputName;
+    localStorage.setItem('tb_name', playerName);
     const roomId = Math.floor(1000 + Math.random() * 9000).toString();
     currentRoom = roomId;
     isHost = true;
-    
-    window.db.ref(`rooms/${roomId}`).set({
-        status: 'lobby',
-        host: playerId,
-        createdAt: Date.now()
-    }).then(() => {
-        joinRoomLogic(roomId);
-    });
+    enableWakeLock();
+    window.db.ref(`rooms/${roomId}`).set({ status: 'lobby', host: playerId, createdAt: Date.now() }).then(() => joinRoomLogic(roomId));
 }
 
 function joinRoom() {
-    if (!getPlayerName()) return;
+    const inputName = document.getElementById('player-name').value.trim();
     const roomId = document.getElementById('room-code-input').value.trim();
-    if (roomId.length !== 4) {
-        alert(currentLang === 'he' ? "קוד חדר חייב להיות 4 ספרות" : "Room code must be 4 digits");
+    
+    if (!inputName) return alert("הכנס שם");
+
+    // ==========================================
+    // QA Sandbox Interception (99999 / 88888)
+    // ==========================================
+    if (roomId === '99999' || roomId === '88888') {
+        playerName = inputName;
+        localStorage.setItem('tb_name', playerName);
+        currentRoom = roomId;
+        enableWakeLock();
+        if (typeof initQARoom === 'function') {
+            initQARoom(roomId); // מזניק את ה-QA
+        } else {
+            alert("שגיאה: קובץ בדיקות (QA) לא נטען כראוי.");
+        }
         return;
     }
-    enableWakeLock();
+
+    if (roomId.length !== 4) return alert("בדוק קוד חדר (4 ספרות)");
     
+    playerName = inputName;
+    localStorage.setItem('tb_name', playerName);
+    currentRoom = roomId;
+    enableWakeLock();
     window.db.ref(`rooms/${roomId}/status`).once('value', snap => {
-        if (!snap.exists()) {
-            alert(currentLang === 'he' ? "החדר לא קיים" : "Room not found");
-            return;
-        }
-        currentRoom = roomId;
+        if (!snap.exists()) return alert("חדר לא נמצא");
         joinRoomLogic(roomId);
     });
 }
@@ -152,51 +123,34 @@ function joinRoomLogic(roomId) {
     document.getElementById('lobby-screen').style.display = 'flex';
     document.getElementById('display-room-code').innerText = roomId;
     
-    window.db.ref(`rooms/${roomId}/players/${playerId}`).set({
-        name: playerName,
-        role: 'thief',
-        t: Date.now()
-    });
-
+    window.db.ref(`rooms/${roomId}/players/${playerId}`).set({ name: playerName, role: 'thief', t: Date.now() });
     window.db.ref(`rooms/${roomId}/players/${playerId}`).onDisconnect().remove();
 
     window.db.ref(`rooms/${roomId}`).on('value', snap => {
         const roomData = snap.val();
-        if (!roomData) return; 
+        if (!roomData) return;
         
         isHost = (roomData.host === playerId);
         if (isHost) document.getElementById('btn-start-game').style.display = 'block';
         
         if (roomData.status === 'playing') {
             window.db.ref(`rooms/${roomId}`).off(); 
-            // Fix: Export host status and variables to game scene
-            window.isHost = isHost;
+            window.isHost = isHost; 
             window.playerRole = roomData.players[playerId]?.role || 'thief';
             window.currentRoom = currentRoom;
             window.playerId = playerId;
             window.currentLang = currentLang;
-            
-            if(typeof enterGameScene === 'function') {
-                enterGameScene();
-            }
+            if(typeof enterGameScene === 'function') enterGameScene();
             return;
         }
-
         renderLobbyPlayers(roomData.players);
     });
 }
 
-// ==========================================
-// 5. Drag & Drop (Mobile & Desktop)
-// ==========================================
 function renderLobbyPlayers(players) {
-    if (!players) return;
     const copsDiv = document.getElementById('players-cops');
     const thievesDiv = document.getElementById('players-thieves');
-    
-    copsDiv.innerHTML = "";
-    thievesDiv.innerHTML = "";
-    
+    copsDiv.innerHTML = ""; thievesDiv.innerHTML = "";
     Object.keys(players).forEach(id => {
         const p = players[id];
         const div = document.createElement('div');
@@ -208,110 +162,69 @@ function renderLobbyPlayers(players) {
             div.addEventListener('touchstart', (e) => handleTouchStart(e, id, div), { passive: false });
             div.addEventListener('touchmove', handleTouchMove, { passive: false });
             div.addEventListener('touchend', (e) => handleTouchEnd(e, id, div));
-            
-            div.draggable = true;
-            div.ondragstart = (e) => { e.dataTransfer.setData("text/plain", id); };
         }
 
-        if (p.role === 'cop') copsDiv.appendChild(div);
-        else thievesDiv.appendChild(div);
+        if (p.role === 'cop') copsDiv.appendChild(div); else thievesDiv.appendChild(div);
     });
 }
 
+// ==========================================
+// 5. Drag & Drop Logic
+// ==========================================
 function handleTouchStart(e, id, el) {
     activeTouchElement = el;
     activeTouchElement.dataset.playerId = id;
     const touch = e.touches[0];
     const rect = el.getBoundingClientRect();
-    
     initialX = touch.clientX - rect.left;
     initialY = touch.clientY - rect.top;
-    
     el.style.position = 'fixed';
     el.style.zIndex = '9999';
     el.style.width = rect.width + 'px';
     el.style.opacity = '0.8';
-    el.style.border = '2px solid #38bdf8';
-    
     moveTouchElement(touch.clientX, touch.clientY);
 }
 
 function handleTouchMove(e) {
     if (!activeTouchElement) return;
-    e.preventDefault(); 
-    const touch = e.touches[0];
-    moveTouchElement(touch.clientX, touch.clientY);
+    e.preventDefault();
+    moveTouchElement(e.touches[0].clientX, e.touches[0].clientY);
 }
 
-function moveTouchElement(clientX, clientY) {
-    activeTouchElement.style.left = (clientX - initialX) + 'px';
-    activeTouchElement.style.top = (clientY - initialY) + 'px';
+function moveTouchElement(x, y) {
+    activeTouchElement.style.left = (x - initialX) + 'px';
+    activeTouchElement.style.top = (y - initialY) + 'px';
 }
 
 function handleTouchEnd(e, id, el) {
     if (!activeTouchElement) return;
     const touch = e.changedTouches[0];
-    
     el.style.display = 'none';
     const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
     el.style.display = 'block';
     
-    el.style.position = '';
-    el.style.zIndex = '';
-    el.style.left = '';
-    el.style.top = '';
-    el.style.width = '';
-    el.style.opacity = '';
-    el.style.border = '1px solid transparent';
-    
+    // Reset styles
+    el.style.position = ''; el.style.zIndex = ''; el.style.left = ''; el.style.top = ''; el.style.width = ''; el.style.opacity = '';
     activeTouchElement = null;
 
     if (dropTarget) {
         const copsList = document.getElementById('list-cops');
         const thievesList = document.getElementById('list-thieves');
         const pId = el.dataset.playerId;
-        
-        if (copsList.contains(dropTarget)) {
-            window.db.ref(`rooms/${currentRoom}/players/${pId}`).update({ role: 'cop' });
-        } else if (thievesList.contains(dropTarget)) {
-            window.db.ref(`rooms/${currentRoom}/players/${pId}`).update({ role: 'thief' });
-        }
+        if (copsList.contains(dropTarget)) window.db.ref(`rooms/${currentRoom}/players/${pId}`).update({ role: 'cop' });
+        else if (thievesList.contains(dropTarget)) window.db.ref(`rooms/${currentRoom}/players/${pId}`).update({ role: 'thief' });
     }
-}
-
-function allowDrop(event) { event.preventDefault(); }
-function dragEnter(event) { if(isHost) event.currentTarget.classList.add('drag-over'); }
-function dragLeave(event) { if(isHost) event.currentTarget.classList.remove('drag-over'); }
-function drop(event, newRole) {
-    event.preventDefault();
-    if(isHost) event.currentTarget.classList.remove('drag-over');
-    if (!isHost) return;
-    const targetPlayerId = event.dataTransfer.getData("text/plain");
-    if (targetPlayerId && currentRoom) {
-        window.db.ref(`rooms/${currentRoom}/players/${targetPlayerId}`).update({ role: newRole });
-    }
-}
-
-// ==========================================
-// 6. Lobby Actions
-// ==========================================
-function shareWhatsApp() {
-    const link = `${window.location.origin}${window.location.pathname}?room=${currentRoom}`;
-    const text = currentLang === 'he' ? 
-        `בואו לשחק שוטרים וגנבים! כנסו ללינק: ${link}` : 
-        `Join my Territory Battle game! Click here: ${link}`;
-    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, '_blank');
 }
 
 function startGame() {
     window.db.ref(`game/${currentRoom}`).remove().then(() => {
-        window.db.ref(`rooms/${currentRoom}`).update({ 
-            status: 'playing',
-            gameStartTime: Date.now() 
-        });
+        window.db.ref(`rooms/${currentRoom}`).update({ status: 'playing', gameStartTime: Date.now() });
     });
 }
 
-function exitGame() {
-    location.reload();
+function shareWhatsApp() {
+    const link = `${window.location.origin}${window.location.pathname}?room=${currentRoom}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent("בואו לשחק! " + link)}`, '_blank');
 }
+
+function exitGame() { location.reload(); }
