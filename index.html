@@ -28,10 +28,14 @@
         .btn-red { background: #991b1b; }
         .btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; max-width: 350px; width: 100%; margin: 15px 0 0 0; }
         
-        /* Map Control Panel (Host Only) */
-        #map-controls { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); z-index: 3000; display: none; flex-direction: column; gap: 8px; }
-        .ctrl-btn { width: 50px; height: 50px; background: rgba(30, 41, 59, 0.9); border: 2px solid #38bdf8; color: white; border-radius: 12px; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
+        /* Compass Map Controls (Bottom Left) */
+        #map-controls { position: absolute; left: 15px; bottom: 80px; z-index: 3000; display: none; flex-direction: column; align-items: center; gap: 5px; }
+        .compass-row { display: flex; flex-direction: row; direction: ltr; gap: 5px; }
+        .ctrl-btn { width: 45px; height: 45px; background: rgba(30, 41, 59, 0.9); border: 2px solid #38bdf8; color: white; border-radius: 10px; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
         .ctrl-btn:active { background: #38bdf8; color: #0f172a; }
+
+        /* Zoom Controls (Bottom Right) */
+        #zoom-controls { position: absolute; right: 15px; bottom: 80px; z-index: 3000; display: none; flex-direction: column; gap: 8px; }
 
         /* Lobby Elements */
         .room-header-container { display: flex; flex-direction: row; align-items: center; justify-content: center; width: 100%; max-width: 350px; margin-bottom: 20px; }
@@ -44,9 +48,10 @@
         .team-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; text-align: center; }
         .player-item { background: #334155; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; text-align: center; touch-action: none; }
 
-        /* Setup UI Overlay */
-        #setup-ui { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 90%; max-width: 400px; display: none; flex-direction: column; gap: 10px; pointer-events: auto; }
-        .setup-msg { background: rgba(30, 41, 59, 0.95); padding: 12px; border-radius: 12px; border: 2px solid #38bdf8; text-align: center; font-size: 13px; color: white; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        /* Compact Setup UI Overlay */
+        #setup-ui { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 95%; max-width: 400px; display: none; flex-direction: row; align-items: center; gap: 8px; pointer-events: auto; }
+        .setup-msg { background: rgba(30, 41, 59, 0.95); padding: 10px; border-radius: 8px; border: 1px solid #38bdf8; text-align: center; font-size: 12px; color: white; flex: 1; box-shadow: 0 0 10px rgba(0,0,0,0.5); margin: 0; }
+        .setup-btn { padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; border: none; color: white; cursor: pointer; margin: 0; height: 100%; display: flex; align-items: center; justify-content: center; }
 
         /* In-Game UI */
         .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 3100; background: rgba(220, 38, 38, 0.9); color: white; border: 2px solid white; border-radius: 50%; width: 40px; height: 40px; font-weight: bold; font-size: 20px; cursor: pointer; display: none; align-items: center; justify-content: center; }
@@ -113,25 +118,27 @@
         <canvas id="drawing-canvas"></canvas>
     </div>
 
+    <!-- Compass Controls (Bottom Left) -->
     <div id="map-controls">
         <button class="ctrl-btn" onclick="panMap('up')">↑</button>
-        <div style="display: flex; gap: 8px;">
+        <div class="compass-row">
             <button class="ctrl-btn" onclick="panMap('left')">←</button>
             <button class="ctrl-btn" onclick="panMap('right')">→</button>
         </div>
         <button class="ctrl-btn" onclick="panMap('down')">↓</button>
-        <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 8px;">
-            <button class="ctrl-btn" onclick="zoomMap(1)">+</button>
-            <button class="ctrl-btn" onclick="zoomMap(-1)">-</button>
-        </div>
     </div>
 
+    <!-- Zoom Controls (Bottom Right) -->
+    <div id="zoom-controls">
+        <button class="ctrl-btn" onclick="zoomMap(1)">+</button>
+        <button class="ctrl-btn" onclick="zoomMap(-1)">-</button>
+    </div>
+
+    <!-- Compact Setup UI Overlay -->
     <div id="setup-ui">
-        <div class="setup-msg" id="setup-msg">השתמש בחצים למיקום המפה, וצייר עם האצבע את שטח המשחק.</div>
-        <div style="display: flex; gap: 10px; width: 100%;">
-            <button class="btn btn-red" style="flex:1; padding: 12px; font-size: 14px;" onclick="clearDrawing()">נקה ציור</button>
-            <button class="btn btn-blue" id="btn-confirm-drawing" style="flex:2; padding: 12px; font-size: 14px; display:none;" onclick="confirmDrawing()">אשר זירה וקבע תחנה</button>
-        </div>
+        <div class="setup-msg" id="setup-msg">מקם מפה וצייר זירה.</div>
+        <button class="setup-btn btn-red" onclick="clearDrawing()">נקה</button>
+        <button class="setup-btn btn-blue" id="btn-confirm-drawing" style="display:none;" onclick="confirmDrawing()">אשר</button>
     </div>
 
     <!-- 4. In-Game UI -->

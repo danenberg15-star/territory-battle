@@ -1,4 +1,4 @@
-// game.js - Phase 1.6: Button-Controlled Map & Free-hand Drawing Arena (Light Theme)
+// game.js - Phase 1.6.2: Setup UI Refinement
 
 // ==========================================
 // 1. Game Globals
@@ -33,7 +33,7 @@ function enterGameScene() {
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Initialize Map with Touch Interactions Disabled for Host Drawing
+    // Initialize Map with Touch Interactions Disabled for Host Drawing[cite: 1]
     map = L.map('map', { 
         zoomControl: false, 
         attributionControl: false,
@@ -45,12 +45,12 @@ function enterGameScene() {
         keyboard: false
     }).setView([32.0853, 34.7818], 18);
 
-    // מפה בהירה - CartoDB Voyager
+    // מפה בהירה - CartoDB Voyager[cite: 1]
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { 
         maxZoom: 20 
     }).addTo(map);
 
-    // Sync Game Data
+    // Sync Game Data[cite: 1]
     window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
         gameStartTime = snap.val() || Date.now();
         checkArenaStatus();
@@ -63,7 +63,7 @@ function enterGameScene() {
 }
 
 // ==========================================
-// 3. Map Control Functions (Buttons Only)
+// 3. Map Control Functions (Buttons Only)[cite: 1]
 // ==========================================
 function panMap(direction) {
     if (!map) return;
@@ -83,7 +83,7 @@ function zoomMap(delta) {
 }
 
 // ==========================================
-// 4. Arena Setup (Drawing Mode)
+// 4. Arena Setup (Drawing Mode)[cite: 1]
 // ==========================================
 function checkArenaStatus() {
     window.db.ref(`game/${window.currentRoom}/arena`).on('value', snap => {
@@ -101,6 +101,10 @@ function checkArenaStatus() {
             document.getElementById('setup-ui').style.display = 'none';
             document.getElementById('drawing-container').style.display = 'none';
             document.getElementById('map-controls').style.display = 'none';
+            document.getElementById('zoom-controls').style.display = 'none';
+            
+            // החזרת התפריט העליון למשתמשים לאחר ציור הזירה
+            document.getElementById('game-header').style.display = 'block';
             
             map.dragging.enable();
             map.touchZoom.enable();
@@ -120,12 +124,16 @@ function checkArenaStatus() {
 }
 
 function setupHostDrawingMode() {
+    // הסתרת התפריט העליון בזמן הציור לתצוגה נקייה
+    document.getElementById('game-header').style.display = 'none';
+    
     if (myLat && myLng) {
         map.setView([myLat, myLng], 14);
     }
     
     document.getElementById('setup-ui').style.display = 'flex';
     document.getElementById('map-controls').style.display = 'flex';
+    document.getElementById('zoom-controls').style.display = 'flex';
     initDrawingCanvas(map); 
 }
 
@@ -154,7 +162,7 @@ function setupPoliceStation() {
 }
 
 // ==========================================
-// 5. GPS & Movement Logic
+// 5. GPS & Movement Logic[cite: 1]
 // ==========================================
 function startRealGpsTracking() {
     if (!navigator.geolocation) return;
@@ -222,7 +230,7 @@ function handleThiefPath() {
 }
 
 // ==========================================
-// 6. Gameplay Mechanics
+// 6. Gameplay Mechanics[cite: 1]
 // ==========================================
 function triggerCapture() {
     if (!isBriefingComplete) return;
@@ -248,7 +256,7 @@ function startCooldown(seconds) {
 }
 
 // ==========================================
-// 7. Firebase Listeners
+// 7. Firebase Listeners[cite: 1]
 // ==========================================
 function listenToVictory() {
     window.db.ref(`game/${window.currentRoom}/winner`).on('value', snap => {

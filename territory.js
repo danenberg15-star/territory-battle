@@ -11,16 +11,26 @@ function initDrawingCanvas(mapInstance) {
     canvas = document.getElementById('drawing-canvas');
     ctx = canvas.getContext('2d');
     
-    // התאמת גודל הקנבס למסך המכשיר
+    // התאמת גודל הקנבס למסך המכשיר[cite: 3]
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     
     document.getElementById('drawing-container').style.display = 'block';
     
-    // מאזיני מגע לציור חופשי
+    // מאזיני מגע לציור חופשי[cite: 3]
     canvas.addEventListener('touchstart', (e) => startDrawing(e, mapInstance), { passive: false });
     canvas.addEventListener('touchmove', (e) => draw(e, mapInstance), { passive: false });
     canvas.addEventListener('touchend', stopDrawing);
+
+    // פתרון לבאג ה-Landscape: עדכון גודל הקנבס בעת סיבוב המסך
+    window.addEventListener('resize', () => {
+        if (canvas && document.getElementById('drawing-container').style.display === 'block') {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+            // ניקוי הציור הכרחי בגלל שנקודות הציור הקודמות כבר לא תואמות לקואורדינטות המפה שהשתנתה
+            clearDrawing(); 
+        }
+    });
 }
 
 function startDrawing(e, mapInstance) {
@@ -33,7 +43,7 @@ function startDrawing(e, mapInstance) {
     
     ctx.beginPath();
     ctx.moveTo(touch.clientX, touch.clientY);
-    ctx.strokeStyle = '#38bdf8'; // צבע כחול ניאון בהתאם לשפה העיצובית
+    ctx.strokeStyle = '#38bdf8'; // צבע כחול ניאון בהתאם לשפה העיצובית[cite: 3]
     ctx.lineWidth = 4;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
@@ -41,7 +51,7 @@ function startDrawing(e, mapInstance) {
 
 function draw(e, mapInstance) {
     if (!isDrawing) return;
-    e.preventDefault(); // מניעת גלילה של הדפדפן בזמן הציור
+    e.preventDefault(); // מניעת גלילה של הדפדפן בזמן הציור[cite: 3]
     
     const touch = e.touches[0];
     ctx.lineTo(touch.clientX, touch.clientY);
@@ -55,13 +65,13 @@ function stopDrawing() {
     isDrawing = false;
     ctx.closePath();
     
-    // הצגת כפתור האישור רק אם יש מספיק נקודות ליצירת שטח[cite: 1]
+    // הצגת כפתור האישור רק אם יש מספיק נקודות ליצירת שטח[cite: 3]
     if (drawingPath.length > 10) {
         document.getElementById('btn-confirm-drawing').style.display = 'block';
     }
 }
 
-// המרת פיקסל על המסך לקואורדינטת GPS לפי מצב המפה הנוכחי
+// המרת פיקסל על המסך לקואורדינטת GPS לפי מצב המפה הנוכחי[cite: 3]
 function addPoint(x, y, mapInstance) {
     const latlng = mapInstance.containerPointToLatLng([x, y]);
     drawingPath.push([latlng.lat, latlng.lng]);
@@ -79,25 +89,25 @@ function clearDrawing() {
 function finalizeDrawing() {
     if (drawingPath.length < 10) return null;
 
-    // סגירת הפוליגון: חיבור הנקודה האחרונה לראשונה
+    // סגירת הפוליגון: חיבור הנקודה האחרונה לראשונה[cite: 3]
     const coords = drawingPath.map(p => [p[1], p[0]]);
     coords.push(coords[0]);
 
     try {
         const polygon = turf.polygon([coords]);
-        const areaSqMeters = turf.area(polygon); // שטח כולל במ"ר
+        const areaSqMeters = turf.area(polygon); // שטח כולל במ"ר[cite: 3]
         
-        // חישוב רדיוס תחנת המשטרה - 5% משטח הזירה[cite: 1]
-        // שטח עיגול = פאי כפול רדיוס בריבוע
+        // חישוב רדיוס תחנת המשטרה - 5% משטח הזירה[cite: 3]
+        // שטח עיגול = פאי כפול רדיוס בריבוע[cite: 3]
         const stationArea = areaSqMeters * 0.05;
         const stationRadius = Math.sqrt(stationArea / Math.PI);
 
-        // מציאת המרכז הגיאומטרי של השטח שצוין
+        // מציאת המרכז הגיאומטרי של השטח שצוין[cite: 3]
         const centroid = turf.centroid(polygon);
         const centerCoords = {
             lat: centroid.geometry.coordinates[1],
             lng: centroid.geometry.coordinates[0],
-            radius: Math.max(15, stationRadius) // רדיוס מינימלי של 15 מטרים למשחקיות
+            radius: Math.max(15, stationRadius) // רדיוס מינימלי של 15 מטרים למשחקיות[cite: 3]
         };
 
         return {
@@ -112,7 +122,7 @@ function finalizeDrawing() {
     }
 }
 
-// פונקציית עזר לבדיקה האם שחקן נמצא בתוך הזירה
+// פונקציית עזר לבדיקה האם שחקן נמצא בתוך הזירה[cite: 3]
 function isPointInArena(lat, lng, arenaPoints) {
     if (!arenaPoints || arenaPoints.length < 3) return true;
     try {
