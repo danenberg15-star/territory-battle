@@ -7,6 +7,9 @@ function initQARoom(roomId) {
     window.playerName = localStorage.getItem('tb_name') || "QA Tester";
     window.currentLang = typeof currentLang !== 'undefined' ? currentLang : 'he';
 
+    // הסתרת מסך ההתחברות (בגלל שדילגנו על הלובי שם זה קורה בדרך כלל)
+    document.getElementById('login-screen').style.display = 'none';
+
     if (!navigator.geolocation) {
         alert("לא ניתן לגשת ל-GPS. חובה לאשר מיקום לטובת סביבת ה-QA.");
         return;
