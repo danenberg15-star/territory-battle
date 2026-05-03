@@ -1,4 +1,4 @@
-// qa.js - QA Sandbox Environment (Rooms 99999 / 88888) - Enhanced Stability
+// qa.js - QA Sandbox Environment (Rooms 99999 / 88888) - Fix: Ancestor Path Conflict
 
 function initQARoom(roomId) {
     console.log("Starting QA Init for room:", roomId);
@@ -17,33 +17,26 @@ function initQARoom(roomId) {
     document.getElementById('briefing-status').innerText = "מייצר סביבת QA וטריטוריה של 2 קמ\"ר...";
     document.getElementById('briefing-overlay').style.display = 'block';
 
-    // הוספת טיימר אבטחה ל-GPS למקרה שהדפדפן לא מגיב[cite: 4]
     navigator.geolocation.getCurrentPosition((pos) => {
-        console.log("GPS Position acquired for QA");
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         
-        // בדיקה שספריית Turf נטענה לפני החישוב[cite: 4]
         if (typeof turf === 'undefined') {
-            console.error("Turf.js not loaded yet!");
             alert("שגיאה: ספריית החישובים לא נטענה. אנא רענן את העמוד.");
             return;
         }
         
         setupQAServerData(roomId, lat, lng);
     }, (err) => {
-        console.error("GPS Error in QA:", err);
-        alert("שגיאת GPS: " + err.message + "\nוודא שאישרת גישה למיקום והדף פועל ב-HTTPS.");
+        alert("שגיאת GPS: " + err.message);
     }, { 
         enableHighAccuracy: true,
-        timeout: 10000, // מקסימום 10 שניות המתנה[cite: 4]
+        timeout: 10000,
         maximumAge: 0
     });
 }
 
 function setupQAServerData(roomId, centerLat, centerLng) {
-    console.log("Setting up Server Data for QA...");
-    
     try {
         const center = turf.point([centerLng, centerLat]);
         const ne = turf.destination(center, 1, 45, {units: 'kilometers'}).geometry.coordinates;
@@ -98,35 +91,29 @@ function setupQAServerData(roomId, centerLat, centerLng) {
         };
         if (window.playerRole === 'cop') bots[window.playerId].inStation = true;
 
-        if (!window.db) {
-            throw new Error("Firebase Database (window.db) not initialized.");
-        }
-
         const updates = {};
-        updates[`rooms/${roomId}`] = { status: 'playing', gameStartTime: Date.now(), host: 'qa_host' };
+        // עדכון שדות ספציפיים בחדר כדי למנוע התנגשות נתיבים[cite: 5]
+        updates[`rooms/${roomId}/status`] = 'playing';
+        updates[`rooms/${roomId}/gameStartTime`] = Date.now();
+        updates[`rooms/${roomId}/host`] = 'qa_host';
         updates[`rooms/${roomId}/players`] = bots; 
+        
         updates[`game/${roomId}/arena`] = arenaData;
         updates[`game/${roomId}/players`] = bots;
         updates[`game/${roomId}/briefing`] = { active: false, timeLeft: 0, complete: true }; 
 
         window.db.ref().update(updates).then(() => {
-            console.log("Firebase QA sync complete");
             document.getElementById('briefing-overlay').style.display = 'none';
             if (typeof enterGameScene === 'function') enterGameScene();
             startBotEngine(roomId);
-        }).catch(error => {
-            console.error("Firebase Update Error:", error);
-            alert("שגיאת תקשורת עם השרת: " + error.message);
         });
 
     } catch (e) {
-        console.error("Calculation Error in QA:", e);
         alert("שגיאת חישוב: " + e.message);
     }
 }
 
 function startBotEngine(roomId) {
-    console.log("Starting Bot Engine...");
     setInterval(() => {
         if (!window.db) return;
         window.db.ref(`game/${roomId}/players`).once('value', snap => {
@@ -138,8 +125,8 @@ function startBotEngine(roomId) {
                 if (id.startsWith('bot_')) {
                     const latChange = (Math.random() - 0.5) * 0.0002;
                     const lngChange = (Math.random() - 0.5) * 0.0002;
-                    botUpdates[`game/${roomId}/players/${id}/lat`] = (players[id].lat || centerLat) + latChange;
-                    botUpdates[`game/${roomId}/players/${id}/lng`] = (players[id].lng || centerLng) + lngChange;
+                    botUpdates[`game/${roomId}/players/${id}/lat`] = (players[id].lat) + latChange;
+                    botUpdates[`game/${roomId}/players/${id}/lng`] = (players[id].lng) + lngChange;
                     botUpdates[`game/${roomId}/players/${id}/t`] = Date.now(); 
                 }
             });
