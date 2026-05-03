@@ -1,36 +1,45 @@
-// audio.js - Ultrasonic Sonar Logic (20kHz - Inaudible Mode)
+// audio.js - Ultrasonic Sonar Logic (20kHz - Phase 5.1 Hybrid Catch)
 let audioCtx = null;
 let oscillator = null;
 let analyzer = null;
-const TARGET_FREQ = 20000; // הגבול העליון המוחלט[cite: 1]
+const TARGET_FREQ = 20000; // תדר אולטרסוני (לא נשמע לרוב האנשים)[cite: 6]
 
 function initAudio() {
-    audioCtx = new (window.AudioContext || window.webkitAudioContext)(); //[cite: 1]
+    if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
 }
 
+// שוטר: משדר סיגנל למשך 10 שניות[cite: 6]
 function broadcastCapture() {
-    if (!audioCtx) initAudio(); //[cite: 1]
-    if (audioCtx.state === 'suspended') audioCtx.resume(); //[cite: 1]
+    initAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
 
-    oscillator = audioCtx.createOscillator(); //[cite: 1]
-    const gainNode = audioCtx.createGain(); //[cite: 1]
+    oscillator = audioCtx.createOscillator();
+    const gainNode = audioCtx.createGain();
     
-    oscillator.type = 'sine'; //[cite: 1]
-    oscillator.frequency.setValueAtTime(TARGET_FREQ, audioCtx.currentTime); //[cite: 1]
+    oscillator.type = 'sine';
+    oscillator.frequency.setValueAtTime(TARGET_FREQ, audioCtx.currentTime);
     
-    // הפחתנו עוצמה ל-1.2 כדי למנוע עיוותי רמקול שנשמעים לאוזן[cite: 1]
+    // עוצמה מוגדרת למניעת עיוותים ברמקול
     gainNode.gain.setValueAtTime(1.2, audioCtx.currentTime); 
     
-    oscillator.connect(gainNode); //[cite: 1]
-    gainNode.connect(audioCtx.destination); //[cite: 1]
+    oscillator.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
     
-    oscillator.start(); //[cite: 1]
-    // עדכון זמן הצליל ל-10 שניות לבקשת המשתמש
-    setTimeout(() => { oscillator.stop(); }, 10000); 
+    oscillator.start();
+    // הצליל נפסק אוטומטית אחרי 10 שניות[cite: 6]
+    setTimeout(() => { 
+        if (oscillator) {
+            oscillator.stop();
+            oscillator = null;
+        }
+    }, 10000); 
 }
 
+// גנב: מאזין לסיגנל ומפעיל את המיקרופון ל-10 שניות[cite: 6]
 async function startListeningForCops(onCaught) {
-    if (!audioCtx) initAudio(); //[cite: 1]
+    initAudio();
     try {
         const stream = await navigator.mediaDevices.getUserMedia({ 
             audio: { 
@@ -38,42 +47,53 @@ async function startListeningForCops(onCaught) {
                 noiseSuppression: false, 
                 autoGainControl: false 
             } 
-        }); //[cite: 1]
+        });
         
-        if (audioCtx.state === 'suspended') audioCtx.resume(); //[cite: 1]
-        const source = audioCtx.createMediaStreamSource(stream); //[cite: 1]
-        analyzer = audioCtx.createAnalyser(); //[cite: 1]
-        analyzer.fftSize = 4096; //[cite: 1]
-        source.connect(analyzer); //[cite: 1]
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const source = audioCtx.createMediaStreamSource(stream);
+        analyzer = audioCtx.createAnalyser();
+        analyzer.fftSize = 4096;
+        source.connect(analyzer);
         
-        const dataArray = new Uint8Array(analyzer.frequencyBinCount); //[cite: 1]
-        const valSpan = document.getElementById('signal-val'); //[cite: 1]
-
-        let detectionCounter = 0; //[cite: 1]
+        const dataArray = new Uint8Array(analyzer.frequencyBinCount);
+        
+        // 1.5 שניות רצופות (בערך 90 דגימות ב-60FPS)[cite: 6]
+        let detectionCounter = 0; 
+        const REQUIRED_FRAMES = 90; 
 
         function checkFrame() {
-            analyzer.getByteFrequencyData(dataArray); //[cite: 1]
-            const binIndex = Math.round(TARGET_FREQ / (audioCtx.sampleRate / analyzer.fftSize)); //[cite: 1]
-            const intensity = dataArray[binIndex]; //[cite: 1]
+            if (!analyzer) return;
+            analyzer.getByteFrequencyData(dataArray);
+            const binIndex = Math.round(TARGET_FREQ / (audioCtx.sampleRate / analyzer.fftSize));
+            const intensity = dataArray[binIndex];
 
-            if (valSpan) valSpan.innerText = Math.round((intensity / 255) * 100); //[cite: 1]
-
-            // בתדר כזה גבוה, רגישות של 40 היא מספיקה[cite: 1]
+            // רגישות סף לקליטת התדר
             if (intensity > 40) { 
                 detectionCounter++;
-                if (detectionCounter > 40) { 
-                    onCaught();
+                if (detectionCounter >= REQUIRED_FRAMES) { 
+                    onCaught(); // אישור מעצר אולטרסוני[cite: 6]
                     detectionCounter = 0;
                 }
             } else {
                 detectionCounter = Math.max(0, detectionCounter - 1);
             }
-            requestAnimationFrame(checkFrame); //[cite: 1]
+            requestAnimationFrame(checkFrame);
         }
-        document.getElementById('audio-status').innerText = "מיקרופון ✅"; //[cite: 1]
-        document.getElementById('audio-status').style.color = "#10b981"; //[cite: 1]
-        checkFrame(); //[cite: 1]
+        
+        document.getElementById('audio-status').innerText = "מיקרופון ✅";
+        document.getElementById('audio-status').style.color = "#10b981";
+        checkFrame();
+        
+        // סגירת המיקרופון אחרי 10 שניות לחסכון בסוללה ופרטיות[cite: 6]
+        setTimeout(() => {
+            stream.getTracks().forEach(track => track.stop());
+            analyzer = null;
+            document.getElementById('audio-status').innerText = "אודיו ⏳";
+            document.getElementById('audio-status').style.color = "#facc15";
+        }, 10000);
+
     } catch (err) {
-        document.getElementById('audio-status').innerText = "שגיאת שמע ❌"; //[cite: 1]
+        console.error("Audio init error:", err);
+        document.getElementById('audio-status').innerText = "שגיאת שמע ❌";
     }
 }

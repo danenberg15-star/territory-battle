@@ -1,13 +1,12 @@
-// game.js - Phase 1.8.2: Refactored for Advanced Thief Mechanics
+// game.js - Phase 1.8.3: Hybrid Catch Implementation (Cop Logic)
 
 // ==========================================
-// 1. Game Globals
+// 1. Game Globals (Updated)
 // ==========================================
 let playerMarkers = {};
 let areaLayers = [];
 let thiefPath = []; 
 let trailLayer = null;
-let lastGpsTimestamp = Date.now();
 let map = null;
 
 let myLat = null;
@@ -58,6 +57,9 @@ function enterGameScene() {
     listenToCapturedAreas();
     listenToVictory(); 
     
+    // האזנה לסיגנלי תפיסה (רלוונטי לגנבים)
+    listenForCaptureSignals(); 
+
     if (window.isHost) {
         setInterval(checkOfflinePlayers, 10000); 
     }
@@ -90,12 +92,10 @@ function checkArenaStatus() {
     window.db.ref(`game/${window.currentRoom}/arena`).on('value', snap => {
         const data = snap.val();
         if (!data) {
-            if (window.isHost) {
-                setupHostDrawingMode();
-            } else {
+            if (window.isHost) setupHostDrawingMode();
+            else {
                 document.getElementById('briefing-overlay').style.display = 'block';
-                const statusMsg = window.currentLang === 'he' ? "ממתין למנהל שיקבע את זירת המשחק..." : "Waiting for host to define arena...";
-                document.getElementById('briefing-status').innerText = statusMsg;
+                document.getElementById('briefing-status').innerText = window.currentLang === 'he' ? "ממתין למנהל..." : "Waiting for host...";
             }
         } else {
             arenaData = data;
@@ -110,7 +110,7 @@ function checkArenaStatus() {
 
             drawArenaOnMap();
             setupPoliceStation();
-            listenToBriefing();
+            if (typeof listenToBriefing === "function") listenToBriefing();
             
             document.getElementById('controls-container').style.display = 'block';
             if (window.playerRole === 'cop') {
@@ -125,16 +125,17 @@ function checkArenaStatus() {
 function setupHostDrawingMode() {
     document.getElementById('game-header').style.display = 'none';
     if (myLat && myLng) map.setView([myLat, myLng], 14);
-    
     document.getElementById('setup-ui').style.display = 'flex';
     document.getElementById('map-controls').style.display = 'flex';
     document.getElementById('zoom-controls').style.display = 'flex';
-    initDrawingCanvas(map); 
+    if (typeof initDrawingCanvas === "function") initDrawingCanvas(map); 
 }
 
 function confirmDrawing() {
-    const results = finalizeDrawing(); 
-    if (results) window.db.ref(`game/${window.currentRoom}/arena`).set(results);
+    if (typeof finalizeDrawing === "function") {
+        const results = finalizeDrawing(); 
+        if (results) window.db.ref(`game/${window.currentRoom}/arena`).set(results);
+    }
 }
 
 function drawArenaOnMap() {
@@ -183,41 +184,139 @@ function updateRealPosition() {
     const isDrawingMode = document.getElementById('drawing-container').style.display === 'block';
     if (!isDrawingMode) map.panTo([myLat, myLng]);
 
-    // עדכון סטטוס תחנה לשוטרים
     if (window.playerRole === 'cop' && arenaData) {
         const dist = map.distance([myLat, myLng], [arenaData.policeStation.lat, arenaData.policeStation.lng]);
         const inStation = dist <= arenaData.policeStation.radius;
         window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/inStation`).set(inStation);
     }
 
-    // הפעלת לוגיקת גנב מתקדמת מקובץ thief-mechanics.js[cite: 2]
     if (window.playerRole === 'thief' && isBriefingComplete) {
-        if (typeof updateThiefLogic === "function") {
-            updateThiefLogic(myLat, myLng);
-        }
+        if (typeof updateThiefLogic === "function") updateThiefLogic(myLat, myLng);
     }
 
-    // עדכון מיקום כללי בשרת - Ticking Rate 2s[cite: 2]
     window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({ 
         lat: myLat, lng: myLng, t: Date.now() 
     });
 
-    if (window.isHost && typeof manageBriefingLogic === "function") {
-        manageBriefingLogic();
-    }
+    if (window.isHost && typeof manageBriefingLogic === "function") manageBriefingLogic();
 }
 
 // ==========================================
-// 6. Gameplay Mechanics & Offline Rules
+// 6. 5.1: Hybrid Catch Logic[cite: 6]
+// ==========================================
+
+function triggerCapture() {
+    if (!isBriefingComplete) return;
+    const btn = document.getElementById('capture-btn');
+    if (btn.disabled) return;
+
+    // 1. הפעלת קירור (Cooldown) ושינוי מצב ויזואלי[cite: 6]
+    btn.disabled = true;
+    btn.classList.add('active-capture');
+    
+    // 2. שידור סונאר אולטרסוני מקומי[cite: 6]
+    if (typeof broadcastCapture === "function") broadcastCapture();
+
+    // 3. שידור סיגנל שרת להפעלת מיקרופונים אצל הגנבים[cite: 6]
+    const timestamp = Date.now();
+    window.db.ref(`game/${window.currentRoom}/captureSignal`).set({
+        sender: window.playerId,
+        t: timestamp,
+        lat: myLat,
+        lng: myLng
+    });
+
+    // 4. בדיקת גיבוי GPS למשך 10 שניות[cite: 6]
+    let gpsChecks = 0;
+    const gpsInterval = setInterval(() => {
+        checkGpsCatch(myLat, myLng, timestamp);
+        gpsChecks++;
+        if (gpsChecks >= 10) clearInterval(gpsInterval);
+    }, 1000);
+
+    // 5. ניהול חיווי ויזואלי (10 שניות) וקירור (60 שניות)[cite: 6]
+    setTimeout(() => {
+        btn.classList.remove('active-capture');
+        startCooldown(60); 
+    }, 10000);
+}
+
+function checkGpsCatch(copLat, copLng, signalTime) {
+    window.db.ref(`game/${window.currentRoom}/players`).once('value', snap => {
+        const players = snap.val() || {};
+        Object.keys(players).forEach(id => {
+            const p = players[id];
+            if (p.role === 'thief') {
+                const dist = map.distance([copLat, copLng], [p.lat, p.lng]);
+                if (dist <= 5) { // תנאי גיבוי GPS: 5 מטרים[cite: 6]
+                    confirmCatch(id, signalTime);
+                }
+            }
+        });
+    });
+}
+
+function listenForCaptureSignals() {
+    window.db.ref(`game/${window.currentRoom}/captureSignal`).on('value', snap => {
+        const sig = snap.val();
+        if (!sig || Date.now() - sig.t > 10000) return;
+        
+        // גנב: מפעיל מיקרופון רק אם קיבל סיגנל טרי[cite: 6]
+        if (window.playerRole === 'thief') {
+            if (typeof startListeningForCops === "function") {
+                startListeningForCops(() => confirmCatch(window.playerId, sig.t));
+            }
+        }
+    });
+}
+
+function confirmCatch(victimId, signalTime) {
+    // מניעת כפילויות תפיסה לאותו סיגנל
+    window.db.ref(`game/${window.currentRoom}/catches/${victimId}_${signalTime}`).transaction(current => {
+        if (current) return; // כבר נתפס
+        return { t: Date.now(), cop: window.playerId };
+    }, (error, committed) => {
+        if (committed) {
+            // הפיכה לשוטר (מלשין יוטמע בשלב 7)[cite: 6]
+            if (victimId === window.playerId) {
+                alert(window.currentLang === 'he' ? "נתפסת!" : "Caught!");
+                window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'cop' })
+                    .then(() => location.reload());
+            }
+        }
+    });
+}
+
+function startCooldown(seconds) {
+    const circle = document.getElementById('cooldown-circle');
+    if (!circle) return;
+    
+    let left = seconds;
+    const totalOffset = 326.7; // stroke-dasharray
+    circle.style.strokeDashoffset = 0;
+
+    const interval = setInterval(() => {
+        left--;
+        const offset = totalOffset - (left / seconds) * totalOffset;
+        circle.style.strokeDashoffset = offset;
+
+        if (left <= 0) {
+            clearInterval(interval);
+            const btn = document.getElementById('capture-btn');
+            if (btn) btn.disabled = false;
+            circle.style.strokeDashoffset = totalOffset;
+        }
+    }, 1000);
+}
+
+// ==========================================
+// 7. Utility & Listeners
 // ==========================================
 function checkOfflinePlayers() {
     if (!window.isHost || !window.currentRoom) return;
     const now = Date.now();
-    
     window.db.ref(`rooms/${window.currentRoom}/players`).once('value', snap => {
-        const players = snap.val();
-        if (!players) return;
-        
+        const players = snap.val() || {};
         Object.keys(players).forEach(id => {
             const p = players[id];
             if (p.isOffline && p.disconnectedAt && (now - p.disconnectedAt > 180000)) {
@@ -227,30 +326,6 @@ function checkOfflinePlayers() {
     });
 }
 
-function triggerCapture() {
-    if (!isBriefingComplete) return;
-    const btn = document.getElementById('capture-btn');
-    if (btn.disabled) return;
-    btn.disabled = true;
-    if (typeof broadcastCapture === "function") broadcastCapture(Date.now());
-    setTimeout(() => startCooldown(60), 10000); 
-}
-
-function startCooldown(seconds) {
-    let left = seconds;
-    const interval = setInterval(() => {
-        left--;
-        if (left <= 0) {
-            clearInterval(interval);
-            const btn = document.getElementById('capture-btn');
-            if (btn) btn.disabled = false;
-        }
-    }, 1000);
-}
-
-// ==========================================
-// 7. Firebase Listeners
-// ==========================================
 function listenToVictory() {
     window.db.ref(`game/${window.currentRoom}/winner`).on('value', snap => {
         if (snap.val() && typeof showVictoryScreen === 'function') showVictoryScreen(snap.val());
@@ -267,10 +342,8 @@ function listenToCapturedAreas() {
 function listenToOtherPlayers() {
     window.db.ref(`rooms/${window.currentRoom}/players`).on('value', snapRooms => {
         const roomPlayers = snapRooms.val() || {};
-        
         window.db.ref(`game/${window.currentRoom}/players`).on('value', snapGame => {
             const gamePlayers = snapGame.val();
-            
             for (let id in playerMarkers) map.removeLayer(playerMarkers[id]);
             playerMarkers = {};
             
@@ -288,48 +361,31 @@ function listenToOtherPlayers() {
                 const rp = roomPlayers[id] || {}; 
                 const role = rp.role || gp.role;
                 const isOffline = rp.isOffline || false;
-                const isFlashing = gp.flashUntil && gp.flashUntil > Date.now(); // חשיפה ל-3 שניות[cite: 2]
+                const isFlashing = gp.flashUntil && gp.flashUntil > Date.now();
                 
                 if (!isOffline) {
                     activeCount++;
                     if (role === 'thief') thievesCount++;
                 }
                 
-                // שוטר לא רואה גנבים אלא אם הם ב"חשיפה"[cite: 2]
                 if (window.playerRole === 'cop' && role === 'thief' && id !== window.playerId && !isFlashing) return;
                 
                 let markerColor = role === 'cop' ? '#2563eb' : '#dc2626';
                 if (isOffline) markerColor = '#6b7280';
                 
-                // יצירת הסמן עם אפקט הבהוב אם הגנב נחשף[cite: 2]
                 const markerOptions = {
                     radius: id === window.playerId ? 25 : 15, 
                     fillColor: markerColor, 
                     fillOpacity: isOffline ? 0.5 : 1,
-                    color: isFlashing ? '#ffff00' : '#fff', // צבע מסגרת בולט בחשיפה
+                    color: isFlashing ? '#ffff00' : '#fff',
                     weight: isFlashing ? 6 : 3 
                 };
 
                 playerMarkers[id] = L.circleMarker([gp.lat, gp.lng], markerOptions).addTo(map);
-                
-                // הוספת אנימציית הבהוב בסיסית אם נחשף
-                if (isFlashing) {
-                    let flashToggle = true;
-                    const flashInt = setInterval(() => {
-                        if (!playerMarkers[id]) { clearInterval(flashInt); return; }
-                        playerMarkers[id].setStyle({ fillOpacity: flashToggle ? 0.2 : 1 });
-                        flashToggle = !flashToggle;
-                        if (Date.now() > gp.flashUntil) {
-                            clearInterval(flashInt);
-                            if (playerMarkers[id]) playerMarkers[id].setStyle({ fillOpacity: 1 });
-                        }
-                    }, 300);
-                }
             });
 
             if (playersCountEl) playersCountEl.innerText = `שחקנים: ${activeCount}`;
             if (thievesCount > 0) hasSeenThief = true;
-            
             if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
                 window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
             }
@@ -339,12 +395,4 @@ function listenToOtherPlayers() {
 
 function startThiefMechanics() {
     trailLayer = L.polyline([], { color: '#dc2626', weight: 4, dashArray: '5, 10' }).addTo(map);
-    if (typeof startListeningForCops === "function") {
-        startListeningForCops((ts) => {
-            if (ts && ts >= gameStartTime) {
-                alert("נתפסת!");
-                window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'cop' }).then(() => location.reload());
-            }
-        });
-    }
 }
