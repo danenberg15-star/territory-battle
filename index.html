@@ -7,73 +7,59 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         /* Base Styles */
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #0f172a; color: white; user-select: none; -webkit-user-select: none; }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #f8fafc; color: #1e293b; user-select: none; -webkit-user-select: none; }
         #map { height: 100%; width: 100%; position: absolute; top: 0; z-index: 1; display: none; }
         
         /* Drawing Layer */
-        #drawing-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2500; display: none; background: rgba(15, 23, 42, 0.2); touch-action: none; }
+        #drawing-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2500; display: none; background: rgba(255, 255, 255, 0.1); touch-action: none; }
         #drawing-canvas { width: 100%; height: 100%; cursor: crosshair; }
         
         /* Screens */
-        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; padding: 20px; box-sizing: border-box; }
+        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; padding: 20px; box-sizing: border-box; color: white; }
         #lobby-screen { display: none; justify-content: flex-start; padding-top: 50px; }
         
-        /* Typography & Inputs */
+        /* Components */
         h1 { color: #38bdf8; font-size: 28px; margin-bottom: 30px; text-align: center; }
-        h2 { color: #e2e8f0; font-size: 20px; margin-bottom: 15px; }
         input { width: 100%; max-width: 300px; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: 1px solid #38bdf8; background: #1e293b; color: white; font-size: 18px; text-align: center; box-sizing: border-box; user-select: auto; }
         
         .btn { width: 100%; max-width: 300px; padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; margin-bottom: 15px; transition: 0.2s; text-align: center; display: flex; align-items: center; justify-content: center; }
         .btn-blue { background: #1e40af; }
         .btn-red { background: #991b1b; }
-        .btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; max-width: 350px; width: 100%; margin: 15px 0 0 0; }
+        .btn-green { background: #10b981; font-size: 15px; padding: 12px; max-width: 350px; width: 100%; margin-top: 10px; }
         
-        /* Map Control Panel (Host Only) */
-        #map-controls { position: absolute; right: 15px; top: 50%; transform: translateY(-50%); z-index: 3000; display: none; flex-direction: column; gap: 8px; }
-        .ctrl-btn { width: 50px; height: 50px; background: rgba(30, 41, 59, 0.9); border: 2px solid #38bdf8; color: white; border-radius: 12px; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
-        .ctrl-btn:active { background: #38bdf8; color: #0f172a; }
+        /* Compass Map Controls (Bottom Left) */
+        #map-controls { position: absolute; left: 15px; bottom: 80px; z-index: 3000; display: none; flex-direction: column; align-items: center; gap: 5px; }
+        .compass-row { display: flex; gap: 5px; }
+        .ctrl-btn { width: 45px; height: 45px; background: rgba(255, 255, 255, 0.9); border: 2px solid #1e40af; color: #1e40af; border-radius: 10px; font-size: 22px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .ctrl-btn:active { background: #1e40af; color: white; }
 
-        /* Lobby Elements */
-        .room-header-container { display: flex; flex-direction: row; align-items: center; justify-content: center; width: 100%; max-width: 350px; margin-bottom: 20px; }
-        .room-code-box { background: #1e293b; border: 2px dashed #38bdf8; padding: 15px; border-radius: 12px; font-size: 24px; font-weight: bold; letter-spacing: 2px; text-align: center; flex-grow: 1; }
-        .btn-whatsapp-icon { background: #25D366; border: none; border-radius: 50%; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-right: 15px; flex-shrink: 0; }
-        .btn-whatsapp-icon svg { width: 30px; height: 30px; fill: white; }
-        
-        .lists-container { display: flex; flex-direction: row; width: 100%; max-width: 350px; gap: 10px; flex-grow: 1; overflow-y: auto; align-items: stretch; }
-        .team-list { background: #1e293b; border-radius: 12px; padding: 10px; flex: 1; display: flex; flex-direction: column; }
-        .team-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; text-align: center; }
-        .player-item { background: #334155; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; text-align: center; touch-action: none; }
+        /* Zoom Controls (Bottom Right) */
+        #zoom-controls { position: absolute; right: 15px; bottom: 80px; z-index: 3000; display: none; flex-direction: column; gap: 8px; }
 
-        /* Setup UI Overlay */
-        #setup-ui { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 90%; max-width: 400px; display: none; flex-direction: column; gap: 10px; pointer-events: auto; }
-        .setup-msg { background: rgba(30, 41, 59, 0.95); padding: 12px; border-radius: 12px; border: 2px solid #38bdf8; text-align: center; font-size: 13px; color: white; box-shadow: 0 0 20px rgba(0,0,0,0.5); }
+        /* Setup UI (Compact Footer) */
+        #setup-ui { position: absolute; bottom: 0; left: 0; right: 0; z-index: 3000; background: rgba(255, 255, 255, 0.95); border-top: 2px solid #1e40af; padding: 10px 15px; display: none; align-items: center; justify-content: space-between; gap: 10px; height: 60px; box-sizing: border-box; }
+        .setup-msg { font-size: 12px; color: #1e293b; font-weight: bold; flex: 1; text-align: right; line-height: 1.2; }
+        .setup-actions { display: flex; gap: 8px; }
+        .setup-btn { padding: 8px 15px; border-radius: 8px; font-size: 13px; font-weight: bold; border: none; color: white; cursor: pointer; }
 
         /* In-Game UI */
         .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 3100; background: rgba(220, 38, 38, 0.9); color: white; border: 2px solid white; border-radius: 50%; width: 40px; height: 40px; font-weight: bold; font-size: 20px; cursor: pointer; display: none; align-items: center; justify-content: center; }
-        .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.95); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #38bdf8; display: none; }
-        .status-row { display: flex; justify-content: space-around; font-size: 11px; margin-bottom: 5px; font-weight: bold; }
-        #gps-status { color: #ef4444; }
-        #audio-status { color: #facc15; }
-        #players-count { color: #10b981; }
+        .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(255, 255, 255, 0.95); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #1e40af; display: none; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .status-row { display: flex; justify-content: space-around; font-size: 11px; margin-bottom: 2px; font-weight: bold; color: #475569; }
+        #gps-status { color: #dc2626; }
+        #players-count { color: #059669; }
         
         /* Briefing UI */
-        #briefing-overlay { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 2500; background: rgba(30, 41, 59, 0.9); padding: 15px 25px; border-radius: 50px; border: 2px solid #facc15; display: none; text-align: center; width: 80%; max-width: 300px; }
-        #briefing-timer-text { font-size: 22px; font-weight: bold; color: #facc15; }
+        #briefing-overlay { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 2500; background: rgba(30, 41, 59, 0.9); padding: 15px 25px; border-radius: 50px; border: 2px solid #facc15; display: none; text-align: center; width: 80%; max-width: 300px; color: white; }
 
         /* Controls */
         #controls-container { display: none; position: absolute; bottom: 10px; left: 0; right: 0; z-index: 2000; padding: 10px; pointer-events: none; }
         #capture-btn-container { position: relative; width: 110px; height: 110px; margin: 0 auto 15px auto; pointer-events: auto; display: none; }
-        #capture-btn { position: absolute; top: 5px; left: 5px; width: 100px; height: 100px; background: #dc2626; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 18px; z-index: 5; display: flex; align-items: center; justify-content: center; cursor: pointer; }
-        
-        .progress-ring { position: absolute; top: 0; left: 0; width: 110px; height: 110px; transform: rotate(-90deg); z-index: 1; }
-        .progress-ring__circle { stroke: #dc2626; stroke-width: 6; fill: transparent; stroke-dasharray: 326.7; stroke-dashoffset: 0; transition: stroke-dashoffset 1s linear; }
-
-        /* Victory */
-        #victory-screen { display: none; z-index: 4000; text-align: center; justify-content: center; align-items: center; }
+        #capture-btn { position: absolute; top: 5px; left: 5px; width: 100px; height: 100px; background: #dc2626; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 18px; z-index: 5; cursor: pointer; }
     </style>
 </head>
 <body>
-    <button id="lang-toggle" onclick="toggleLanguage()" style="position:absolute; top:15px; right:15px; z-index:3101; background:#1e293b; color:white; border-radius:50%; width:40px; height:40px; border:1px solid #38bdf8;">🌐</button>
+    <button id="lang-toggle" onclick="toggleLanguage()" style="position:absolute; top:15px; right:15px; z-index:3101; background:white; color:#1e40af; border-radius:50%; width:40px; height:40px; border:1px solid #1e40af; font-weight:bold;">🌐</button>
 
     <!-- 1. Login -->
     <div id="login-screen" class="screen">
@@ -89,13 +75,13 @@
         <h2 id="lbl-lobby-title">לובי המתנה</h2>
         <div class="room-header-container">
             <div class="room-code-box">
-                <span id="lbl-room-code">קוד חדר:</span> <span id="display-room-code">----</span>
+                <span id="lbl-room-code" style="color:#94a3b8; font-size:14px;">קוד חדר:</span> <span id="display-room-code">----</span>
             </div>
             <button class="btn-whatsapp-icon" onclick="shareWhatsApp()">
                 <svg viewBox="0 0 24 24"><path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.128.552 4.195 1.6 6.02L.053 24l6.113-1.603c1.764.954 3.754 1.458 5.865 1.458 6.646 0 12.031-5.385 12.031-12.031S18.677 0 12.031 0zm3.626 17.15c-.156.44-1.295.992-1.847 1.054-.537.06-1.127.186-3.413-.761-2.92-1.21-4.787-4.225-4.93-4.417-.143-.192-1.178-1.568-1.178-2.986 0-1.418.736-2.115 1.002-2.392.266-.277.674-.352.887-.352.213 0 .426.002.605.009.213.008.497-.083.775.589.284.685.952 2.321 1.036 2.493.084.172.143.376.035.592-.108.216-.164.352-.326.544-.164.192-.345.426-.497.589-.168.176-.347.37-.148.712.199.342.885 1.463 1.895 2.361 1.305 1.159 2.404 1.516 2.748 1.673.344.157.545.132.748-.101.203-.233.882-1.025 1.118-1.378.236-.353.473-.294.787-.176.314.118 1.986.937 2.327 1.107.341.17.568.256.653.398.085.142.085.83-.071 1.27z"/></svg>
             </button>
         </div>
-        <div class="lists-container">
+        <div class="lists-container" style="width:100%; max-width:350px;">
             <div class="team-list" id="list-cops" style="border: 1px solid #3b82f6;">
                 <div class="team-title" style="color: #3b82f6;">שוטרים 👮‍♂️</div>
                 <div id="players-cops" class="drop-zone"></div>
@@ -108,29 +94,33 @@
         <button class="btn btn-green" id="btn-start-game" style="display: none;" onclick="startGame()">התחל משחק</button>
     </div>
 
-    <!-- 3. Drawing & Map Controls UI -->
+    <!-- 3. Drawing & Map Controls -->
     <div id="drawing-container">
         <canvas id="drawing-canvas"></canvas>
     </div>
 
+    <!-- Compass Controls (Bottom Left) -->
     <div id="map-controls">
         <button class="ctrl-btn" onclick="panMap('up')">↑</button>
-        <div style="display: flex; gap: 8px;">
-            <button class="ctrl-btn" onclick="panMap('left')">←</button>
+        <div class="compass-row">
             <button class="ctrl-btn" onclick="panMap('right')">→</button>
+            <button class="ctrl-btn" onclick="panMap('left')">←</button>
         </div>
         <button class="ctrl-btn" onclick="panMap('down')">↓</button>
-        <div style="margin-top: 15px; display: flex; flex-direction: column; gap: 8px;">
-            <button class="ctrl-btn" onclick="zoomMap(1)">+</button>
-            <button class="ctrl-btn" onclick="zoomMap(-1)">-</button>
-        </div>
     </div>
 
+    <!-- Zoom Controls (Bottom Right) -->
+    <div id="zoom-controls">
+        <button class="ctrl-btn" onclick="zoomMap(1)">+</button>
+        <button class="ctrl-btn" onclick="zoomMap(-1)">-</button>
+    </div>
+
+    <!-- Compact Setup UI -->
     <div id="setup-ui">
-        <div class="setup-msg" id="setup-msg">השתמש בחצים למיקום המפה, וצייר עם האצבע את שטח המשחק.</div>
-        <div style="display: flex; gap: 10px; width: 100%;">
-            <button class="btn btn-red" style="flex:1; padding: 12px; font-size: 14px;" onclick="clearDrawing()">נקה ציור</button>
-            <button class="btn btn-blue" id="btn-confirm-drawing" style="flex:2; padding: 12px; font-size: 14px; display:none;" onclick="confirmDrawing()">אשר זירה וקבע תחנה</button>
+        <div class="setup-msg" id="setup-msg">השתמש בחיצים למיקום וצייר את הזירה על המסך</div>
+        <div class="setup-actions">
+            <button class="setup-btn btn-red" onclick="clearDrawing()">נקה</button>
+            <button class="setup-btn btn-blue" id="btn-confirm-drawing" style="display:none;" onclick="confirmDrawing()">אשר</button>
         </div>
     </div>
 
@@ -142,19 +132,18 @@
             <span id="audio-status">אודיו ⏳</span>
             <span id="players-count">שחקנים: 0</span>
         </div>
-        <h1 style="margin:0; font-size:16px; color: #38bdf8;">Territory Battle</h1>
+        <h1 style="margin:0; font-size:16px; color: #1e40af;">Territory Battle</h1>
     </div>
 
     <div id="briefing-overlay">
         <div id="briefing-timer-text">00:30</div>
-        <div id="briefing-status">ממתין לשוטרים בתחנה...</div>
+        <div id="briefing-status">ממתין לשוטרים...</div>
     </div>
 
     <div id="map"></div>
 
     <div id="controls-container">
         <div id="capture-btn-container">
-            <svg class="progress-ring"><circle class="progress-ring__circle" id="cooldown-circle" cx="55" cy="55" r="52"></circle></svg>
             <button id="capture-btn" onclick="triggerCapture()">תפוס!</button>
         </div>
     </div>

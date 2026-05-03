@@ -1,4 +1,4 @@
-// game.js - Phase 1.6: Button-Controlled Map & Free-hand Drawing Arena (Light Theme)
+// game.js - Phase 1.7: Clean UI Setup, Compass Controls & Dynamic Line Weight
 
 // ==========================================
 // 1. Game Globals
@@ -26,14 +26,13 @@ let arenaPolygonLayer = null;
 // ==========================================
 function enterGameScene() {
     document.getElementById('lobby-screen').style.display = 'none';
-    document.getElementById('game-header').style.display = 'block';
     document.getElementById('map').style.display = 'block';
     document.getElementById('exit-btn').style.display = 'flex';
 
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Initialize Map with Touch Interactions Disabled for Host Drawing
+    // Initialize Map - Interaction disabled for Host during drawing
     map = L.map('map', { 
         zoomControl: false, 
         attributionControl: false,
@@ -45,12 +44,10 @@ function enterGameScene() {
         keyboard: false
     }).setView([32.0853, 34.7818], 18);
 
-    // מפה בהירה - CartoDB Voyager
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { 
         maxZoom: 20 
     }).addTo(map);
 
-    // Sync Game Data
     window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
         gameStartTime = snap.val() || Date.now();
         checkArenaStatus();
@@ -63,11 +60,11 @@ function enterGameScene() {
 }
 
 // ==========================================
-// 3. Map Control Functions (Buttons Only)
+// 3. Compass & Zoom Logic
 // ==========================================
 function panMap(direction) {
     if (!map) return;
-    const offset = 100; 
+    const offset = 120; // תזוזה מעט גדולה יותר לניווט מהיר
     switch (direction) {
         case 'up': map.panBy([0, -offset]); break;
         case 'down': map.panBy([0, offset]); break;
@@ -83,7 +80,7 @@ function zoomMap(delta) {
 }
 
 // ==========================================
-// 4. Arena Setup (Drawing Mode)
+// 4. Clean Arena Setup Mode
 // ==========================================
 function checkArenaStatus() {
     window.db.ref(`game/${window.currentRoom}/arena`).on('value', snap => {
@@ -92,15 +89,19 @@ function checkArenaStatus() {
             if (window.isHost) {
                 setupHostDrawingMode();
             } else {
+                // Guests wait with header visible
+                document.getElementById('game-header').style.display = 'block';
                 document.getElementById('briefing-overlay').style.display = 'block';
-                const statusMsg = window.currentLang === 'he' ? "ממתין למנהל שיקבע את זירת המשחק..." : "Waiting for host to define arena...";
-                document.getElementById('briefing-status').innerText = statusMsg;
+                document.getElementById('briefing-status').innerText = window.currentLang === 'he' ? "ממתין למנהל שיקבע את הזירה..." : "Waiting for host...";
             }
         } else {
+            // Arena Defined - Show Main UI
             arenaData = data;
+            document.getElementById('game-header').style.display = 'block';
             document.getElementById('setup-ui').style.display = 'none';
             document.getElementById('drawing-container').style.display = 'none';
             document.getElementById('map-controls').style.display = 'none';
+            document.getElementById('zoom-controls').style.display = 'none';
             
             map.dragging.enable();
             map.touchZoom.enable();
@@ -120,27 +121,39 @@ function checkArenaStatus() {
 }
 
 function setupHostDrawingMode() {
+    // Hide header for clean drawing workspace
+    document.getElementById('game-header').style.display = 'none';
+    
     if (myLat && myLng) {
         map.setView([myLat, myLng], 14);
     }
     
     document.getElementById('setup-ui').style.display = 'flex';
     document.getElementById('map-controls').style.display = 'flex';
-    initDrawingCanvas(map); 
+    document.getElementById('zoom-controls').style.display = 'flex';
+    
+    if (typeof initDrawingCanvas === 'function') initDrawingCanvas(map); 
 }
 
 function confirmDrawing() {
-    const results = finalizeDrawing(); 
-    if (results) {
-        window.db.ref(`game/${window.currentRoom}/arena`).set(results);
+    if (typeof finalizeDrawing === 'function') {
+        const results = finalizeDrawing();
+        if (results) {
+            window.db.ref(`game/${window.currentRoom}/arena`).set(results);
+        }
     }
 }
 
 function drawArenaOnMap() {
     if (!arenaData || !map) return;
     if (arenaPolygonLayer) map.removeLayer(arenaPolygonLayer);
+    
+    // Increased weight (6) and dynamic visibility
     arenaPolygonLayer = L.polygon(arenaData.points, {
-        color: '#1d4ed8', weight: 4, fillOpacity: 0.1, dashArray: '5, 10'
+        color: '#1e40af', 
+        weight: 6, 
+        fillOpacity: 0.15, 
+        dashArray: '10, 10'
     }).addTo(map);
 }
 
@@ -149,12 +162,12 @@ function setupPoliceStation() {
     if (policeStationCircle) map.removeLayer(policeStationCircle);
     policeStationCircle = L.circle([data.lat, data.lng], {
         radius: data.radius,
-        color: '#1e40af', fillColor: '#3b82f6', fillOpacity: 0.3
+        color: '#1e40af', fillColor: '#3b82f6', fillOpacity: 0.3, weight: 3
     }).addTo(map);
 }
 
 // ==========================================
-// 5. GPS & Movement Logic
+// 5. GPS & Movement
 // ==========================================
 function startRealGpsTracking() {
     if (!navigator.geolocation) return;
@@ -165,7 +178,7 @@ function startRealGpsTracking() {
         const gpsEl = document.getElementById('gps-status');
         if (gpsEl) {
             gpsEl.innerText = "GPS ✅";
-            gpsEl.style.color = "#10b981";
+            gpsEl.style.color = "#059669";
         }
 
         if (map && !window.firstLoadDone) {
@@ -222,17 +235,16 @@ function handleThiefPath() {
 }
 
 // ==========================================
-// 6. Gameplay Mechanics
+// 6. Mechanics & Listeners
 // ==========================================
 function triggerCapture() {
     if (!isBriefingComplete) return;
     const btn = document.getElementById('capture-btn');
-    if (btn.disabled) return;
-    btn.disabled = true;
-    broadcastCapture(Date.now());
-    setTimeout(() => {
-        startCooldown(60);
-    }, 10000); 
+    if (btn && !btn.disabled) {
+        btn.disabled = true;
+        broadcastCapture(Date.now());
+        setTimeout(() => { startCooldown(60); }, 10000); 
+    }
 }
 
 function startCooldown(seconds) {
@@ -247,9 +259,6 @@ function startCooldown(seconds) {
     }, 1000);
 }
 
-// ==========================================
-// 7. Firebase Listeners
-// ==========================================
 function listenToVictory() {
     window.db.ref(`game/${window.currentRoom}/winner`).on('value', snap => {
         if (snap.val() && typeof showVictoryScreen === 'function') showVictoryScreen(snap.val());
@@ -277,14 +286,11 @@ function listenToOtherPlayers() {
 
         let activeCount = 0;
         let thievesCount = 0;
-
         Object.keys(players).forEach(id => {
             const p = players[id];
             activeCount++;
             if (p.role === 'thief') thievesCount++;
-            
             if (window.playerRole === 'cop' && p.role === 'thief' && id !== window.playerId) return;
-            
             playerMarkers[id] = L.circleMarker([p.lat, p.lng], { 
                 radius: id === window.playerId ? 25 : 15, 
                 fillColor: p.role === 'cop' ? '#2563eb' : '#dc2626', 
@@ -319,18 +325,18 @@ function manageBriefingLogic() {
         const players = snap.val() || {};
         const cops = Object.values(players).filter(p => p.role === 'cop');
         const ready = cops.length > 0 && cops.every(c => c.inStation);
-        if (ready) {
-            // Timer logic in DB
-        }
+        // Sync ready status logic here if needed
     });
 }
 
 function startThiefMechanics() {
     trailLayer = L.polyline([], { color: '#dc2626', weight: 4, dashArray: '5, 10' }).addTo(map);
-    startListeningForCops((ts) => {
-        if (ts && ts >= gameStartTime) {
-            alert("נתפסת!");
-            window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'cop' }).then(() => location.reload());
-        }
-    });
+    if (typeof startListeningForCops === 'function') {
+        startListeningForCops((ts) => {
+            if (ts && ts >= gameStartTime) {
+                alert("נתפסת!");
+                window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'cop' }).then(() => location.reload());
+            }
+        });
+    }
 }
