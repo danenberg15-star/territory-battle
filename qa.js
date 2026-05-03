@@ -1,6 +1,12 @@
 // qa.js - QA Sandbox Environment (Rooms 99999 / 88888)
 
 function initQARoom(roomId) {
+    // הגדרת משתני החלון (Global) - קריטי כדי ש-game.js ייגש לחדר הנכון
+    window.currentRoom = roomId;
+    window.playerId = localStorage.getItem('tb_uuid') || 'p_qa_' + Date.now();
+    window.playerName = localStorage.getItem('tb_name') || "QA Tester";
+    window.currentLang = typeof currentLang !== 'undefined' ? currentLang : 'he';
+
     if (!navigator.geolocation) {
         alert("לא ניתן לגשת ל-GPS. חובה לאשר מיקום לטובת סביבת ה-QA.");
         return;
