@@ -27,25 +27,25 @@
         .btn-red { background: #991b1b; }
         .btn-green { background: #10b981; font-size: 15px; padding: 12px; max-width: 350px; width: 100%; margin-top: 10px; }
         
-        /* Compass Map Controls (Bottom Left) */
+        /* Compass Map Controls (Host ONLY Setup) */
         #map-controls { position: absolute; left: 15px; bottom: 80px; z-index: 3000; display: none; flex-direction: column; align-items: center; gap: 5px; }
         .compass-row { display: flex; gap: 5px; }
-        .ctrl-btn { width: 45px; height: 45px; background: rgba(255, 255, 255, 0.9); border: 2px solid #1e40af; color: #1e40af; border-radius: 10px; font-size: 22px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .ctrl-btn { width: 45px; height: 45px; background: rgba(255, 255, 255, 0.9); border: 2px solid #1e40af; color: #1e40af; border-radius: 10px; font-size: 22px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
         .ctrl-btn:active { background: #1e40af; color: white; }
 
-        /* Zoom Controls (Bottom Right) */
+        /* Zoom Controls (Host ONLY Setup) */
         #zoom-controls { position: absolute; right: 15px; bottom: 80px; z-index: 3000; display: none; flex-direction: column; gap: 8px; }
 
-        /* Setup UI (Compact Footer) */
-        #setup-ui { position: absolute; bottom: 0; left: 0; right: 0; z-index: 3000; background: rgba(255, 255, 255, 0.95); border-top: 2px solid #1e40af; padding: 10px 15px; display: none; align-items: center; justify-content: space-between; gap: 10px; height: 60px; box-sizing: border-box; }
-        .setup-msg { font-size: 12px; color: #1e293b; font-weight: bold; flex: 1; text-align: right; line-height: 1.2; }
+        /* Setup UI Footer */
+        #setup-ui { position: absolute; bottom: 0; left: 0; right: 0; z-index: 3000; background: rgba(255, 255, 255, 0.95); border-top: 2px solid #1e40af; padding: 10px 15px; display: none; align-items: center; justify-content: space-between; gap: 10px; height: 65px; box-sizing: border-box; }
+        .setup-msg { font-size: 12px; color: #1e293b; font-weight: bold; flex: 1; text-align: right; }
         .setup-actions { display: flex; gap: 8px; }
-        .setup-btn { padding: 8px 15px; border-radius: 8px; font-size: 13px; font-weight: bold; border: none; color: white; cursor: pointer; }
+        .setup-btn { padding: 10px 15px; border-radius: 8px; font-size: 13px; font-weight: bold; border: none; color: white; cursor: pointer; }
 
         /* In-Game UI */
         .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 3100; background: rgba(220, 38, 38, 0.9); color: white; border: 2px solid white; border-radius: 50%; width: 40px; height: 40px; font-weight: bold; font-size: 20px; cursor: pointer; display: none; align-items: center; justify-content: center; }
-        .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(255, 255, 255, 0.95); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #1e40af; display: none; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .status-row { display: flex; justify-content: space-around; font-size: 11px; margin-bottom: 2px; font-weight: bold; color: #475569; }
+        .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(255, 255, 255, 0.95); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #1e40af; display: none; }
+        .status-row { display: flex; justify-content: space-around; font-size: 11px; font-weight: bold; color: #475569; }
         #gps-status { color: #dc2626; }
         #players-count { color: #059669; }
         
@@ -56,6 +56,9 @@
         #controls-container { display: none; position: absolute; bottom: 10px; left: 0; right: 0; z-index: 2000; padding: 10px; pointer-events: none; }
         #capture-btn-container { position: relative; width: 110px; height: 110px; margin: 0 auto 15px auto; pointer-events: auto; display: none; }
         #capture-btn { position: absolute; top: 5px; left: 5px; width: 100px; height: 100px; background: #dc2626; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 18px; z-index: 5; cursor: pointer; }
+        
+        /* Victory Screen */
+        #victory-screen { display: none; z-index: 4000; text-align: center; justify-content: center; align-items: center; flex-direction: column; }
     </style>
 </head>
 <body>
@@ -75,31 +78,27 @@
         <h2 id="lbl-lobby-title">לובי המתנה</h2>
         <div class="room-header-container">
             <div class="room-code-box">
-                <span id="lbl-room-code" style="color:#94a3b8; font-size:14px;">קוד חדר:</span> <span id="display-room-code">----</span>
+                <span id="display-room-code">----</span>
             </div>
-            <button class="btn-whatsapp-icon" onclick="shareWhatsApp()">
-                <svg viewBox="0 0 24 24"><path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.128.552 4.195 1.6 6.02L.053 24l6.113-1.603c1.764.954 3.754 1.458 5.865 1.458 6.646 0 12.031-5.385 12.031-12.031S18.677 0 12.031 0zm3.626 17.15c-.156.44-1.295.992-1.847 1.054-.537.06-1.127.186-3.413-.761-2.92-1.21-4.787-4.225-4.93-4.417-.143-.192-1.178-1.568-1.178-2.986 0-1.418.736-2.115 1.002-2.392.266-.277.674-.352.887-.352.213 0 .426.002.605.009.213.008.497-.083.775.589.284.685.952 2.321 1.036 2.493.084.172.143.376.035.592-.108.216-.164.352-.326.544-.164.192-.345.426-.497.589-.168.176-.347.37-.148.712.199.342.885 1.463 1.895 2.361 1.305 1.159 2.404 1.516 2.748 1.673.344.157.545.132.748-.101.203-.233.882-1.025 1.118-1.378.236-.353.473-.294.787-.176.314.118 1.986.937 2.327 1.107.341.17.568.256.653.398.085.142.085.83-.071 1.27z"/></svg>
-            </button>
         </div>
         <div class="lists-container" style="width:100%; max-width:350px;">
             <div class="team-list" id="list-cops" style="border: 1px solid #3b82f6;">
                 <div class="team-title" style="color: #3b82f6;">שוטרים 👮‍♂️</div>
-                <div id="players-cops" class="drop-zone"></div>
+                <div id="players-cops"></div>
             </div>
             <div class="team-list" id="list-thieves" style="border: 1px solid #ef4444;">
                 <div class="team-title" style="color: #ef4444;">גנבים 🥷</div>
-                <div id="players-thieves" class="drop-zone"></div>
+                <div id="players-thieves"></div>
             </div>
         </div>
         <button class="btn btn-green" id="btn-start-game" style="display: none;" onclick="startGame()">התחל משחק</button>
     </div>
 
-    <!-- 3. Drawing & Map Controls -->
+    <!-- 3. Drawing & Compass (Setup ONLY) -->
     <div id="drawing-container">
         <canvas id="drawing-canvas"></canvas>
     </div>
 
-    <!-- Compass Controls (Bottom Left) -->
     <div id="map-controls">
         <button class="ctrl-btn" onclick="panMap('up')">↑</button>
         <div class="compass-row">
@@ -109,35 +108,31 @@
         <button class="ctrl-btn" onclick="panMap('down')">↓</button>
     </div>
 
-    <!-- Zoom Controls (Bottom Right) -->
     <div id="zoom-controls">
         <button class="ctrl-btn" onclick="zoomMap(1)">+</button>
         <button class="ctrl-btn" onclick="zoomMap(-1)">-</button>
     </div>
 
-    <!-- Compact Setup UI -->
     <div id="setup-ui">
-        <div class="setup-msg" id="setup-msg">השתמש בחיצים למיקום וצייר את הזירה על המסך</div>
+        <div class="setup-msg">הזז את המפה עם החיצים וצייר את הזירה</div>
         <div class="setup-actions">
             <button class="setup-btn btn-red" onclick="clearDrawing()">נקה</button>
             <button class="setup-btn btn-blue" id="btn-confirm-drawing" style="display:none;" onclick="confirmDrawing()">אשר</button>
         </div>
     </div>
 
-    <!-- 4. In-Game UI -->
+    <!-- 4. Game UI -->
     <button id="exit-btn" class="exit-btn" onclick="exitGame()">X</button>
     <div class="header" id="game-header">
         <div class="status-row">
             <span id="gps-status">GPS ❌</span>
-            <span id="audio-status">אודיו ⏳</span>
             <span id="players-count">שחקנים: 0</span>
         </div>
-        <h1 style="margin:0; font-size:16px; color: #1e40af;">Territory Battle</h1>
     </div>
 
     <div id="briefing-overlay">
         <div id="briefing-timer-text">00:30</div>
-        <div id="briefing-status">ממתין לשוטרים...</div>
+        <div id="briefing-status">ממתין...</div>
     </div>
 
     <div id="map"></div>
@@ -148,7 +143,11 @@
         </div>
     </div>
 
-    <div id="victory-screen" class="screen"><h1>ניצחון!</h1></div>
+    <!-- Victory Screen -->
+    <div id="victory-screen" class="screen">
+        <h1 id="victory-text">ניצחון!</h1>
+        <button class="btn btn-blue" onclick="location.reload()">חזור ללובי</button>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
@@ -159,7 +158,6 @@
     <script src="territory.js"></script>
     <script src="firebase-init.js"></script>
     <script src="lobby.js"></script>
-    <script src="victory.js"></script>
     <script src="game.js"></script>
 </body>
 </html>

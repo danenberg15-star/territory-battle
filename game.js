@@ -1,4 +1,4 @@
-// game.js - Phase 1.7: Clean UI Setup, Compass Controls & Dynamic Line Weight
+// game.js - Full Mechanics + Compass Setup + Restored Gameplay
 
 // ==========================================
 // 1. Game Globals
@@ -7,7 +7,6 @@ let playerMarkers = {};
 let areaLayers = [];
 let thiefPath = []; 
 let trailLayer = null;
-let lastGpsTimestamp = Date.now();
 let map = null;
 
 let myLat = null;
@@ -28,20 +27,19 @@ function enterGameScene() {
     document.getElementById('lobby-screen').style.display = 'none';
     document.getElementById('map').style.display = 'block';
     document.getElementById('exit-btn').style.display = 'flex';
+    document.getElementById('victory-screen').style.display = 'none';
 
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    // Initialize Map - Interaction disabled for Host during drawing
+    // אתחול מפה - מצב התחלתי נעול לטובת סימון המנהל
     map = L.map('map', { 
         zoomControl: false, 
         attributionControl: false,
         dragging: false,      
         touchZoom: false,     
         doubleClickZoom: false,
-        scrollWheelZoom: false,
-        boxZoom: false,
-        keyboard: false
+        scrollWheelZoom: false
     }).setView([32.0853, 34.7818], 18);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { 
@@ -60,11 +58,11 @@ function enterGameScene() {
 }
 
 // ==========================================
-// 3. Compass & Zoom Logic
+// 3. Setup Controls (Compass & Zoom) - ONLY FOR SETUP
 // ==========================================
 function panMap(direction) {
     if (!map) return;
-    const offset = 120; // תזוזה מעט גדולה יותר לניווט מהיר
+    const offset = 120; 
     switch (direction) {
         case 'up': map.panBy([0, -offset]); break;
         case 'down': map.panBy([0, offset]); break;
@@ -80,7 +78,7 @@ function zoomMap(delta) {
 }
 
 // ==========================================
-// 4. Clean Arena Setup Mode
+// 4. Arena & Briefing Logic
 // ==========================================
 function checkArenaStatus() {
     window.db.ref(`game/${window.currentRoom}/arena`).on('value', snap => {
@@ -89,13 +87,12 @@ function checkArenaStatus() {
             if (window.isHost) {
                 setupHostDrawingMode();
             } else {
-                // Guests wait with header visible
                 document.getElementById('game-header').style.display = 'block';
                 document.getElementById('briefing-overlay').style.display = 'block';
-                document.getElementById('briefing-status').innerText = window.currentLang === 'he' ? "ממתין למנהל שיקבע את הזירה..." : "Waiting for host...";
+                document.getElementById('briefing-status').innerText = "ממתין למנהל שיקבע את הזירה...";
             }
         } else {
-            // Arena Defined - Show Main UI
+            // שחרור המפה למצב משחק חופשי
             arenaData = data;
             document.getElementById('game-header').style.display = 'block';
             document.getElementById('setup-ui').style.display = 'none';
@@ -121,12 +118,8 @@ function checkArenaStatus() {
 }
 
 function setupHostDrawingMode() {
-    // Hide header for clean drawing workspace
     document.getElementById('game-header').style.display = 'none';
-    
-    if (myLat && myLng) {
-        map.setView([myLat, myLng], 14);
-    }
+    if (myLat && myLng) map.setView([myLat, myLng], 14);
     
     document.getElementById('setup-ui').style.display = 'flex';
     document.getElementById('map-controls').style.display = 'flex';
@@ -138,22 +131,15 @@ function setupHostDrawingMode() {
 function confirmDrawing() {
     if (typeof finalizeDrawing === 'function') {
         const results = finalizeDrawing();
-        if (results) {
-            window.db.ref(`game/${window.currentRoom}/arena`).set(results);
-        }
+        if (results) window.db.ref(`game/${window.currentRoom}/arena`).set(results);
     }
 }
 
 function drawArenaOnMap() {
     if (!arenaData || !map) return;
     if (arenaPolygonLayer) map.removeLayer(arenaPolygonLayer);
-    
-    // Increased weight (6) and dynamic visibility
     arenaPolygonLayer = L.polygon(arenaData.points, {
-        color: '#1e40af', 
-        weight: 6, 
-        fillOpacity: 0.15, 
-        dashArray: '10, 10'
+        color: '#1e40af', weight: 6, fillOpacity: 0.15, dashArray: '10, 10'
     }).addTo(map);
 }
 
@@ -161,8 +147,7 @@ function setupPoliceStation() {
     const data = arenaData.policeStation;
     if (policeStationCircle) map.removeLayer(policeStationCircle);
     policeStationCircle = L.circle([data.lat, data.lng], {
-        radius: data.radius,
-        color: '#1e40af', fillColor: '#3b82f6', fillOpacity: 0.3, weight: 3
+        radius: data.radius, color: '#1e40af', fillColor: '#3b82f6', fillOpacity: 0.3, weight: 3
     }).addTo(map);
 }
 
@@ -174,26 +159,16 @@ function startRealGpsTracking() {
     gpsWatchId = navigator.geolocation.watchPosition((pos) => {
         myLat = pos.coords.latitude;
         myLng = pos.coords.longitude;
-        
         const gpsEl = document.getElementById('gps-status');
-        if (gpsEl) {
-            gpsEl.innerText = "GPS ✅";
-            gpsEl.style.color = "#059669";
-        }
-
-        if (map && !window.firstLoadDone) {
-            map.setView([myLat, myLng], 18);
-            window.firstLoadDone = true;
-        }
+        if (gpsEl) { gpsEl.innerText = "GPS ✅"; gpsEl.style.color = "#059669"; }
+        if (map && !window.firstLoadDone) { map.setView([myLat, myLng], 18); window.firstLoadDone = true; }
         updateRealPosition();
     }, null, { enableHighAccuracy: true });
 }
 
 function updateRealPosition() {
     if(!map || myLat === null) return;
-    
-    const isDrawingMode = document.getElementById('drawing-container').style.display === 'block';
-    if (!isDrawingMode) {
+    if (document.getElementById('drawing-container').style.display !== 'block') {
         map.panTo([myLat, myLng]);
     }
 
@@ -235,14 +210,39 @@ function handleThiefPath() {
 }
 
 // ==========================================
-// 6. Mechanics & Listeners
+// 6. Mechanics & Victory
 // ==========================================
+let bInterval = null;
+function manageBriefingLogic() {
+    if (!window.isHost || isBriefingComplete || !arenaData) return;
+    window.db.ref(`game/${window.currentRoom}/players`).once('value', snap => {
+        const players = snap.val() || {};
+        const cops = Object.values(players).filter(p => p.role === 'cop');
+        const ready = cops.length > 0 && cops.every(c => c.inStation);
+
+        window.db.ref(`game/${window.currentRoom}/briefing`).once('value', bSnap => {
+            let bData = bSnap.val() || { active: false, timeLeft: 30, complete: false };
+            if (ready && !bData.active) {
+                bData.active = true;
+                bInterval = setInterval(() => {
+                    bData.timeLeft--;
+                    if (bData.timeLeft <= 0) { bData.complete = true; clearInterval(bInterval); }
+                    window.db.ref(`game/${window.currentRoom}/briefing`).set(bData);
+                }, 1000);
+            } else if (!ready && bData.active) {
+                bData.active = false; bData.timeLeft = 30; clearInterval(bInterval);
+                window.db.ref(`game/${window.currentRoom}/briefing`).set(bData);
+            }
+        });
+    });
+}
+
 function triggerCapture() {
     if (!isBriefingComplete) return;
     const btn = document.getElementById('capture-btn');
     if (btn && !btn.disabled) {
         btn.disabled = true;
-        broadcastCapture(Date.now());
+        if (typeof broadcastCapture === 'function') broadcastCapture(Date.now());
         setTimeout(() => { startCooldown(60); }, 10000); 
     }
 }
@@ -261,14 +261,11 @@ function startCooldown(seconds) {
 
 function listenToVictory() {
     window.db.ref(`game/${window.currentRoom}/winner`).on('value', snap => {
-        if (snap.val() && typeof showVictoryScreen === 'function') showVictoryScreen(snap.val());
-    });
-}
-
-function listenToCapturedAreas() {
-    window.db.ref(`game/${window.currentRoom}/capturedAreas`).on('value', snap => {
-        const areas = snap.val();
-        if (typeof renderAreas === "function") areaLayers = renderAreas(map, areas, areaLayers);
+        const winner = snap.val();
+        if (winner) {
+            document.getElementById('victory-screen').style.display = 'flex';
+            document.getElementById('victory-text').innerText = winner === 'cops' ? "השוטרים ניצחו!" : "הגנבים ניצחו!";
+        }
     });
 }
 
@@ -279,10 +276,7 @@ function listenToOtherPlayers() {
         playerMarkers = {};
         
         const playersCountEl = document.getElementById('players-count');
-        if (!players) {
-            if (playersCountEl) playersCountEl.innerText = "שחקנים: 0";
-            return;
-        }
+        if (!players) { if (playersCountEl) playersCountEl.innerText = "שחקנים: 0"; return; }
 
         let activeCount = 0;
         let thievesCount = 0;
@@ -299,10 +293,19 @@ function listenToOtherPlayers() {
         });
 
         if (playersCountEl) playersCountEl.innerText = `שחקנים: ${activeCount}`;
+        
+        // תיקון ניצחון: חייבים להיות גנבים שנתפסו כדי לסיים
         if (thievesCount > 0) hasSeenThief = true;
-        if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
-            window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
+        if (activeCount > 0 && arenaData && hasSeenThief && thievesCount === 0) {
+            window.db.ref(`game/${window.currentRoom}/winner`).transaction(curr => curr || 'cops');
         }
+    });
+}
+
+function listenToCapturedAreas() {
+    window.db.ref(`game/${window.currentRoom}/capturedAreas`).on('value', snap => {
+        const areas = snap.val();
+        if (typeof renderAreas === "function") areaLayers = renderAreas(map, areas, areaLayers);
     });
 }
 
@@ -310,22 +313,11 @@ function listenToBriefing() {
     window.db.ref(`game/${window.currentRoom}/briefing`).on('value', snap => {
         const b = snap.val() || { active: false, timeLeft: 30, complete: false };
         isBriefingComplete = b.complete;
-        if (isBriefingComplete) {
-            document.getElementById('briefing-overlay').style.display = 'none';
-        } else {
+        if (isBriefingComplete) document.getElementById('briefing-overlay').style.display = 'none';
+        else {
             document.getElementById('briefing-overlay').style.display = 'block';
             document.getElementById('briefing-timer-text').innerText = `00:${b.timeLeft < 10 ? '0' : ''}${b.timeLeft}`;
         }
-    });
-}
-
-function manageBriefingLogic() {
-    if (!window.isHost || isBriefingComplete || !arenaData) return;
-    window.db.ref(`game/${window.currentRoom}/players`).once('value', snap => {
-        const players = snap.val() || {};
-        const cops = Object.values(players).filter(p => p.role === 'cop');
-        const ready = cops.length > 0 && cops.every(c => c.inStation);
-        // Sync ready status logic here if needed
     });
 }
 
