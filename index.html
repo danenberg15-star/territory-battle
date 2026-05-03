@@ -68,9 +68,12 @@
         /* Controls */
         #controls-container { display: none; position: absolute; bottom: 10px; left: 0; right: 0; z-index: 2000; padding: 10px; pointer-events: none; }
         #capture-btn-container { position: relative; width: 110px; height: 110px; margin: 0 auto 15px auto; pointer-events: auto; display: none; }
-        #capture-btn { position: absolute; top: 5px; left: 5px; width: 100px; height: 100px; background: #dc2626; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 18px; z-index: 5; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s; }
         
-        /* 5.1: Active Capture UI - Pulsing effect[cite: 6] */
+        #capture-btn { position: absolute; top: 5px; left: 5px; width: 100px; height: 100px; background: #dc2626; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 18px; z-index: 5; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: transform 0.2s, background-color 0.3s, color 0.3s; }
+        
+        /* 5.1: Cooldown Transparency[cite: 6] */
+        #capture-btn:disabled:not(.active-capture) { background-color: transparent !important; color: transparent !important; box-shadow: none !important; }
+        
         #capture-btn.active-capture { animation: pulse-red 1s infinite; transform: scale(1.1); box-shadow: 0 0 20px #ef4444; }
         @keyframes pulse-red {
             0% { background-color: #dc2626; }

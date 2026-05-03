@@ -1,7 +1,7 @@
-// game.js - Phase 1.8.3: Hybrid Catch Implementation (Cop Logic)
+// game.js - Phase 1.8.3: Hybrid Catch Implementation with Visual Cooldown
 
 // ==========================================
-// 1. Game Globals (Updated)
+// 1. Game Globals
 // ==========================================
 let playerMarkers = {};
 let areaLayers = [];
@@ -56,8 +56,6 @@ function enterGameScene() {
     listenToOtherPlayers();
     listenToCapturedAreas();
     listenToVictory(); 
-    
-    // האזנה לסיגנלי תפיסה (רלוונטי לגנבים)
     listenForCaptureSignals(); 
 
     if (window.isHost) {
@@ -210,14 +208,11 @@ function triggerCapture() {
     const btn = document.getElementById('capture-btn');
     if (btn.disabled) return;
 
-    // 1. הפעלת קירור (Cooldown) ושינוי מצב ויזואלי[cite: 6]
     btn.disabled = true;
     btn.classList.add('active-capture');
     
-    // 2. שידור סונאר אולטרסוני מקומי[cite: 6]
     if (typeof broadcastCapture === "function") broadcastCapture();
 
-    // 3. שידור סיגנל שרת להפעלת מיקרופונים אצל הגנבים[cite: 6]
     const timestamp = Date.now();
     window.db.ref(`game/${window.currentRoom}/captureSignal`).set({
         sender: window.playerId,
@@ -226,7 +221,6 @@ function triggerCapture() {
         lng: myLng
     });
 
-    // 4. בדיקת גיבוי GPS למשך 10 שניות[cite: 6]
     let gpsChecks = 0;
     const gpsInterval = setInterval(() => {
         checkGpsCatch(myLat, myLng, timestamp);
@@ -234,10 +228,9 @@ function triggerCapture() {
         if (gpsChecks >= 10) clearInterval(gpsInterval);
     }, 1000);
 
-    // 5. ניהול חיווי ויזואלי (10 שניות) וקירור (60 שניות)[cite: 6]
     setTimeout(() => {
         btn.classList.remove('active-capture');
-        startCooldown(60); 
+        startCooldown(60); // המעבר לשקיפות יתבצע כאן אוטומטית דרך ה-CSS[cite: 6]
     }, 10000);
 }
 
@@ -248,9 +241,7 @@ function checkGpsCatch(copLat, copLng, signalTime) {
             const p = players[id];
             if (p.role === 'thief') {
                 const dist = map.distance([copLat, copLng], [p.lat, p.lng]);
-                if (dist <= 5) { // תנאי גיבוי GPS: 5 מטרים[cite: 6]
-                    confirmCatch(id, signalTime);
-                }
+                if (dist <= 5) confirmCatch(id, signalTime);
             }
         });
     });
@@ -261,7 +252,6 @@ function listenForCaptureSignals() {
         const sig = snap.val();
         if (!sig || Date.now() - sig.t > 10000) return;
         
-        // גנב: מפעיל מיקרופון רק אם קיבל סיגנל טרי[cite: 6]
         if (window.playerRole === 'thief') {
             if (typeof startListeningForCops === "function") {
                 startListeningForCops(() => confirmCatch(window.playerId, sig.t));
@@ -271,13 +261,11 @@ function listenForCaptureSignals() {
 }
 
 function confirmCatch(victimId, signalTime) {
-    // מניעת כפילויות תפיסה לאותו סיגנל
     window.db.ref(`game/${window.currentRoom}/catches/${victimId}_${signalTime}`).transaction(current => {
-        if (current) return; // כבר נתפס
+        if (current) return;
         return { t: Date.now(), cop: window.playerId };
     }, (error, committed) => {
         if (committed) {
-            // הפיכה לשוטר (מלשין יוטמע בשלב 7)[cite: 6]
             if (victimId === window.playerId) {
                 alert(window.currentLang === 'he' ? "נתפסת!" : "Caught!");
                 window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'cop' })
@@ -293,18 +281,19 @@ function startCooldown(seconds) {
     
     let left = seconds;
     const totalOffset = 326.7; // stroke-dasharray
-    circle.style.strokeDashoffset = 0;
+    circle.style.strokeDashoffset = 0; // התחלה כטבעת מלאה[cite: 6]
 
     const interval = setInterval(() => {
         left--;
+        // חישוב הריקון של הטבעת האדומה[cite: 6]
         const offset = totalOffset - (left / seconds) * totalOffset;
         circle.style.strokeDashoffset = offset;
 
         if (left <= 0) {
             clearInterval(interval);
             const btn = document.getElementById('capture-btn');
-            if (btn) btn.disabled = false;
-            circle.style.strokeDashoffset = totalOffset;
+            if (btn) btn.disabled = false; // הכפתור יחזור להיות נראה
+            circle.style.strokeDashoffset = totalOffset; // איפוס טבעת
         }
     }, 1000);
 }
