@@ -1,13 +1,13 @@
 // qa.js - QA Sandbox Environment (Rooms 99999 / 88888)
 
 function initQARoom(roomId) {
-    // הגדרת משתני החלון (Global) - קריטי כדי ש-game.js ייגש לחדר הנכון
+    // הגדרת משתני החלון (Global) - קריטי כדי ש-game.js ו-thief-mechanics.js ייגשו לחדר הנכון[cite: 4, 5]
     window.currentRoom = roomId;
     window.playerId = localStorage.getItem('tb_uuid') || 'p_qa_' + Date.now();
     window.playerName = localStorage.getItem('tb_name') || "QA Tester";
     window.currentLang = typeof currentLang !== 'undefined' ? currentLang : 'he';
 
-    // הסתרת מסך ההתחברות (בגלל שדילגנו על הלובי שם זה קורה בדרך כלל)
+    // הסתרת מסך ההתחברות[cite: 4]
     document.getElementById('login-screen').style.display = 'none';
 
     if (!navigator.geolocation) {
@@ -28,14 +28,13 @@ function initQARoom(roomId) {
 }
 
 function setupQAServerData(roomId, centerLat, centerLng) {
-    // 1. חישוב זירה של 2 קמ"ר סביב המשתמש (מרחק של 1 ק"מ מהמרכז לכל פינה ייצר ריבוע בשטח הזה)
+    // 1. חישוב זירה של 2 קמ"ר סביב המשתמש[cite: 4]
     const center = turf.point([centerLng, centerLat]);
     const ne = turf.destination(center, 1, 45, {units: 'kilometers'}).geometry.coordinates;
     const se = turf.destination(center, 1, 135, {units: 'kilometers'}).geometry.coordinates;
     const sw = turf.destination(center, 1, 225, {units: 'kilometers'}).geometry.coordinates;
     const nw = turf.destination(center, 1, 315, {units: 'kilometers'}).geometry.coordinates;
     
-    // Leaflet משתמש ב-[lat, lng] בניגוד ל-Turf
     const arenaPoints = [
         [ne[1], ne[0]],
         [se[1], se[0]],
@@ -45,37 +44,56 @@ function setupQAServerData(roomId, centerLat, centerLng) {
 
     const arenaData = {
         points: arenaPoints,
-        totalArea: 2000000, // 2 קמ"ר במ"ר
-        policeStation: { lat: centerLat, lng: centerLng, radius: 178 } // 5% מהשטח הכולל
+        totalArea: 2000000, 
+        policeStation: { lat: centerLat, lng: centerLng, radius: 178 } 
     };
 
-    // 2. הכנת הבוטים
+    // 2. הכנת הבוטים עם תמיכה במכניקות החדשות[cite: 4, 2]
     const bots = {};
     for (let i = 1; i <= 4; i++) {
-        bots['bot_cop_' + i] = { name: 'שוטר בוט ' + i, role: 'cop', lat: centerLat + (Math.random() - 0.5)*0.005, lng: centerLng + (Math.random() - 0.5)*0.005, t: Date.now(), inStation: true };
-        bots['bot_thief_' + i] = { name: 'גנב בוט ' + i, role: 'thief', lat: centerLat + (Math.random() - 0.5)*0.005, lng: centerLng + (Math.random() - 0.5)*0.005, t: Date.now() };
+        bots['bot_cop_' + i] = { 
+            name: 'שוטר בוט ' + i, 
+            role: 'cop', 
+            lat: centerLat + (Math.random() - 0.5)*0.005, 
+            lng: centerLng + (Math.random() - 0.5)*0.005, 
+            t: Date.now(), 
+            inStation: true,
+            isOffline: false 
+        };
+        bots['bot_thief_' + i] = { 
+            name: 'גנב בוט ' + i, 
+            role: 'thief', 
+            lat: centerLat + (Math.random() - 0.5)*0.005, 
+            lng: centerLng + (Math.random() - 0.5)*0.005, 
+            t: Date.now(),
+            isOffline: false,
+            flashUntil: 0 // שדה חשיפה חדש[cite: 2]
+        };
     }
     
-    // הוספת המשתמש הנוכחי בהתאם לקוד החדר
     window.playerRole = (roomId === '99999') ? 'thief' : 'cop';
-    window.isHost = false; // ביטול הרשאות מנהל לטובת בדיקה נקייה
-    bots[window.playerId] = { name: window.playerName + ' (QA)', role: window.playerRole, lat: centerLat, lng: centerLng, t: Date.now() };
+    window.isHost = false; 
+    bots[window.playerId] = { 
+        name: window.playerName + ' (QA)', 
+        role: window.playerRole, 
+        lat: centerLat, 
+        lng: centerLng, 
+        t: Date.now(),
+        isOffline: false
+    };
     if (window.playerRole === 'cop') bots[window.playerId].inStation = true;
 
-    // 3. הזרקת הנתונים ישירות ל-Firebase
+    // 3. הזרקת הנתונים ל-Firebase[cite: 4]
     const updates = {};
-    updates[`rooms/${roomId}`] = { status: 'playing', gameStartTime: Date.now() };
+    updates[`rooms/${roomId}`] = { status: 'playing', gameStartTime: Date.now(), host: 'qa_host' };
+    updates[`rooms/${roomId}/players`] = bots; // סנכרון רשימת השחקנים ללובי
     updates[`game/${roomId}/arena`] = arenaData;
     updates[`game/${roomId}/players`] = bots;
-    // דילוג על זמן תדריך בסביבת הבדיקות
     updates[`game/${roomId}/briefing`] = { active: false, timeLeft: 0, complete: true }; 
 
     window.db.ref().update(updates).then(() => {
-        // 4. אתחול ממשק המשחק
         document.getElementById('briefing-overlay').style.display = 'none';
         if (typeof enterGameScene === 'function') enterGameScene();
-        
-        // 5. התחלת מנוע תנועת הבוטים
         startBotEngine(roomId);
     });
 }
@@ -89,12 +107,11 @@ function startBotEngine(roomId) {
             const botUpdates = {};
             Object.keys(players).forEach(id => {
                 if (id.startsWith('bot_')) {
-                    // הזזת הבוט באופן רנדומלי (כמה מטרים בודדים)
                     const latChange = (Math.random() - 0.5) * 0.0002;
                     const lngChange = (Math.random() - 0.5) * 0.0002;
                     botUpdates[`game/${roomId}/players/${id}/lat`] = players[id].lat + latChange;
                     botUpdates[`game/${roomId}/players/${id}/lng`] = players[id].lng + lngChange;
-                    botUpdates[`game/${roomId}/players/${id}/t`] = Date.now();
+                    botUpdates[`game/${roomId}/players/${id}/t`] = Date.now(); // מניעת חוק 3 הדקות[cite: 5]
                 }
             });
             window.db.ref().update(botUpdates);
