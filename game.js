@@ -1,4 +1,4 @@
-// game.js - Phase 1.8.3: Hybrid Catch Implementation with Visual Cooldown
+// game.js - Phase 1.8.5: Hybrid Catch & Operational Chat Activation[cite: 18]
 
 // ==========================================
 // 1. Game Globals
@@ -84,7 +84,7 @@ function zoomMap(delta) {
 }
 
 // ==========================================
-// 4. Arena Setup
+// 4. Arena Setup & Chat Activation[cite: 18]
 // ==========================================
 function checkArenaStatus() {
     window.db.ref(`game/${window.currentRoom}/arena`).on('value', snap => {
@@ -111,6 +111,12 @@ function checkArenaStatus() {
             if (typeof listenToBriefing === "function") listenToBriefing();
             
             document.getElementById('controls-container').style.display = 'block';
+
+            // הפעלת הצ'אט המבצעי עם תחילת המשחק[cite: 18]
+            if (typeof toggleChatVisibility === "function") {
+                toggleChatVisibility(true);
+            }
+
             if (window.playerRole === 'cop') {
                 document.getElementById('capture-btn-container').style.display = 'block';
             } else {
@@ -154,7 +160,7 @@ function setupPoliceStation() {
 }
 
 // ==========================================
-// 5. GPS & Movement Logic
+// 5. GPS & Movement Logic (2s Tick Rate)[cite: 18]
 // ==========================================
 function startRealGpsTracking() {
     if (!navigator.geolocation) return;
@@ -192,6 +198,7 @@ function updateRealPosition() {
         if (typeof updateThiefLogic === "function") updateThiefLogic(myLat, myLng);
     }
 
+    // עדכון שרת - קואורדינטות מתעדכנות כל 2 שניות בדיוק מוחלט[cite: 18]
     window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({ 
         lat: myLat, lng: myLng, t: Date.now() 
     });
@@ -200,9 +207,8 @@ function updateRealPosition() {
 }
 
 // ==========================================
-// 6. 5.1: Hybrid Catch Logic[cite: 6]
+// 6. 5.1: Hybrid Catch Logic[cite: 18]
 // ==========================================
-
 function triggerCapture() {
     if (!isBriefingComplete) return;
     const btn = document.getElementById('capture-btn');
@@ -230,7 +236,7 @@ function triggerCapture() {
 
     setTimeout(() => {
         btn.classList.remove('active-capture');
-        startCooldown(60); // המעבר לשקיפות יתבצע כאן אוטומטית דרך ה-CSS[cite: 6]
+        startCooldown(60); 
     }, 10000);
 }
 
@@ -280,20 +286,19 @@ function startCooldown(seconds) {
     if (!circle) return;
     
     let left = seconds;
-    const totalOffset = 326.7; // stroke-dasharray
-    circle.style.strokeDashoffset = 0; // התחלה כטבעת מלאה[cite: 6]
+    const totalOffset = 326.7; 
+    circle.style.strokeDashoffset = 0; 
 
     const interval = setInterval(() => {
         left--;
-        // חישוב הריקון של הטבעת האדומה[cite: 6]
         const offset = totalOffset - (left / seconds) * totalOffset;
         circle.style.strokeDashoffset = offset;
 
         if (left <= 0) {
             clearInterval(interval);
             const btn = document.getElementById('capture-btn');
-            if (btn) btn.disabled = false; // הכפתור יחזור להיות נראה
-            circle.style.strokeDashoffset = totalOffset; // איפוס טבעת
+            if (btn) btn.disabled = false; 
+            circle.style.strokeDashoffset = totalOffset; 
         }
     }, 1000);
 }
