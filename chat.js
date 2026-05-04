@@ -1,4 +1,4 @@
-// chat.js - Phase 5.2: Operational Chat & Voice-to-Text Engine[cite: 18]
+// chat.js - Phase 5.2: Operational Chat & Voice-to-Text Engine
 
 let recognition = null;
 
@@ -23,7 +23,7 @@ document.addEventListener('DOMContentLoaded', () => {
 });
 
 /**
- * אתחול מנגנון זיהוי הדיבור של הדפדפן[cite: 18]
+ * אתחול מנגנון זיהוי הדיבור של הדפדפן
  */
 function initSpeechRecognition() {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -37,7 +37,7 @@ function initSpeechRecognition() {
 
     recognition = new SpeechRecognition();
     
-    // הגדרת שפה דינמית לפי הגדרות המשחק[cite: 18]
+    // הגדרת שפה דינמית לפי הגדרות המשחק (עברית או אנגלית)[cite: 9]
     recognition.lang = window.currentLang === 'he' ? 'he-IL' : 'en-US';
     recognition.interimResults = false;
     recognition.continuous = false;
@@ -52,7 +52,7 @@ function initSpeechRecognition() {
         const chatInput = document.getElementById('chat-input');
         if (chatInput) {
             chatInput.value = transcript;
-            // שליחה אוטומטית מיד עם סיום ההכתבה לחיסכון בזמן בזירה[cite: 18]
+            // שליחה אוטומטית מיד עם סיום ההכתבה לחיסכון בזמן בזירה
             sendMessage(); 
         }
     };
@@ -63,6 +63,10 @@ function initSpeechRecognition() {
 
 function toggleSpeechRecognition() {
     if (!recognition) return;
+    
+    // עדכון שפה לפני כל הפעלה למקרה שהמשתמש שינה שפה באמצע המשחק[cite: 9]
+    recognition.lang = window.currentLang === 'he' ? 'he-IL' : 'en-US';
+    
     try {
         recognition.start();
     } catch (e) {
@@ -76,7 +80,7 @@ function stopMicUI() {
 }
 
 /**
- * אתחול האזנה להודעות בחדר הנוכחי[cite: 18]
+ * אתחול האזנה להודעות בחדר הנוכחי
  */
 function initChat(roomId) {
     const messagesDiv = document.getElementById('chat-messages');
@@ -85,7 +89,7 @@ function initChat(roomId) {
     // ניקוי הודעות ישנות מתצוגה מקומית (אם קיימות)
     messagesDiv.innerHTML = "";
 
-    // האזנה ל-20 ההודעות האחרונות בלבד ב-Firebase[cite: 18]
+    // האזנה ל-20 ההודעות האחרונות בלבד ב-Firebase
     window.db.ref(`game/${roomId}/chat`).limitToLast(20).on('child_added', (snapshot) => {
         const msgData = snapshot.val();
         renderChatMessage(msgData);
@@ -93,7 +97,7 @@ function initChat(roomId) {
 }
 
 /**
- * שליחת הודעה לשרת[cite: 18]
+ * שליחת הודעה לשרת
  */
 function sendMessage() {
     const chatInput = document.getElementById('chat-input');
@@ -117,22 +121,21 @@ function sendMessage() {
 }
 
 /**
- * הצגת ההודעה בממשק המשתמש[cite: 18]
+ * הצגת ההודעה בממשק המשתמש (עיצוב מינימליסטי וזהה לכל ההודעות)
  */
 function renderChatMessage(data) {
     const messagesDiv = document.getElementById('chat-messages');
     if (!messagesDiv) return;
 
-    const isSelf = data.senderId === window.playerId;
     const msgEl = document.createElement('div');
-    msgEl.className = `msg ${isSelf ? 'msg-self' : 'msg-other'}`;
+    // עיצוב אחיד ללא תלות במי השולח[cite: 10]
+    msgEl.className = 'msg';
 
-    // הוספת שם השולח רק להודעות של שחקנים אחרים[cite: 18]
-    const senderHtml = isSelf ? "" : `<span class="msg-sender">${data.senderName}</span>`;
+    // הצגת שם השולח בכל הודעה (כולל הודעות עצמיות)
+    const senderHtml = `<span class="msg-sender">${data.senderName}:</span>`;
     
     msgEl.innerHTML = `
-        ${senderHtml}
-        <span class="msg-text">${data.text}</span>
+        ${senderHtml} <span class="msg-text">${data.text}</span>
     `;
 
     messagesDiv.appendChild(msgEl);
@@ -142,7 +145,7 @@ function renderChatMessage(data) {
 }
 
 /**
- * שליטה על נראות הצ'אט במסך המשחק[cite: 18]
+ * שליטה על נראות הצ'אט במסך המשחק
  */
 function toggleChatVisibility(show) {
     const chatContainer = document.getElementById('chat-container');
