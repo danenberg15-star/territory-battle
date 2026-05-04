@@ -1,4 +1,4 @@
-// game.js - Phase 1.8.8: Treasures, Jail Card & Cop Radar Integration
+// game.js - Phase 7.1: Arrest Animation & Snitch Mechanics
 
 // ==========================================
 // 1. Game Globals
@@ -61,7 +61,6 @@ function enterGameScene() {
     listenToVictory(); 
     listenForCaptureSignals(); 
     
-    // הפעלת האזנה לאוצרות ולמצבי הקפאה[cite: 10]
     if (typeof listenToTreasures === 'function') listenToTreasures();
 
     if (window.isHost) {
@@ -90,7 +89,7 @@ function zoomMap(delta) {
 }
 
 // ==========================================
-// 4. Arena Setup & Chat Activation
+// 4. Arena Setup & UI Activation
 // ==========================================
 function checkArenaStatus() {
     window.db.ref(`game/${window.currentRoom}/arena`).on('value', snap => {
@@ -117,7 +116,6 @@ function checkArenaStatus() {
             drawArenaOnMap();
             setupPoliceStation();
             
-            // הגרלת אוצרות לזירה (מנהל בלבד)[cite: 10]
             if (window.isHost && typeof initTreasuresMaster === 'function') {
                 initTreasuresMaster();
             }
@@ -130,8 +128,11 @@ function checkArenaStatus() {
                 toggleChatVisibility(true);
             }
 
+            // חלוקת הממשק לפי תפקיד: שוטר, מלשין או גנב
             if (window.playerRole === 'cop') {
                 document.getElementById('capture-btn-container').style.display = 'block';
+            } else if (window.playerRole === 'snitch') {
+                document.getElementById('snitch-btn-container').style.display = 'block';
             } else {
                 startThiefMechanics();
             }
@@ -203,7 +204,8 @@ function updateRealPosition() {
     const isDrawingMode = document.getElementById('drawing-container').style.display === 'block';
     if (!isDrawingMode) map.panTo([myLat, myLng]);
 
-    if (window.playerRole === 'cop' && arenaData) {
+    // גם שוטרים וגם מלשינים צריכים לחזור לתחנה במצבים מסוימים
+    if ((window.playerRole === 'cop' || window.playerRole === 'snitch') && arenaData) {
         const dist = map.distance([myLat, myLng], [arenaData.policeStation.lat, arenaData.policeStation.lng]);
         const inStation = dist <= arenaData.policeStation.radius;
         window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/inStation`).set(inStation);
@@ -213,7 +215,6 @@ function updateRealPosition() {
         if (typeof updateThiefLogic === "function") updateThiefLogic(myLat, myLng);
     }
     
-    // בדיקת קרבה לאוצרות[cite: 10]
     if (typeof checkTreasureProximity === 'function') {
         checkTreasureProximity(myLat, myLng);
     }
@@ -226,7 +227,7 @@ function updateRealPosition() {
 }
 
 // ==========================================
-// 6. 5.1: Tactical Taser Catch Logic
+// 6. Tactical Taser, Snitching & Catch Logic
 // ==========================================
 function triggerCapture() {
     if (!isBriefingComplete || (typeof isGameFrozen !== 'undefined' && isGameFrozen)) return;
@@ -288,27 +289,93 @@ function listenForCaptureSignals() {
 }
 
 function confirmCatch(victimId, signalTime) {
-    // בדיקה האם לגנב יש כרטיס יציאה מהכלא (הקפאת משחק)[cite: 10]
     window.db.ref(`game/${window.currentRoom}/players/${victimId}/hasJailCard`).once('value', snap => {
         if (snap.val()) {
             if (typeof triggerGameFreeze === 'function') triggerGameFreeze(victimId);
-            return; // מילוט מוצלח, המעצר בוטל!
+            return; 
         }
         
-        // אם אין כרטיס, ממשיכים לתפיסה רגילה
         window.db.ref(`game/${window.currentRoom}/catches/${victimId}_${signalTime}`).transaction(current => {
             if (current) return;
             return { t: Date.now(), cop: window.playerId };
         }, (error, committed) => {
             if (committed) {
                 if (victimId === window.playerId) {
-                    alert(window.currentLang === 'he' ? "נתפסת!" : "Caught!");
-                    window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'cop' })
-                        .then(() => location.reload());
+                    // הפעלת אנימציית מעצר והפיכה למלשין
+                    playArrestAnimation(() => {
+                        window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'snitch' })
+                            .then(() => location.reload());
+                    });
                 }
             }
         });
     });
+}
+
+function playArrestAnimation(callback) {
+    const overlay = document.getElementById('arrest-overlay');
+    const bars = document.getElementById('jail-bars');
+    const text = document.getElementById('arrest-text');
+    
+    if (overlay) overlay.style.display = 'flex';
+    if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
+    
+    setTimeout(() => {
+        if (bars) bars.classList.add('closed');
+    }, 100);
+
+    setTimeout(() => {
+        if (text) text.classList.add('show');
+    }, 600);
+
+    setTimeout(() => {
+        if (callback) callback();
+    }, 3500); // 3.5 שניות של חוויית מעצר לפני ריענון המסך
+}
+
+function triggerSnitch() {
+    if (typeof isGameFrozen !== 'undefined' && isGameFrozen) return;
+    
+    const btn = document.getElementById('snitch-btn');
+    if (btn.disabled) return;
+
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+
+    let foundThief = false;
+    window.db.ref(`game/${window.currentRoom}/players`).once('value', snap => {
+        const players = snap.val() || {};
+        Object.keys(players).forEach(id => {
+            const p = players[id];
+            if (p.role === 'thief' && !p.isOffline) {
+                const dist = map.distance([myLat, myLng], [p.lat, p.lng]);
+                // רדיוס החשיפה של מלשין - 15 מטרים
+                if (dist <= 15) {
+                    window.db.ref(`game/${window.currentRoom}/players/${id}/flashUntil`).set(Date.now() + 3000);
+                    foundThief = true;
+                }
+            }
+        });
+
+        if (foundThief) {
+            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+        } else {
+            const text = document.getElementById('briefing-status');
+            const overlay = document.getElementById('briefing-overlay');
+            if (overlay && text) {
+                text.innerText = window.currentLang === 'he' ? "לא נמצאו גנבים קרובים!" : "No thieves nearby!";
+                overlay.style.display = 'block';
+                overlay.style.borderColor = "#ef4444";
+                setTimeout(() => { overlay.style.display = 'none'; overlay.style.borderColor = "#facc15"; }, 2000);
+            }
+        }
+    });
+
+    // 10 שניות קירור לכפתור המלשין
+    setTimeout(() => {
+        btn.disabled = false;
+        btn.style.opacity = '1';
+    }, 10000);
 }
 
 function startCooldown(seconds) {
@@ -384,8 +451,8 @@ function listenToOtherPlayers() {
             let thievesCount = 0;
             let isThiefNearby = false; 
             
-            // בדיקה האם אוצר "מכ"ם בזק" הופעל כרגע[cite: 10]
             const isCopRadarActive = window.copRadarActiveUntil && window.copRadarActiveUntil > Date.now();
+            const isLawEnforcement = window.playerRole === 'cop' || window.playerRole === 'snitch';
 
             Object.keys(gamePlayers).forEach(id => {
                 const gp = gamePlayers[id];
@@ -399,17 +466,19 @@ function listenToOtherPlayers() {
                     if (role === 'thief') thievesCount++;
                 }
 
-                if (window.playerRole === 'cop' && role === 'thief' && !isOffline && myLat && myLng) {
+                if (isLawEnforcement && role === 'thief' && !isOffline && myLat && myLng) {
                     if (map.distance([myLat, myLng], [gp.lat, gp.lng]) <= 30) {
                         isThiefNearby = true;
                     }
                 }
                 
-                // אם המכ"ם פעיל, אל תסתיר את הגנב![cite: 10]
-                if (window.playerRole === 'cop' && role === 'thief' && id !== window.playerId && !isFlashing && !isCopRadarActive) return;
+                // כוחות האכיפה לא רואים גנבים אלא אם הם נחשפו או שיש מכ"ם פעיל
+                if (isLawEnforcement && role === 'thief' && id !== window.playerId && !isFlashing && !isCopRadarActive) return;
                 
-                let markerColor = role === 'cop' ? '#2563eb' : '#dc2626';
-                if (isOffline) markerColor = '#6b7280';
+                let markerColor = '#dc2626'; // אדום לגנב
+                if (role === 'cop') markerColor = '#2563eb'; // כחול לשוטר
+                if (role === 'snitch') markerColor = '#f59e0b'; // כתום למלשין
+                if (isOffline) markerColor = '#6b7280'; // אפור למנותק
                 
                 const markerOptions = {
                     radius: id === window.playerId ? 25 : 15, 
@@ -424,11 +493,12 @@ function listenToOtherPlayers() {
 
             if (playersCountEl) playersCountEl.innerText = `שחקנים: ${activeCount}`;
             if (thievesCount > 0) hasSeenThief = true;
+            // ניצחון: אם היו גנבים וכולם נתפסו (או הפכו למלשינים)
             if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
                 window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
             }
 
-            if (window.playerRole === 'cop') {
+            if (isLawEnforcement) {
                 const radar = document.getElementById('radar-overlay');
                 if (radar) {
                     radar.style.display = (isThiefNearby || isCopRadarActive) ? 'block' : 'none';
