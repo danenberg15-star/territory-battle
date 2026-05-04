@@ -45,7 +45,7 @@
         .team-list { background: #1e293b; border-radius: 12px; padding: 10px; flex: 1; display: flex; flex-direction: column; }
         .player-item { background: #334155; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; text-align: center; touch-action: none; }
 
-        /* Setup UI with Safety Check */
+        /* Compact Setup UI & Safety Check */
         #setup-ui { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 95%; max-width: 450px; display: none; flex-direction: column; align-items: center; gap: 8px; pointer-events: auto; background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; }
         .setup-msg { text-align: center; font-size: 13px; color: white; margin-bottom: 5px; }
         .safety-check-row { display: flex; align-items: center; gap: 10px; background: rgba(239, 68, 68, 0.2); padding: 8px; border-radius: 8px; margin-bottom: 5px; width: 100%; }
@@ -62,17 +62,17 @@
         /* Floating Exit Button */
         .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 3100; background: rgba(220, 38, 38, 0.8); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; font-weight: bold; font-size: 16px; cursor: pointer; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
         
-        /* Optical Radar */
+        /* 5.3 Optical Radar */
         #radar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2400; display: none; pointer-events: none; background: rgba(56, 189, 248, 0.1); animation: radar-flash 1.5s infinite alternate; }
         @keyframes radar-flash { 0% { box-shadow: inset 0 0 10px rgba(56, 189, 248, 0.2); opacity: 0.5; } 100% { box-shadow: inset 0 0 60px rgba(56, 189, 248, 0.6); opacity: 1; } }
 
-        /* Game Freeze Overlay */
+        /* 6.3 Game Freeze Overlay */
         #freeze-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 4000; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); display: none; flex-direction: column; align-items: center; justify-content: center; text-align: center; padding: 20px; pointer-events: auto; }
         #freeze-message { font-size: 28px; font-weight: bold; color: #ef4444; margin-bottom: 15px; text-shadow: 0 0 10px rgba(239, 68, 68, 0.5); }
         #freeze-subtext { font-size: 18px; color: white; margin-bottom: 25px; line-height: 1.5; }
         #freeze-timer { font-size: 60px; font-weight: bold; color: #facc15; text-shadow: 0 0 15px rgba(250, 204, 21, 0.5); }
 
-        /* Arrest Animation Overlay */
+        /* 7.1 Arrest Animation Overlay */
         #arrest-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 4500; display: none; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; background: rgba(0,0,0,0.8); pointer-events: auto; }
         .police-lights { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; animation: police-flash 0.5s infinite; opacity: 0.4; }
         @keyframes police-flash { 0% { background: #ef4444; } 50% { background: #3b82f6; } 100% { background: #ef4444; } }
@@ -81,14 +81,14 @@
         #arrest-text { position: relative; z-index: 3; color: white; font-size: 50px; font-weight: bold; text-shadow: 0 0 20px #ef4444; opacity: 0; transform: scale(0.5); transition: all 0.5s ease-out 0.5s; }
         #arrest-text.show { opacity: 1; transform: scale(1); }
 
-        /* Voice-Only Chat UI - Dark & Professional[cite: 13, 17] */
-        #chat-container { position: absolute; top: 60px; right: 10px; width: 40%; max-width: 180px; height: 160px; z-index: 2600; display: none; flex-direction: column; pointer-events: auto; }
+        /* 5.2 Voice-Only Chat UI - Corner Move (Top Left) */
+        #chat-container { position: absolute; top: 60px; left: 15px; width: 40%; max-width: 180px; height: 160px; z-index: 2600; display: none; flex-direction: column; pointer-events: auto; }
         #chat-messages { flex: 1; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); border-radius: 8px; margin-bottom: 6px; overflow-y: auto; padding: 8px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; border: 1px solid rgba(56, 189, 248, 0.2); }
         .msg { padding: 2px 0; word-wrap: break-word; line-height: 1.3; font-size: 14px; text-align: right; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
-        .msg-sender { font-weight: bold; font-size: 11px; display: inline-block; color: #7dd3fc; margin-left: 5px; }
-        #chat-input-row { display: flex; justify-content: flex-end; align-items: center; height: 50px; }
+        .msg-sender { font-weight: bold; font-size: 11px; display: inline-block; color: #7dd3fc; margin-left: 5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
+        #chat-input-row { display: flex; justify-content: flex-start; align-items: center; height: 50px; }
         
-        /* Dark Radio Button[cite: 13] */
+        /* Dark Radio Button Positioning */
         #chat-mic-btn { 
             width: 50px; height: 50px; background: #1e293b; border: 2px solid #334155; border-radius: 12px; cursor: pointer; 
             display: flex; align-items: center; justify-content: center; transition: 0.3s; flex-shrink: 0; 
@@ -99,36 +99,49 @@
         #chat-mic-btn.recording svg { fill: white; }
         @keyframes mic-pulse { 0% { transform: scale(1); box-shadow: 0 0 0px #ef4444; } 50% { transform: scale(1.1); box-shadow: 0 0 15px #ef4444; } 100% { transform: scale(1); box-shadow: 0 0 0px #ef4444; } }
 
-        /* Tactical Taser Button */
-        #capture-btn-container { position: relative; width: 120px; height: 120px; margin: 0 auto; pointer-events: auto; display: none; }
-        #capture-btn { position: absolute; top: 10px; left: 10px; width: 100px; height: 100px; background: linear-gradient(145deg, #334155, #0f172a); color: #38bdf8; border: 3px solid #1e293b; border-radius: 50%; font-weight: bold; font-size: 32px; z-index: 5; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 5px 15px rgba(0,0,0,0.5); }
-        #capture-btn:disabled:not(.active-capture) { background: transparent !important; color: transparent !important; border-color: transparent !important; box-shadow: none !important; }
-        #capture-btn.active-capture { animation: taser-fire 0.2s infinite; border-color: #7dd3fc; color: white; background: #0284c7; box-shadow: 0 0 30px #38bdf8, inset 0 0 20px #e0f2fe; transform: scale(1.05); }
+        /* Overlays & Controls */
+        #briefing-overlay { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 2500; background: rgba(30, 41, 59, 0.9); padding: 15px 25px; border-radius: 50px; border: 2px solid #facc15; display: none; text-align: center; width: 80%; max-width: 300px; backdrop-filter: blur(5px); }
         
-        /* Snitch Button */
-        #snitch-btn-container { position: relative; width: 120px; height: 120px; margin: 0 auto; pointer-events: auto; display: none; }
-        #snitch-btn { position: absolute; top: 10px; left: 10px; width: 100px; height: 100px; background: linear-gradient(145deg, #b45309, #78350f); color: white; border: 3px solid #fcd34d; border-radius: 50%; font-weight: bold; font-size: 18px; z-index: 5; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 5px 15px rgba(0,0,0,0.5); text-align: center; line-height: 1.2; }
-        #snitch-btn:active { transform: scale(0.95); background: #d97706; }
+        /* 5.1 Tactical Taser - Centered Bottom */
+        #controls-container { display: none; position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 2000; padding: 10px; pointer-events: none; width: 140px; }
+        #capture-btn-container { position: relative; width: 120px; height: 120px; margin: 0 auto; pointer-events: auto; }
+        #capture-btn { 
+            position: absolute; top: 10px; left: 10px; width: 100px; height: 100px; 
+            background: linear-gradient(145deg, #1e293b, #0f172a); border: 3px solid #38bdf8; border-radius: 50%; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            cursor: pointer; transition: 0.2s; box-shadow: 0 10px 20px rgba(0,0,0,0.6); 
+        }
+        #capture-btn .bolt { font-size: 32px; color: #38bdf8; line-height: 1; }
+        #capture-btn .label { font-size: 14px; font-weight: bold; color: #38bdf8; margin-top: 2px; text-transform: uppercase; }
+        #capture-btn:disabled:not(.active-capture) { opacity: 0.3; filter: grayscale(1); }
+        #capture-btn.active-capture { animation: taser-fire 0.2s infinite; border-color: #7dd3fc; color: white; background: #0284c7; box-shadow: 0 0 30px #38bdf8, inset 0 0 20px #e0f2fe; transform: scale(1.05); }
+        #capture-btn.active-capture .bolt, #capture-btn.active-capture .label { color: white; }
 
         .progress-ring { position: absolute; top: 0; left: 0; width: 120px; height: 120px; transform: rotate(-90deg); z-index: 1; }
         .progress-ring__circle { stroke: #06b6d4; stroke-width: 6; fill: transparent; stroke-dasharray: 358; stroke-dashoffset: 358; transition: stroke-dashoffset 1s linear; filter: drop-shadow(0 0 4px #06b6d4); }
 
         #victory-screen { display: none; z-index: 4000; text-align: center; justify-content: center; align-items: center; background: radial-gradient(circle, #1e293b 0%, #0f172a 100%); }
 
-        /* Visual Effects */
+        #security-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 5000; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: none; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.4); pointer-events: none; }
+        .watermark-text { font-size: 2rem; font-weight: bold; transform: rotate(-30deg); text-align: center; white-space: nowrap; user-select: none; line-height: 1.5; opacity: 0.3; }
+
+        /* New Effects & Star Animations */
         @keyframes star-glow { from { transform: scale(1); filter: drop-shadow(0 0 5px gold); } to { transform: scale(1.2); filter: drop-shadow(0 0 15px yellow); } }
+        
+        /* Electric Blue Taser Arc Effect */
         .electric-arc-pulse { animation: electric-arc-anim 0.5s infinite; stroke-dasharray: 5, 10; }
         @keyframes electric-arc-anim { 0% { stroke-width: 4; opacity: 0.6; stroke: #7dd3fc; } 50% { stroke-width: 12; opacity: 1; stroke: #e0f2fe; } 100% { stroke-width: 4; opacity: 0.6; stroke: #7dd3fc; } }
 
     </style>
 </head>
 <body>
-    <div id="security-overlay" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 5000; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); display: none; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.4); pointer-events: none;">
-        <div id="watermark-content" style="font-size: 2rem; font-weight: bold; transform: rotate(-30deg); text-align: center; opacity: 0.3;">Territory Battle</div>
+    <div id="security-overlay">
+        <div class="watermark-text" id="watermark-content">Territory Battle</div>
     </div>
 
     <button id="lang-toggle" onclick="toggleLanguage()" style="position:absolute; top:15px; right:15px; z-index:3101; background:rgba(30, 41, 59, 0.8); color:white; border-radius:50%; width:40px; height:40px; border:1px solid #38bdf8; backdrop-filter: blur(5px);">🌐</button>
 
+    <!-- 1. Login -->
     <div id="login-screen" class="screen">
         <h1 id="lbl-main-title">Territory Battle</h1>
         <input type="text" id="player-name" placeholder="הכנס שם שחקן" />
@@ -137,13 +150,14 @@
         <button class="btn btn-red" id="btn-create" onclick="createRoom()">צור חדר חדש</button>
     </div>
 
+    <!-- 2. Lobby -->
     <div id="lobby-screen" class="screen">
         <h2 id="lbl-lobby-title">לובי המתנה</h2>
         <div class="room-header-container">
             <div class="room-code-box">
                 <span id="lbl-room-code">קוד חדר:</span> <span id="display-room-code">----</span>
             </div>
-            <button class="btn-whatsapp-icon" onclick="shareWhatsApp()">
+            <button class="btn-whatsapp-icon" onclick="shareWhatsApp()" style="background: #25D366; border: none; border-radius: 50%; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-right: 15px; flex-shrink: 0;">
                 <svg viewBox="0 0 24 24" style="width: 30px; height: 30px; fill: white;"><path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.128.552 4.195 1.6 6.02L.053 24l6.113-1.603c1.764.954 3.754 1.458 5.865 1.458 6.646 0 12.031-5.385 12.031-12.031S18.677 0 12.031 0zm3.626 17.15c-.156.44-1.295.992-1.847 1.054-.537.06-1.127.186-3.413-.761-2.92-1.21-4.787-4.225-4.93-4.417-.143-.192-1.178-1.568-1.178-2.986 0-1.418.736-2.115 1.002-2.392.266-.277.674-.352.887-.352.213 0 .426.002.605.009.213.008.497-.083.775.589.284.685.952 2.321 1.036 2.493.084.172.143.376.035.592-.108.216-.164.352-.326.544-.164.192-.345.426-.497.589-.168.176-.347.37-.148.712.199.342.885 1.463 1.895 2.361 1.305 1.159 2.404 1.516 2.748 1.673.344.157.545.132.748-.101.203-.233.882-1.025 1.118-1.378.236-.353.473-.294.787-.176.314.118 1.986.937 2.327 1.107.341.17.568.256.653.398.085.142.085.83-.071 1.27z"/></svg>
             </button>
         </div>
@@ -160,7 +174,10 @@
         <button class="btn btn-green" id="btn-start-game" style="display: none;" onclick="startGame()">התחל משחק</button>
     </div>
 
-    <div id="drawing-container"><canvas id="drawing-canvas"></canvas></div>
+    <!-- 3. Drawing & Map Controls UI -->
+    <div id="drawing-container">
+        <canvas id="drawing-canvas"></canvas>
+    </div>
 
     <div id="map-controls">
         <button class="ctrl-btn" onclick="panMap('up')">↑</button>
@@ -183,13 +200,15 @@
             <label for="safety-confirm-checkbox">אני מאשר שכל השחקנים מעל גיל 16 (חובת בטיחות כבישים)</label>
         </div>
         <div style="display: flex; gap: 8px; width: 100%;">
-            <button class="setup-btn btn-red" onclick="clearDrawing()" style="flex: 1; padding: 10px; border-radius: 8px; font-size: 13px; background: #991b1b; color: white; border: none;">נקה</button>
-            <button class="setup-btn btn-blue" id="btn-confirm-drawing" style="display:none; flex: 2; padding: 10px; border-radius: 8px; font-size: 13px; background: #1e40af; color: white; border: none;" onclick="confirmDrawing()">אשר וסרוק כבישים</button>
+            <button class="setup-btn btn-red" onclick="clearDrawing()" style="flex: 1; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; border: none; color: white; cursor: pointer; background: #991b1b;">נקה</button>
+            <button class="setup-btn btn-blue" id="btn-confirm-drawing" style="display:none; flex: 2; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; border: none; color: white; cursor: pointer; background: #1e40af;" onclick="confirmDrawing()">אשר וסרוק כבישים</button>
         </div>
     </div>
 
+    <!-- 4. In-Game UI -->
     <button id="exit-btn" class="exit-btn" onclick="exitGame()">X</button>
     
+    <!-- Floating Stats -->
     <div id="floating-stats">
         <div class="stat-item"><span id="gps-status">GPS ❌</span></div>
         <div class="stat-item">|</div>
@@ -198,28 +217,30 @@
         <div class="stat-item"><span id="players-count">שחקנים: 0</span></div>
     </div>
 
+    <!-- 5.3 Optical Radar Overlay -->
     <div id="radar-overlay"></div>
 
+    <!-- 6.3 Game Freeze Overlay -->
     <div id="freeze-overlay">
         <div id="freeze-message">הגנב שוחרר ממעצר לא חוקי!</div>
         <div id="freeze-subtext">כל השוטרים חייבים לחזור לתחנה.<br>המצוד יתחדש בקרוב.</div>
         <div id="freeze-timer">05</div>
     </div>
 
+    <!-- 7.1 Arrest Animation Overlay -->
     <div id="arrest-overlay">
         <div class="police-lights"></div>
         <div class="jail-bars" id="jail-bars"></div>
         <div id="arrest-text">נתפסת!</div>
     </div>
 
-    <!-- Dark Walkie-Talkie Interface[cite: 13, 17] -->
+    <!-- 5.2 Voice-Only Chat Interface (Walkie-Talkie Top-Left) -->
     <div id="chat-container">
         <div id="chat-messages"></div>
         <div id="chat-input-row">
             <button id="chat-mic-btn" title="מכשיר קשר">
-                <!-- Radio/Walkie-Talkie Icon -->
-                <svg viewBox="0 0 24 24" width="30" height="30">
-                    <path d="M12,2c-0.55,0-1,0.45-1,1v1H8C6.9,4,6,4.9,6,6v14c0,1.1,0.9,2,2,2h8c1.1,0,2-0.9,2-2V6c0-1.1-0.9-2-2-2h-3V3C13,2.45,12.55,2,12,2z M8,6h8v14H8V6z M10,8v2h4V8H10z M10,12v2h4v-2H10z M10,16v2h4v-2H10z"/>
+                <svg viewBox="0 0 24 24" width="32" height="32">
+                    <path d="M12,2c-0.55,0-1,0.45-1,1v1H8C6.9,4,6,4.9,6,6v14c0,1.1,0.9,2,2,2h8c1.1,0,2-0.9,2-2V6c0-1.1-0.9-2-2-2h-3V3C13,2.45,12.55,2,12,2z M8,6h8v14H8V6z M10,8h4v2h-4V8z M10,12h4v2h-4V12z M10,16h4v2h-4V16z"/>
                 </svg>
             </button>
         </div>
@@ -232,13 +253,20 @@
 
     <div id="map"></div>
 
+    <!-- Controls Container (Centered Taser) -->
     <div id="controls-container">
+        <!-- 5.1 Tactical Taser Button -->
         <div id="capture-btn-container">
             <svg class="progress-ring"><circle class="progress-ring__circle" id="cooldown-circle" cx="60" cy="60" r="57"></circle></svg>
-            <button id="capture-btn" title="Taser" onclick="triggerCapture()">⚡</button>
+            <button id="capture-btn" title="Taser" onclick="triggerCapture()">
+                <span class="bolt">⚡</span>
+                <span class="label">טייזר</span>
+            </button>
         </div>
-        <div id="snitch-btn-container">
-            <button id="snitch-btn" onclick="triggerSnitch()">מצאתי<br>גנב!</button>
+        
+        <!-- 7.1 Snitch Button (Hidden by default) -->
+        <div id="snitch-btn-container" style="display: none; position: fixed; bottom: 150px; left: 50%; transform: translateX(-50%); pointer-events: auto;">
+            <button id="snitch-btn" onclick="triggerSnitch()" style="width: 100px; height: 100px; background: linear-gradient(145deg, #b45309, #78350f); color: white; border: 3px solid #fcd34d; border-radius: 50%; font-weight: bold; font-size: 18px; cursor: pointer; box-shadow: 0 5px 15px rgba(0,0,0,0.5);">מצאתי<br>גנב!</button>
         </div>
     </div>
 
