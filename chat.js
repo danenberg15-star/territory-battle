@@ -1,4 +1,4 @@
-// chat.js - Phase 5.2: Voice-Only Operational Chat (Walkie-Talkie)[cite: 9]
+// chat.js - Phase 5.2: Voice-Only Team Chat (Walkie-Talkie)
 
 let recognition = null;
 
@@ -27,7 +27,7 @@ function initSpeechRecognition() {
 
     recognition = new SpeechRecognition();
     
-    // הגדרת שפה דינמית לפי הגדרות המשחק (עברית או אנגלית)[cite: 9]
+    // הגדרת שפה דינמית לפי הגדרות המשחק (עברית או אנגלית)
     recognition.lang = window.currentLang === 'he' ? 'he-IL' : 'en-US';
     recognition.interimResults = false;
     recognition.continuous = false;
@@ -40,7 +40,7 @@ function initSpeechRecognition() {
     recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         if (transcript && transcript.trim() !== "") {
-            // שליחה ישירה לשרת ללא צורך בשורת קלט[cite: 9]
+            // שליחה ישירה לשרת ללא צורך בשורת קלט
             sendMessage(transcript.trim()); 
         }
     };
@@ -52,7 +52,7 @@ function initSpeechRecognition() {
 function toggleSpeechRecognition() {
     if (!recognition) return;
     
-    // עדכון שפה לפני כל הפעלה למקרה שהמשתמש שינה שפה באמצע המשחק[cite: 9]
+    // עדכון שפה לפני כל הפעלה למקרה שהמשתמש שינה שפה באמצע המשחק
     recognition.lang = window.currentLang === 'he' ? 'he-IL' : 'en-US';
     
     try {
@@ -68,28 +68,30 @@ function stopMicUI() {
 }
 
 /**
- * אתחול האזנה להודעות בחדר הנוכחי
+ * אתחול האזנה להודעות בערוץ של הקבוצה הנוכחית בלבד
  */
 function initChat(roomId) {
     const messagesDiv = document.getElementById('chat-messages');
-    if (!messagesDiv || !window.db) return;
+    if (!messagesDiv || !window.db || !window.playerRole) return;
 
     // ניקוי הודעות ישנות מתצוגה מקומית (אם קיימות)
     messagesDiv.innerHTML = "";
 
-    // האזנה ל-20 ההודעות האחרונות בלבד ב-Firebase
-    window.db.ref(`game/${roomId}/chat`).limitToLast(20).on('child_added', (snapshot) => {
+    // האזנה רק לערוץ של התפקיד הנוכחי (chat_cop או chat_thief)
+    const teamChatPath = `game/${roomId}/chat_${window.playerRole}`;
+    
+    window.db.ref(teamChatPath).limitToLast(20).on('child_added', (snapshot) => {
         const msgData = snapshot.val();
         renderChatMessage(msgData);
     });
 }
 
 /**
- * שליחת הודעה לשרת
+ * שליחת הודעה לשרת לערוץ הקבוצתי
  * @param {string} text - הטקסט שזוהה על ידי המיקרופון
  */
 function sendMessage(text) {
-    if (!text || !window.currentRoom || !window.db) return;
+    if (!text || !window.currentRoom || !window.db || !window.playerRole) return;
 
     const newMessage = {
         senderId: window.playerId,
@@ -99,8 +101,11 @@ function sendMessage(text) {
         t: firebase.database.ServerValue.TIMESTAMP
     };
 
-    window.db.ref(`game/${window.currentRoom}/chat`).push(newMessage)
-        .catch(err => console.error("Chat sync error:", err));
+    // שליחה רק לערוץ של התפקיד הנוכחי (chat_cop או chat_thief)
+    const teamChatPath = `game/${window.currentRoom}/chat_${window.playerRole}`;
+
+    window.db.ref(teamChatPath).push(newMessage)
+        .catch(err => console.error("Team chat sync error:", err));
 }
 
 /**
@@ -113,7 +118,7 @@ function renderChatMessage(data) {
     const msgEl = document.createElement('div');
     msgEl.className = 'msg';
 
-    // הצגת שם השולח בכל הודעה[cite: 9]
+    // הצגת שם השולח בכל הודעה
     const senderHtml = `<span class="msg-sender">${data.senderName}:</span>`;
     
     msgEl.innerHTML = `
