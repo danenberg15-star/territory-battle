@@ -1,4 +1,4 @@
-// territory.js - Canvas Drawing to GPS Mapping & Arena Math
+// territory.js - Canvas Drawing to GPS Mapping & Arena Math + Safety Logic[cite: 7, 13]
 
 let drawingPath = [];
 let isDrawing = false;
@@ -11,23 +11,21 @@ function initDrawingCanvas(mapInstance) {
     canvas = document.getElementById('drawing-canvas');
     ctx = canvas.getContext('2d');
     
-    // התאמת גודל הקנבס למסך המכשיר[cite: 3]
+    // התאמת גודל הקנבס למסך המכשיר[cite: 13]
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     
     document.getElementById('drawing-container').style.display = 'block';
     
-    // מאזיני מגע לציור חופשי[cite: 3]
+    // מאזיני מגע לציור חופשי[cite: 13]
     canvas.addEventListener('touchstart', (e) => startDrawing(e, mapInstance), { passive: false });
     canvas.addEventListener('touchmove', (e) => draw(e, mapInstance), { passive: false });
     canvas.addEventListener('touchend', stopDrawing);
 
-    // פתרון לבאג ה-Landscape: עדכון גודל הקנבס בעת סיבוב המסך
     window.addEventListener('resize', () => {
         if (canvas && document.getElementById('drawing-container').style.display === 'block') {
             canvas.width = window.innerWidth;
             canvas.height = window.innerHeight;
-            // ניקוי הציור הכרחי בגלל שנקודות הציור הקודמות כבר לא תואמות לקואורדינטות המפה שהשתנתה
             clearDrawing(); 
         }
     });
@@ -43,7 +41,7 @@ function startDrawing(e, mapInstance) {
     
     ctx.beginPath();
     ctx.moveTo(touch.clientX, touch.clientY);
-    ctx.strokeStyle = '#38bdf8'; // צבע כחול ניאון בהתאם לשפה העיצובית[cite: 3]
+    ctx.strokeStyle = '#38bdf8'; 
     ctx.lineWidth = 4;
     ctx.lineJoin = 'round';
     ctx.lineCap = 'round';
@@ -51,7 +49,7 @@ function startDrawing(e, mapInstance) {
 
 function draw(e, mapInstance) {
     if (!isDrawing) return;
-    e.preventDefault(); // מניעת גלילה של הדפדפן בזמן הציור[cite: 3]
+    e.preventDefault(); 
     
     const touch = e.touches[0];
     ctx.lineTo(touch.clientX, touch.clientY);
@@ -65,13 +63,11 @@ function stopDrawing() {
     isDrawing = false;
     ctx.closePath();
     
-    // הצגת כפתור האישור רק אם יש מספיק נקודות ליצירת שטח[cite: 3]
     if (drawingPath.length > 10) {
         document.getElementById('btn-confirm-drawing').style.display = 'block';
     }
 }
 
-// המרת פיקסל על המסך לקואורדינטת GPS לפי מצב המפה הנוכחי[cite: 3]
 function addPoint(x, y, mapInstance) {
     const latlng = mapInstance.containerPointToLatLng([x, y]);
     drawingPath.push([latlng.lat, latlng.lng]);
@@ -84,30 +80,35 @@ function clearDrawing() {
 }
 
 // ==========================================
-// 2. Finalize & Calculate Arena (The 5% Rule)
+// 2. Finalize & Calculate Arena (Safety Rule Check)[cite: 7]
 // ==========================================
 function finalizeDrawing() {
+    // 3.1: בדיקת אישור בטיחות גיל (חובה לפי האפיון)[cite: 7]
+    const safetyChecked = document.getElementById('safety-confirm-checkbox').checked;
+    if (!safetyChecked) {
+        alert(window.currentLang === 'he' 
+            ? "עליך לאשר שכל השחקנים מעל גיל 16 לטובת בטיחות בדרכים לפני התחלת המשחק!" 
+            : "You must confirm all players are over 16 for road safety before starting!");
+        return null;
+    }
+
     if (drawingPath.length < 10) return null;
 
-    // סגירת הפוליגון: חיבור הנקודה האחרונה לראשונה[cite: 3]
     const coords = drawingPath.map(p => [p[1], p[0]]);
     coords.push(coords[0]);
 
     try {
         const polygon = turf.polygon([coords]);
-        const areaSqMeters = turf.area(polygon); // שטח כולל במ"ר[cite: 3]
+        const areaSqMeters = turf.area(polygon); 
         
-        // חישוב רדיוס תחנת המשטרה - 5% משטח הזירה[cite: 3]
-        // שטח עיגול = פאי כפול רדיוס בריבוע[cite: 3]
         const stationArea = areaSqMeters * 0.05;
         const stationRadius = Math.sqrt(stationArea / Math.PI);
 
-        // מציאת המרכז הגיאומטרי של השטח שצוין[cite: 3]
         const centroid = turf.centroid(polygon);
         const centerCoords = {
             lat: centroid.geometry.coordinates[1],
             lng: centroid.geometry.coordinates[0],
-            radius: Math.max(15, stationRadius) // רדיוס מינימלי של 15 מטרים למשחקיות[cite: 3]
+            radius: Math.max(15, stationRadius) 
         };
 
         return {
@@ -122,7 +123,6 @@ function finalizeDrawing() {
     }
 }
 
-// פונקציית עזר לבדיקה האם שחקן נמצא בתוך הזירה[cite: 3]
 function isPointInArena(lat, lng, arenaPoints) {
     if (!arenaPoints || arenaPoints.length < 3) return true;
     try {

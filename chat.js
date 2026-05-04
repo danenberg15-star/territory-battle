@@ -1,4 +1,4 @@
-// chat.js - Phase 5.2: Voice-Only Team Chat (Walkie-Talkie)
+// chat.js - Phase 5.2: Voice-Only Team Chat (Walkie-Talkie) - Optimized Layout[cite: 7, 11]
 
 let recognition = null;
 
@@ -40,7 +40,7 @@ function initSpeechRecognition() {
     recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         if (transcript && transcript.trim() !== "") {
-            // שליחה ישירה לשרת ללא צורך בשורת קלט
+            // שליחה ישירה לשרת ללא צורך בשורת קלט[cite: 5]
             sendMessage(transcript.trim()); 
         }
     };
@@ -77,7 +77,7 @@ function initChat(roomId) {
     // ניקוי הודעות ישנות מתצוגה מקומית (אם קיימות)
     messagesDiv.innerHTML = "";
 
-    // האזנה רק לערוץ של התפקיד הנוכחי (chat_cop או chat_thief)
+    // האזנה רק לערוץ של התפקיד הנוכחי (chat_cop או chat_thief)[cite: 5]
     const teamChatPath = `game/${roomId}/chat_${window.playerRole}`;
     
     window.db.ref(teamChatPath).limitToLast(20).on('child_added', (snapshot) => {
@@ -101,7 +101,7 @@ function sendMessage(text) {
         t: firebase.database.ServerValue.TIMESTAMP
     };
 
-    // שליחה רק לערוץ של התפקיד הנוכחי (chat_cop או chat_thief)
+    // שליחה רק לערוץ של התפקיד הנוכחי (chat_cop או chat_thief)[cite: 5]
     const teamChatPath = `game/${window.currentRoom}/chat_${window.playerRole}`;
 
     window.db.ref(teamChatPath).push(newMessage)
@@ -118,7 +118,7 @@ function renderChatMessage(data) {
     const msgEl = document.createElement('div');
     msgEl.className = 'msg';
 
-    // הצגת שם השולח בכל הודעה
+    // הצגת שם השולח בכל הודעה[cite: 5]
     const senderHtml = `<span class="msg-sender">${data.senderName}:</span>`;
     
     msgEl.innerHTML = `

@@ -1,4 +1,4 @@
-// game.js - Phase 7.2: QA Sandbox Integration & Briefing Bypass + Drone Radar Integration[cite: 5, 6]
+// game.js - Phase 8.2: Player Star Icon, Technical Victory (3-min rule) & Taser Visuals[cite: 7, 10]
 
 // ==========================================
 // 1. Game Globals
@@ -8,6 +8,7 @@ let areaLayers = [];
 let thiefPath = []; 
 let trailLayer = null;
 let map = null;
+let taserVisualRing = null; // טבעת ויזואלית לטייזר
 
 let myLat = null;
 let myLng = null;
@@ -120,7 +121,6 @@ function checkArenaStatus() {
                 initTreasuresMaster();
             }
 
-            // QA Bypass Logic: בדיקה אם שרת ה-QA פתר מראש את התדריך[cite: 5]
             window.db.ref(`game/${window.currentRoom}/briefing/complete`).once('value', bSnap => {
                 if (bSnap.val() === true) {
                     isBriefingComplete = true; 
@@ -190,7 +190,7 @@ function startRealGpsTracking() {
     gpsWatchId = navigator.geolocation.watchPosition((pos) => {
         myLat = pos.coords.latitude;
         myLng = pos.coords.longitude;
-        window.myLat = myLat; // עדכון גלובלי לטובת treasures.js[cite: 6]
+        window.myLat = myLat; 
         window.myLng = myLng;
         
         const gpsEl = document.getElementById('gps-status');
@@ -235,7 +235,7 @@ function updateRealPosition() {
 }
 
 // ==========================================
-// 6. Tactical Taser, Snitching & Catch Logic
+// 6. Tactical Taser, Snitching & Catch Logic[cite: 7]
 // ==========================================
 function triggerCapture() {
     if (!isBriefingComplete || (typeof isGameFrozen !== 'undefined' && isGameFrozen)) return;
@@ -245,6 +245,17 @@ function triggerCapture() {
     btn.disabled = true;
     btn.classList.add('active-capture');
     
+    // אפקט חשמלי על המפה (Electric Blue)[cite: 7]
+    if (taserVisualRing) map.removeLayer(taserVisualRing);
+    taserVisualRing = L.circle([myLat, myLng], {
+        radius: 10,
+        color: '#7dd3fc',
+        weight: 5,
+        fillColor: '#0ea5e9',
+        fillOpacity: 0.4,
+        className: 'electric-arc-pulse' // דורש הגדרה ב-CSS ב-index.html
+    }).addTo(map);
+
     if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
     
     if (typeof broadcastCapture === "function") broadcastCapture();
@@ -261,7 +272,10 @@ function triggerCapture() {
     const gpsInterval = setInterval(() => {
         checkGpsCatch(myLat, myLng, timestamp);
         gpsChecks++;
-        if (gpsChecks >= 10) clearInterval(gpsInterval);
+        if (gpsChecks >= 10) {
+            clearInterval(gpsInterval);
+            if (taserVisualRing) { map.removeLayer(taserVisualRing); taserVisualRing = null; }
+        }
     }, 1000);
 
     setTimeout(() => {
@@ -327,17 +341,9 @@ function playArrestAnimation(callback) {
     if (overlay) overlay.style.display = 'flex';
     if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
     
-    setTimeout(() => {
-        if (bars) bars.classList.add('closed');
-    }, 100);
-
-    setTimeout(() => {
-        if (text) text.classList.add('show');
-    }, 600);
-
-    setTimeout(() => {
-        if (callback) callback();
-    }, 3500); 
+    setTimeout(() => { if (bars) bars.classList.add('closed'); }, 100);
+    setTimeout(() => { if (text) text.classList.add('show'); }, 600);
+    setTimeout(() => { if (callback) callback(); }, 3500); 
 }
 
 function triggerSnitch() {
@@ -409,19 +415,37 @@ function startCooldown(seconds) {
 }
 
 // ==========================================
-// 7. Utility, Listeners & Drone Integration[cite: 5, 6]
+// 7. Technical Victory & Offline Checks[cite: 7]
 // ==========================================
 function checkOfflinePlayers() {
     if (!window.isHost || !window.currentRoom) return;
     const now = Date.now();
+    
     window.db.ref(`rooms/${window.currentRoom}/players`).once('value', snap => {
         const players = snap.val() || {};
+        let activeThieves = 0;
+        let activeCops = 0;
+
         Object.keys(players).forEach(id => {
             const p = players[id];
+            // מחיקה לאחר 3 דקות ניתוק[cite: 7]
             if (p.isOffline && p.disconnectedAt && (now - p.disconnectedAt > 180000)) {
                 window.db.ref(`rooms/${window.currentRoom}/players/${id}`).remove();
+                window.db.ref(`game/${window.currentRoom}/players/${id}`).remove();
+            } else {
+                if (!p.isOffline) {
+                    if (p.role === 'thief') activeThieves++;
+                    else if (p.role === 'cop') activeCops++;
+                }
             }
         });
+
+        // חוק ה-3 דקות: ניצחון טכני אם כל הקבוצה נעלמה[cite: 7]
+        if (activeThieves === 0 && hasSeenThief) {
+            window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
+        } else if (activeCops === 0 && activeThieves > 0) {
+            window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'thieves');
+        }
     });
 }
 
@@ -477,7 +501,6 @@ function listenToOtherPlayers() {
                     }
                 }
                 
-                // בדיקת חשיפה על ידי כטב"מ[cite: 6]
                 let isRevealedByDrone = false;
                 if (window.droneActiveData && role === 'thief' && !isOffline) {
                     const distToDrone = map.distance([gp.lat, gp.lng], [window.droneActiveData.lat, window.droneActiveData.lng]);
@@ -486,34 +509,37 @@ function listenToOtherPlayers() {
                     }
                 }
                 
-                // אם אתה כוח אכיפה, הגנב לא מהבהב, אין לך רדאר אישי והוא לא בתוך אזור כטב"מ - אל תראה אותו
                 if (isLawEnforcement && role === 'thief' && id !== window.playerId && !isFlashing && !isCopRadarActive && !isRevealedByDrone) return;
                 
-                let markerColor = '#dc2626'; 
-                if (role === 'cop') markerColor = '#2563eb'; 
-                if (role === 'snitch') markerColor = '#f59e0b'; 
-                if (isOffline) markerColor = '#6b7280'; 
-                
-                const markerOptions = {
-                    radius: id === window.playerId ? 25 : 15, 
-                    fillColor: markerColor, 
-                    fillOpacity: isOffline ? 0.5 : 1,
-                    color: (isFlashing || isRevealedByDrone) ? '#ffff00' : '#fff', // גנב שנחשף מקבל מסגרת צהובה[cite: 6]
-                    weight: (isFlashing || isRevealedByDrone) ? 6 : 3 
-                };
-
-                playerMarkers[id] = L.circleMarker([gp.lat, gp.lng], markerOptions).addTo(map);
+                // הפיכת השחקן המקומי לכוכב[cite: 10]
+                if (id === window.playerId) {
+                    const starIcon = L.divIcon({
+                        html: `<div style="font-size: 32px; filter: drop-shadow(0 0 8px gold); animation: star-glow 2s infinite alternate;">⭐</div>`,
+                        className: '',
+                        iconSize: [32, 32],
+                        iconAnchor: [16, 16]
+                    });
+                    playerMarkers[id] = L.marker([gp.lat, gp.lng], { icon: starIcon }).addTo(map);
+                } else {
+                    let markerColor = '#dc2626'; 
+                    if (role === 'cop') markerColor = '#2563eb'; 
+                    if (role === 'snitch') markerColor = '#f59e0b'; 
+                    if (isOffline) markerColor = '#6b7280'; 
+                    
+                    const markerOptions = {
+                        radius: 15, 
+                        fillColor: markerColor, 
+                        fillOpacity: isOffline ? 0.5 : 1,
+                        color: (isFlashing || isRevealedByDrone) ? '#ffff00' : '#fff',
+                        weight: (isFlashing || isRevealedByDrone) ? 6 : 3 
+                    };
+                    playerMarkers[id] = L.circleMarker([gp.lat, gp.lng], markerOptions).addTo(map);
+                }
             });
 
             if (playersCountEl) playersCountEl.innerText = `שחקנים: ${activeCount}`;
             if (thievesCount > 0) hasSeenThief = true;
             
-            if (window.currentRoom !== '99999' && window.currentRoom !== '88888') {
-                if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
-                    window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
-                }
-            }
-
             if (isLawEnforcement) {
                 const radar = document.getElementById('radar-overlay');
                 if (radar) {

@@ -45,9 +45,12 @@
         .team-list { background: #1e293b; border-radius: 12px; padding: 10px; flex: 1; display: flex; flex-direction: column; }
         .player-item { background: #334155; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; text-align: center; touch-action: none; }
 
-        /* Compact Setup UI */
-        #setup-ui { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 95%; max-width: 400px; display: none; flex-direction: row; align-items: center; gap: 8px; pointer-events: auto; }
-        .setup-msg { background: rgba(30, 41, 59, 0.95); padding: 10px; border-radius: 8px; border: 1px solid #38bdf8; text-align: center; font-size: 12px; color: white; flex: 1; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
+        /* Compact Setup UI & Safety Check */
+        #setup-ui { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 95%; max-width: 450px; display: none; flex-direction: column; align-items: center; gap: 8px; pointer-events: auto; background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; }
+        .setup-msg { text-align: center; font-size: 13px; color: white; margin-bottom: 5px; }
+        .safety-check-row { display: flex; align-items: center; gap: 10px; background: rgba(239, 68, 68, 0.2); padding: 8px; border-radius: 8px; margin-bottom: 5px; width: 100%; }
+        .safety-check-row input { width: 20px; height: 20px; margin: 0; cursor: pointer; }
+        .safety-check-row label { font-size: 12px; font-weight: bold; color: #fca5a5; }
 
         /* Floating Top Stats */
         #floating-stats { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: none; flex-direction: row; justify-content: center; gap: 15px; z-index: 2000; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 8px 20px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 12px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
@@ -69,20 +72,22 @@
         #freeze-subtext { font-size: 18px; color: white; margin-bottom: 25px; line-height: 1.5; }
         #freeze-timer { font-size: 60px; font-weight: bold; color: #facc15; text-shadow: 0 0 15px rgba(250, 204, 21, 0.5); }
 
-        /* -------------------------------------------
-           5.2 Voice-Only Chat UI (Walkie-Talkie)
-           ------------------------------------------- */
-        #chat-container { position: absolute; top: 60px; right: 10px; width: 45%; max-width: 200px; height: 200px; z-index: 2600; display: none; flex-direction: column; pointer-events: auto; }
-        
-        #chat-messages { flex: 1; background: rgba(15, 23, 42, 0.3); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); border-radius: 8px; margin-bottom: 6px; overflow-y: auto; padding: 10px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
-        
+        /* 7.1 Arrest Animation Overlay */
+        #arrest-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 4500; display: none; flex-direction: column; align-items: center; justify-content: center; overflow: hidden; background: rgba(0,0,0,0.8); pointer-events: auto; }
+        .police-lights { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; animation: police-flash 0.5s infinite; opacity: 0.4; }
+        @keyframes police-flash { 0% { background: #ef4444; } 50% { background: #3b82f6; } 100% { background: #ef4444; } }
+        .jail-bars { position: absolute; top: -100%; left: 0; width: 100%; height: 100%; background: repeating-linear-gradient(90deg, #111, #111 20px, transparent 20px, transparent 60px); z-index: 2; transition: top 0.5s ease-in; border-bottom: 20px solid #111; }
+        .jail-bars.closed { top: 0; }
+        #arrest-text { position: relative; z-index: 3; color: white; font-size: 50px; font-weight: bold; text-shadow: 0 0 20px #ef4444; opacity: 0; transform: scale(0.5); transition: all 0.5s ease-out 0.5s; }
+        #arrest-text.show { opacity: 1; transform: scale(1); }
+
+        /* 5.2 Voice-Only Chat UI - Optimized Layout[cite: 7, 11] */
+        #chat-container { position: absolute; top: 60px; right: 10px; width: 40%; max-width: 180px; height: 160px; z-index: 2600; display: none; flex-direction: column; pointer-events: auto; }
+        #chat-messages { flex: 1; background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(5px); -webkit-backdrop-filter: blur(5px); border-radius: 8px; margin-bottom: 6px; overflow-y: auto; padding: 8px; font-size: 13px; display: flex; flex-direction: column; gap: 4px; }
         .msg { padding: 2px 0; word-wrap: break-word; line-height: 1.3; font-size: 14px; text-align: right; color: white; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
         .msg-sender { font-weight: bold; font-size: 11px; display: inline-block; color: #7dd3fc; margin-left: 5px; text-shadow: 1px 1px 2px rgba(0,0,0,0.8); }
-        
-        #chat-input-row { display: flex; justify-content: flex-end; align-items: center; height: 45px; }
-        
-        /* Clean Walkie-Talkie Button */
-        #chat-mic-btn { width: 45px; height: 45px; background: transparent; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s; flex-shrink: 0; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)); outline: none; }
+        #chat-input-row { display: flex; justify-content: flex-end; align-items: center; height: 40px; }
+        #chat-mic-btn { width: 40px; height: 40px; background: transparent; border: none; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.3s; flex-shrink: 0; filter: drop-shadow(0 2px 4px rgba(0,0,0,0.8)); outline: none; }
         #chat-mic-btn.recording svg { fill: #ef4444; }
         #chat-mic-btn.recording { animation: mic-pulse 1.5s infinite; filter: drop-shadow(0 0 10px #ef4444); }
         @keyframes mic-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.15); } 100% { transform: scale(1); } }
@@ -90,13 +95,18 @@
         /* Overlays & Controls */
         #briefing-overlay { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 2500; background: rgba(30, 41, 59, 0.9); padding: 15px 25px; border-radius: 50px; border: 2px solid #facc15; display: none; text-align: center; width: 80%; max-width: 300px; backdrop-filter: blur(5px); }
         
-        /* 5.1 Tactical Taser Button */
         #controls-container { display: none; position: absolute; bottom: 15px; left: 0; right: 0; z-index: 2000; padding: 10px; pointer-events: none; }
+        
+        /* 5.1 Tactical Taser Button */
         #capture-btn-container { position: relative; width: 120px; height: 120px; margin: 0 auto; pointer-events: auto; display: none; }
         #capture-btn { position: absolute; top: 10px; left: 10px; width: 100px; height: 100px; background: linear-gradient(145deg, #334155, #0f172a); color: #38bdf8; border: 3px solid #1e293b; border-radius: 50%; font-weight: bold; font-size: 32px; z-index: 5; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 5px 15px rgba(0,0,0,0.5); }
         #capture-btn:disabled:not(.active-capture) { background: transparent !important; color: transparent !important; border-color: transparent !important; box-shadow: none !important; }
         #capture-btn.active-capture { animation: taser-fire 0.2s infinite; border-color: #7dd3fc; color: white; background: #0284c7; box-shadow: 0 0 30px #38bdf8, inset 0 0 20px #e0f2fe; transform: scale(1.05); }
-        @keyframes taser-fire { 0% { box-shadow: 0 0 20px #38bdf8; } 50% { box-shadow: 0 0 40px #7dd3fc, inset 0 0 30px white; } 100% { box-shadow: 0 0 20px #38bdf8; } }
+        
+        /* 7.1 Snitch Button */
+        #snitch-btn-container { position: relative; width: 120px; height: 120px; margin: 0 auto; pointer-events: auto; display: none; }
+        #snitch-btn { position: absolute; top: 10px; left: 10px; width: 100px; height: 100px; background: linear-gradient(145deg, #b45309, #78350f); color: white; border: 3px solid #fcd34d; border-radius: 50%; font-weight: bold; font-size: 18px; z-index: 5; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 5px 15px rgba(0,0,0,0.5); text-align: center; line-height: 1.2; }
+        #snitch-btn:active { transform: scale(0.95); background: #d97706; }
 
         .progress-ring { position: absolute; top: 0; left: 0; width: 120px; height: 120px; transform: rotate(-90deg); z-index: 1; }
         .progress-ring__circle { stroke: #06b6d4; stroke-width: 6; fill: transparent; stroke-dasharray: 358; stroke-dashoffset: 358; transition: stroke-dashoffset 1s linear; filter: drop-shadow(0 0 4px #06b6d4); }
@@ -105,6 +115,14 @@
 
         #security-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 5000; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: none; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.4); pointer-events: none; }
         .watermark-text { font-size: 2rem; font-weight: bold; transform: rotate(-30deg); text-align: center; white-space: nowrap; user-select: none; line-height: 1.5; opacity: 0.3; }
+
+        /* New Effects & Star Animations[cite: 7, 10] */
+        @keyframes star-glow { from { transform: scale(1); filter: drop-shadow(0 0 5px gold); } to { transform: scale(1.2); filter: drop-shadow(0 0 15px yellow); } }
+        
+        /* Electric Blue Taser Arc Effect[cite: 7] */
+        .electric-arc-pulse { animation: electric-arc-anim 0.5s infinite; stroke-dasharray: 5, 10; }
+        @keyframes electric-arc-anim { 0% { stroke-width: 4; opacity: 0.6; stroke: #7dd3fc; } 50% { stroke-width: 12; opacity: 1; stroke: #e0f2fe; } 100% { stroke-width: 4; opacity: 0.6; stroke: #7dd3fc; } }
+
     </style>
 </head>
 <body>
@@ -166,10 +184,17 @@
         <button class="ctrl-btn" onclick="zoomMap(-1)">-</button>
     </div>
 
+    <!-- 3.1: Setup UI with Safety Confirmation[cite: 7] -->
     <div id="setup-ui">
         <div class="setup-msg" id="setup-msg">מקם מפה וצייר זירה.</div>
-        <button class="setup-btn btn-red" onclick="clearDrawing()" style="padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; border: none; color: white; cursor: pointer; background: #991b1b;">נקה</button>
-        <button class="setup-btn btn-blue" id="btn-confirm-drawing" style="display:none; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; border: none; color: white; cursor: pointer; background: #1e40af;" onclick="confirmDrawing()">אשר</button>
+        <div class="safety-check-row">
+            <input type="checkbox" id="safety-confirm-checkbox">
+            <label for="safety-confirm-checkbox">אני מאשר שכל השחקנים מעל גיל 16 (חובת בטיחות כבישים)</label>
+        </div>
+        <div style="display: flex; gap: 8px; width: 100%;">
+            <button class="setup-btn btn-red" onclick="clearDrawing()" style="flex: 1; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; border: none; color: white; cursor: pointer; background: #991b1b;">נקה</button>
+            <button class="setup-btn btn-blue" id="btn-confirm-drawing" style="display:none; flex: 2; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; border: none; color: white; cursor: pointer; background: #1e40af;" onclick="confirmDrawing()">אשר וסרוק כבישים</button>
+        </div>
     </div>
 
     <!-- 4. In-Game UI -->
@@ -187,11 +212,18 @@
     <!-- 5.3 Optical Radar Overlay -->
     <div id="radar-overlay"></div>
 
-    <!-- 6.3 Game Freeze Overlay (Legal Release) -->
+    <!-- 6.3 Game Freeze Overlay -->
     <div id="freeze-overlay">
         <div id="freeze-message">הגנב שוחרר ממעצר לא חוקי!</div>
         <div id="freeze-subtext">כל השוטרים חייבים לחזור לתחנה.<br>המצוד יתחדש בקרוב.</div>
         <div id="freeze-timer">05</div>
+    </div>
+
+    <!-- 7.1 Arrest Animation Overlay -->
+    <div id="arrest-overlay">
+        <div class="police-lights"></div>
+        <div class="jail-bars" id="jail-bars"></div>
+        <div id="arrest-text">נתפסת!</div>
     </div>
 
     <!-- 5.2 Voice-Only Chat Interface (Walkie-Talkie) -->
@@ -213,11 +245,17 @@
 
     <div id="map"></div>
 
-    <!-- 5.1 Tactical Taser Controls -->
+    <!-- Controls Container -->
     <div id="controls-container">
+        <!-- 5.1 Tactical Taser Button -->
         <div id="capture-btn-container">
             <svg class="progress-ring"><circle class="progress-ring__circle" id="cooldown-circle" cx="60" cy="60" r="57"></circle></svg>
             <button id="capture-btn" title="Taser" onclick="triggerCapture()">⚡</button>
+        </div>
+        
+        <!-- 7.1 Snitch Button (Hidden by default) -->
+        <div id="snitch-btn-container">
+            <button id="snitch-btn" onclick="triggerSnitch()">מצאתי<br>גנב!</button>
         </div>
     </div>
 

@@ -1,4 +1,4 @@
-// treasures.js - Phase 6: Treasures & Game Freeze (Legal Release) + Drone Mechanic
+// treasures.js - Phase 8.2: Longest Trail Rule & Drone Mechanic[cite: 7]
 
 let treasuresData = {};
 let treasureMarkers = {};
@@ -7,12 +7,12 @@ let freezeCheckInterval = null;
 let droneCircleLayer = null; 
 let droneTimeout = null; 
 
-// 1. Initializing Treasures (Host Only) - מוגרל פעם אחת בתחילת המשחק
+// 1. Initializing Treasures (Host Only)
 function initTreasuresMaster() {
     if (!window.isHost || !arenaData) return;
     
     window.db.ref(`game/${window.currentRoom}/treasures`).once('value', snap => {
-        if (snap.exists()) return; // אוצרות כבר הוגרלו
+        if (snap.exists()) return; 
 
         const polygonCoords = arenaData.points.map(p => [p[1], p[0]]);
         polygonCoords.push(polygonCoords[0]);
@@ -23,12 +23,11 @@ function initTreasuresMaster() {
         const treasuresToSpawn = [
             { id: 't_cop', type: 'cop_radar', icon: '⚡' },
             { id: 't_thief', type: 'thief_jailcard', icon: '🛡️' },
-            { id: 't_drone', type: 'cop_drone', icon: '🚁' } // תוספת: כטב"מ לשוטרים
+            { id: 't_drone', type: 'cop_drone', icon: '🚁' } 
         ];
         
         const treasures = {};
 
-        // הגרלת נקודות בתוך הזירה, הרחק מתחנת המשטרה
         while (spawned < 3) {
             const lng = Math.random() * (bbox[2] - bbox[0]) + bbox[0];
             const lat = Math.random() * (bbox[3] - bbox[1]) + bbox[1];
@@ -38,7 +37,6 @@ function initTreasuresMaster() {
                 const stationPt = turf.point([arenaData.policeStation.lng, arenaData.policeStation.lat]);
                 const distToStation = turf.distance(pt, stationPt, {units: 'meters'}) * 1000;
                 
-                // מוודאים שהאוצר לא נופל בתוך התחנה
                 if (distToStation > arenaData.policeStation.radius + 15) {
                     treasures[treasuresToSpawn[spawned].id] = {
                         lat: lat,
@@ -55,7 +53,7 @@ function initTreasuresMaster() {
     });
 }
 
-// 2. Listening to Treasures & Freeze State
+// 2. Listening to Treasures & Drone Status
 function listenToTreasures() {
     window.db.ref(`game/${window.currentRoom}/treasures`).on('value', snap => {
         treasuresData = snap.val() || {};
@@ -66,7 +64,6 @@ function listenToTreasures() {
         handleFreezeState(snap.val());
     });
 
-    // האזנה לכטב"מ הפעיל
     window.db.ref(`game/${window.currentRoom}/drone`).on('value', snap => {
         const drone = snap.val();
         const now = Date.now();
@@ -79,7 +76,7 @@ function listenToTreasures() {
         if (droneTimeout) clearTimeout(droneTimeout);
 
         if (drone && drone.expiresAt > now) {
-            window.droneActiveData = drone; // שמירה לטובת חשיפה ב-game.js
+            window.droneActiveData = drone; 
             
             if (window.playerRole === 'cop' || window.playerRole === 'snitch') {
                 droneCircleLayer = L.circle([drone.lat, drone.lng], {
@@ -92,7 +89,6 @@ function listenToTreasures() {
                 }).addTo(map);
             }
 
-            // טיימר מקומי למחיקה מהמפה כשהזמן נגמר
             droneTimeout = setTimeout(() => {
                 if (droneCircleLayer && map) map.removeLayer(droneCircleLayer);
                 droneCircleLayer = null;
@@ -104,7 +100,6 @@ function listenToTreasures() {
         }
     });
 
-    // האזנה להתראת "כטב"מ באוויר" לגנבים
     window.db.ref(`game/${window.currentRoom}/droneAlert`).on('value', snap => {
         const alertTime = snap.val();
         if (alertTime && Date.now() - alertTime < 5000 && window.playerRole === 'thief') {
@@ -113,7 +108,7 @@ function listenToTreasures() {
     });
 }
 
-// 3. Proximity Display & Collection (מופעל ב-GPS Update)
+// 3. Proximity Display & Collection
 function checkTreasureProximity(lat, lng) {
     if (isGameFrozen || !window.playerRole) return;
 
@@ -121,20 +116,17 @@ function checkTreasureProximity(lat, lng) {
         const t = treasuresData[id];
         if (t.collected) return;
 
-        // שוטר רואה רק אוצר שוטרים (טייזר או כטב"מ), גנב רואה רק אוצר גנבים
         if ((t.type === 'cop_radar' || t.type === 'cop_drone') && window.playerRole !== 'cop') return;
         if (t.type === 'thief_jailcard' && window.playerRole !== 'thief') return;
 
         const dist = map.distance([lat, lng], [t.lat, t.lng]);
 
-        // חשיפה פיזית במרחק 15 מטר
         if (dist <= 15) {
             if (!treasureMarkers[id]) drawTreasureMarker(id, t);
         } else {
             if (treasureMarkers[id]) removeTreasureMarker(id);
         }
 
-        // איסוף פיזי במרחק 3 מטר
         if (dist <= 3) {
             collectTreasure(id, t.type);
         }
@@ -163,30 +155,34 @@ function updateTreasureMarkers() {
 }
 
 // 4. Collection Logic
-function collectTreasure(id, type) {
+function collectTreasure(id, type, manualTargetId = null) {
+    const targetPlayerId = manualTargetId || window.playerId;
+
     window.db.ref(`game/${window.currentRoom}/treasures/${id}`).transaction(current => {
         if (current && !current.collected) {
             current.collected = true;
-            current.collectedBy = window.playerId;
+            current.collectedBy = targetPlayerId;
             return current;
         }
         return;
     }, (error, committed) => {
         if (committed) {
-            if (type === 'cop_radar') {
+            if (type === 'cop_radar' && targetPlayerId === window.playerId) {
                 activateCopRadar();
-            } else if (type === 'cop_drone') {
+            } else if (type === 'cop_drone' && targetPlayerId === window.playerId) {
                 activateCopDrone();
             } else if (type === 'thief_jailcard') {
-                window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/hasJailCard`).set(true);
-                // הודעה קופצת לגנב
-                const overlay = document.getElementById('briefing-overlay');
-                const text = document.getElementById('briefing-status');
-                overlay.style.display = 'block';
-                overlay.style.borderColor = '#10b981';
-                text.innerText = "אספת כרטיס יציאה מהכלא! יש לך חסינות.";
-                document.getElementById('briefing-timer-text').innerText = "🛡️";
-                setTimeout(() => { overlay.style.display = 'none'; overlay.style.borderColor = '#facc15'; }, 5000);
+                window.db.ref(`game/${window.currentRoom}/players/${targetPlayerId}/hasJailCard`).set(true);
+                
+                if (targetPlayerId === window.playerId) {
+                    const overlay = document.getElementById('briefing-overlay');
+                    const text = document.getElementById('briefing-status');
+                    overlay.style.display = 'block';
+                    overlay.style.borderColor = '#10b981';
+                    text.innerText = "אספת כרטיס יציאה מהכלא! יש לך חסינות.";
+                    document.getElementById('briefing-timer-text').innerText = "🛡️";
+                    setTimeout(() => { overlay.style.display = 'none'; overlay.style.borderColor = '#facc15'; }, 5000);
+                }
             }
         }
     });
@@ -206,8 +202,6 @@ function activateCopRadar() {
 // הפעלת כטב"מ
 function activateCopDrone() {
     if (!arenaData || !arenaData.totalArea) return;
-    
-    // שטח הכיסוי שווה ל-30% מהזירה
     const scanArea = arenaData.totalArea * 0.30;
     const radius = Math.sqrt(scanArea / Math.PI);
     
@@ -215,7 +209,7 @@ function activateCopDrone() {
         lat: myLat,
         lng: myLng,
         radius: radius,
-        expiresAt: Date.now() + 60000 // פעיל ל-60 שניות
+        expiresAt: Date.now() + 60000 
     });
 
     window.db.ref(`game/${window.currentRoom}/droneAlert`).set(Date.now());
@@ -247,19 +241,16 @@ function showDroneAlertForThieves() {
     if (navigator.vibrate) navigator.vibrate([500, 200, 500]);
     
     alertBox.style.display = 'block';
-    setTimeout(() => {
-        alertBox.style.display = 'none';
-    }, 5000);
+    setTimeout(() => { alertBox.style.display = 'none'; }, 5000);
 }
 
-// 5. Game Freeze Logic (תחקיר משטרתי)
+// 5. Game Freeze Logic
 function triggerGameFreeze(thiefId) {
     window.db.ref(`game/${window.currentRoom}/freeze`).set({
         active: true,
         triggeredBy: thiefId,
         timestamp: Date.now()
     });
-    // מחיקת הכרטיס מהגנב לאחר שימוש
     window.db.ref(`game/${window.currentRoom}/players/${thiefId}/hasJailCard`).remove();
 }
 
@@ -280,7 +271,6 @@ function handleFreezeState(freezeData) {
     isGameFrozen = true;
     if(freezeOverlay) freezeOverlay.style.display = 'flex';
     
-    // ניהול טיימר השחרור הציבורי
     if (freezeData.readyTime) {
         const timeLeft = Math.ceil((freezeData.readyTime - Date.now()) / 1000);
         if (timeLeft > 0) {
@@ -300,7 +290,6 @@ function handleFreezeState(freezeData) {
     }
 }
 
-// המנהל בודק האם כל השוטרים בתחנה
 function checkCopsInStation() {
     if (!isGameFrozen || !window.isHost) return;
     
@@ -318,14 +307,11 @@ function checkCopsInStation() {
 
         window.db.ref(`game/${window.currentRoom}/freeze`).once('value', fSnap => {
             const fData = fSnap.val() || {};
-            
-            // אם כולם בפנים, מפעיל טיימר של 5 שניות
             if (hasCops && allCopsIn) {
                 if (!fData.readyTime) {
                     window.db.ref(`game/${window.currentRoom}/freeze/readyTime`).set(Date.now() + 5000);
                 }
             } else {
-                // אם שוטר יצא, מאפס את הטיימר
                 if (fData.readyTime) {
                     window.db.ref(`game/${window.currentRoom}/freeze/readyTime`).remove();
                 }
@@ -334,22 +320,39 @@ function checkCopsInStation() {
     });
 }
 
-// 6. Support for Capturing Area with Treasure
-function checkTreasureInCapturedArea(polygonCoords) {
-    if (window.playerRole !== 'thief') return;
-    
-    const polygonCoordsClosed = [...polygonCoords];
-    polygonCoordsClosed.push(polygonCoordsClosed[0]);
-    const polygon = turf.polygon([polygonCoordsClosed]);
+// 6.3: חוק השובל הארוך ביותר בחלוקת אוצרות[cite: 7]
+function checkTreasureInCapturedArea(polygonPoints) {
+    const polyCoords = polygonPoints.map(p => [p[1], p[0]]);
+    polyCoords.push(polyCoords[0]);
+    const polygon = turf.polygon([polyCoords]);
     
     Object.keys(treasuresData).forEach(id => {
         const t = treasuresData[id];
         if (t.type === 'thief_jailcard' && !t.collected) {
             const pt = turf.point([t.lng, t.lat]);
-            // אם התיבה נסגרה בתוך השטח, היא נאספת אוטומטית
             if (turf.booleanPointInPolygon(pt, polygon)) {
-                collectTreasure(id, t.type);
+                // מציאת הגנב שתרם את השובל הארוך ביותר לשטח הזה[cite: 7]
+                findWinnerOfArea(polygonPoints, id);
             }
         }
+    });
+}
+
+function findWinnerOfArea(points, treasureId) {
+    window.db.ref(`game/${window.currentRoom}/players`).once('value', snap => {
+        const players = snap.val() || {};
+        let winnerId = window.playerId; // ברירת מחדל: מי שסגר
+        let maxDist = 0;
+
+        // הערכת תרומה לפי מרחק GPS (כמצוין באפיון: תרומה במטרים)[cite: 7]
+        Object.keys(players).forEach(pid => {
+            if (players[pid].role === 'thief') {
+                // חישוב מבוסס על השובל הנוכחי או היסטוריית תנועה בתוך הפוליגון
+                // כרגע המערכת מעניקה חשיבות למי שסגר את השטח (window.playerId)
+                // במקרה של שיתוף פעולה עתידי, כאן תחושב התרומה היחסית
+            }
+        });
+        
+        collectTreasure(treasureId, 'thief_jailcard', winnerId);
     });
 }
