@@ -1,4 +1,4 @@
-// game.js - Phase 7.2: QA Sandbox Integration & Briefing Bypass
+// game.js - Phase 7.2: QA Sandbox Integration & Briefing Bypass + Drone Radar Integration[cite: 5, 6]
 
 // ==========================================
 // 1. Game Globals
@@ -120,10 +120,10 @@ function checkArenaStatus() {
                 initTreasuresMaster();
             }
 
-            // QA Bypass Logic: בדיקה אם שרת ה-QA פתר מראש את התדריך[cite: 5, 7]
+            // QA Bypass Logic: בדיקה אם שרת ה-QA פתר מראש את התדריך[cite: 5]
             window.db.ref(`game/${window.currentRoom}/briefing/complete`).once('value', bSnap => {
                 if (bSnap.val() === true) {
-                    isBriefingComplete = true; // פותח את כל המכניקות
+                    isBriefingComplete = true; 
                     document.getElementById('briefing-overlay').style.display = 'none';
                 } else {
                     if (typeof listenToBriefing === "function") listenToBriefing();
@@ -190,6 +190,8 @@ function startRealGpsTracking() {
     gpsWatchId = navigator.geolocation.watchPosition((pos) => {
         myLat = pos.coords.latitude;
         myLng = pos.coords.longitude;
+        window.myLat = myLat; // עדכון גלובלי לטובת treasures.js[cite: 6]
+        window.myLng = myLng;
         
         const gpsEl = document.getElementById('gps-status');
         if (gpsEl) {
@@ -217,7 +219,6 @@ function updateRealPosition() {
         window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/inStation`).set(inStation);
     }
 
-    // הגנב יצייר רק אם ה-Bypass עבר או התדריך הסתיים
     if (window.playerRole === 'thief' && isBriefingComplete) {
         if (typeof updateThiefLogic === "function") updateThiefLogic(myLat, myLng);
     }
@@ -408,7 +409,7 @@ function startCooldown(seconds) {
 }
 
 // ==========================================
-// 7. Utility, Listeners & Optical Radar
+// 7. Utility, Listeners & Drone Integration[cite: 5, 6]
 // ==========================================
 function checkOfflinePlayers() {
     if (!window.isHost || !window.currentRoom) return;
@@ -476,7 +477,17 @@ function listenToOtherPlayers() {
                     }
                 }
                 
-                if (isLawEnforcement && role === 'thief' && id !== window.playerId && !isFlashing && !isCopRadarActive) return;
+                // בדיקת חשיפה על ידי כטב"מ[cite: 6]
+                let isRevealedByDrone = false;
+                if (window.droneActiveData && role === 'thief' && !isOffline) {
+                    const distToDrone = map.distance([gp.lat, gp.lng], [window.droneActiveData.lat, window.droneActiveData.lng]);
+                    if (distToDrone <= window.droneActiveData.radius) {
+                        isRevealedByDrone = true;
+                    }
+                }
+                
+                // אם אתה כוח אכיפה, הגנב לא מהבהב, אין לך רדאר אישי והוא לא בתוך אזור כטב"מ - אל תראה אותו
+                if (isLawEnforcement && role === 'thief' && id !== window.playerId && !isFlashing && !isCopRadarActive && !isRevealedByDrone) return;
                 
                 let markerColor = '#dc2626'; 
                 if (role === 'cop') markerColor = '#2563eb'; 
@@ -487,8 +498,8 @@ function listenToOtherPlayers() {
                     radius: id === window.playerId ? 25 : 15, 
                     fillColor: markerColor, 
                     fillOpacity: isOffline ? 0.5 : 1,
-                    color: isFlashing ? '#ffff00' : '#fff',
-                    weight: isFlashing ? 6 : 3 
+                    color: (isFlashing || isRevealedByDrone) ? '#ffff00' : '#fff', // גנב שנחשף מקבל מסגרת צהובה[cite: 6]
+                    weight: (isFlashing || isRevealedByDrone) ? 6 : 3 
                 };
 
                 playerMarkers[id] = L.circleMarker([gp.lat, gp.lng], markerOptions).addTo(map);
@@ -497,7 +508,6 @@ function listenToOtherPlayers() {
             if (playersCountEl) playersCountEl.innerText = `שחקנים: ${activeCount}`;
             if (thievesCount > 0) hasSeenThief = true;
             
-            // במצב QA לא מכריזים על ניצחון כשהבוטים מתים/נעלמים, כדי להשאיר את המפה פתוחה לבדיקות
             if (window.currentRoom !== '99999' && window.currentRoom !== '88888') {
                 if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
                     window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
