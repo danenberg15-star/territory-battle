@@ -1,4 +1,4 @@
-// game.js - Phase 1.8.6: UI Overhaul, Floating Stats & Tactical Taser Cooldown
+// game.js - Phase 1.8.7: UI Overhaul & Optical Radar[cite: 20]
 
 // ==========================================
 // 1. Game Globals
@@ -25,7 +25,7 @@ let arenaPolygonLayer = null;
 // ==========================================
 function enterGameScene() {
     document.getElementById('lobby-screen').style.display = 'none';
-    // שימוש בשורת הסטטוסים הצפה במקום הבר האטום הישן
+    
     const floatingStats = document.getElementById('floating-stats');
     if (floatingStats) floatingStats.style.display = 'flex';
     
@@ -166,7 +166,7 @@ function setupPoliceStation() {
 }
 
 // ==========================================
-// 5. GPS & Movement Logic (2s Tick Rate)
+// 5. GPS & Movement Logic
 // ==========================================
 function startRealGpsTracking() {
     if (!navigator.geolocation) return;
@@ -177,7 +177,7 @@ function startRealGpsTracking() {
         const gpsEl = document.getElementById('gps-status');
         if (gpsEl) {
             gpsEl.innerText = "GPS ✅";
-            gpsEl.style.color = "#10b981"; // צבע ירוק תקין
+            gpsEl.style.color = "#10b981"; 
         }
 
         if (map && !window.firstLoadDone) {
@@ -212,18 +212,16 @@ function updateRealPosition() {
 }
 
 // ==========================================
-// 6. 5.1: Hybrid Catch Logic (Tactical Taser)
+// 6. 5.1: Tactical Taser Catch Logic
 // ==========================================
 function triggerCapture() {
     if (!isBriefingComplete) return;
     const btn = document.getElementById('capture-btn');
     if (btn.disabled) return;
 
-    // הפעלת מצב "ירייה"
     btn.disabled = true;
     btn.classList.add('active-capture');
     
-    // רטט קצר לדימוי יריית טייזר (אם נתמך בדפדפן)
     if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
     
     if (typeof broadcastCapture === "function") broadcastCapture();
@@ -295,7 +293,6 @@ function startCooldown(seconds) {
     if (!circle) return;
     
     let left = seconds;
-    // היקף המעגל עודכן ל-358 בגלל רדיוס 57 של הטייזר החדש
     const totalOffset = 358; 
     circle.style.strokeDashoffset = 0; 
 
@@ -309,7 +306,6 @@ function startCooldown(seconds) {
             const btn = document.getElementById('capture-btn');
             if (btn) {
                 btn.disabled = false;
-                // סאונד קצר/רטט בסיום הטעינה
                 if (navigator.vibrate) navigator.vibrate(50);
             }
             circle.style.strokeDashoffset = totalOffset; 
@@ -318,7 +314,7 @@ function startCooldown(seconds) {
 }
 
 // ==========================================
-// 7. Utility & Listeners
+// 7. Utility, Listeners & Optical Radar[cite: 20]
 // ==========================================
 function checkOfflinePlayers() {
     if (!window.isHost || !window.currentRoom) return;
@@ -363,6 +359,7 @@ function listenToOtherPlayers() {
 
             let activeCount = 0;
             let thievesCount = 0;
+            let isThiefNearby = false; // דגל לבדיקת מרחק לרדאר[cite: 20]
 
             Object.keys(gamePlayers).forEach(id => {
                 const gp = gamePlayers[id];
@@ -374,6 +371,13 @@ function listenToOtherPlayers() {
                 if (!isOffline) {
                     activeCount++;
                     if (role === 'thief') thievesCount++;
+                }
+
+                // 5.3 Optical Radar Logic[cite: 20]
+                if (window.playerRole === 'cop' && role === 'thief' && !isOffline && myLat && myLng) {
+                    if (map.distance([myLat, myLng], [gp.lat, gp.lng]) <= 30) {
+                        isThiefNearby = true;
+                    }
                 }
                 
                 if (window.playerRole === 'cop' && role === 'thief' && id !== window.playerId && !isFlashing) return;
@@ -396,6 +400,14 @@ function listenToOtherPlayers() {
             if (thievesCount > 0) hasSeenThief = true;
             if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
                 window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
+            }
+
+            // עדכון נראות מסך הרדאר לשוטרים בלבד[cite: 20]
+            if (window.playerRole === 'cop') {
+                const radar = document.getElementById('radar-overlay');
+                if (radar) {
+                    radar.style.display = isThiefNearby ? 'block' : 'none';
+                }
             }
         });
     });
