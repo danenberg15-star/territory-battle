@@ -1,4 +1,4 @@
-// game.js - Phase 8.4: Taser Logic Fix, Star Icon & Technical Victory[cite: 7, 10, 13]
+// game.js - Phase 8.5: Taser Visibility & Reactivity Fix, 10k SQM Sync[cite: 1, 11]
 
 // ==========================================
 // 1. Game Globals
@@ -25,7 +25,7 @@ let arenaPolygonLayer = null;
 // 2. Game Scene Initialization
 // ==========================================
 function enterGameScene() {
-    console.log("Entering Game Scene...");
+    console.log("Initializing Tactical Map...");
     document.getElementById('lobby-screen').style.display = 'none';
     
     const floatingStats = document.getElementById('floating-stats');
@@ -37,7 +37,6 @@ function enterGameScene() {
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    // אתחול מפה עם תמיכה בגרירה וזום
     map = L.map('map', { 
         zoomControl: false, 
         attributionControl: false,
@@ -92,7 +91,7 @@ function zoomMap(delta) {
 }
 
 // ==========================================
-// 4. Arena Setup & QA Bypass
+// 4. Arena Setup & Role-Based UI[cite: 1, 11]
 // ==========================================
 function checkArenaStatus() {
     window.db.ref(`game/${window.currentRoom}/arena`).on('value', snap => {
@@ -120,7 +119,6 @@ function checkArenaStatus() {
                 initTreasuresMaster();
             }
 
-            // QA Bypass: כניסה מיידית למשחק[cite: 7]
             window.db.ref(`game/${window.currentRoom}/briefing/complete`).once('value', bSnap => {
                 if (bSnap.val() === true) {
                     isBriefingComplete = true; 
@@ -131,17 +129,26 @@ function checkArenaStatus() {
                 }
             });
             
+            // הצגת בקרים לפי תפקיד בלבד[cite: 1, 11]
             document.getElementById('controls-container').style.display = 'block';
 
             if (typeof toggleChatVisibility === "function") {
                 toggleChatVisibility(true);
+                const micBtn = document.getElementById('chat-mic-btn');
+                if (micBtn) micBtn.style.display = 'flex';
             }
 
             if (window.playerRole === 'cop') {
+                // רק שוטר רואה טייזר[cite: 1, 11]
                 document.getElementById('capture-btn-container').style.display = 'block';
+                document.getElementById('snitch-btn-container').style.display = 'none';
             } else if (window.playerRole === 'snitch') {
+                document.getElementById('capture-btn-container').style.display = 'none';
                 document.getElementById('snitch-btn-container').style.display = 'block';
             } else {
+                // גנב לא רואה טייזר ולא כפתור מלשין[cite: 11]
+                document.getElementById('capture-btn-container').style.display = 'none';
+                document.getElementById('snitch-btn-container').style.display = 'none';
                 if (isBriefingComplete) startThiefMechanics();
             }
         }
@@ -181,7 +188,7 @@ function setupPoliceStation() {
 }
 
 // ==========================================
-// 5. GPS & Movement Logic (Auto-Pan)
+// 5. GPS & Movement Logic (Auto-Pan for Thief)[cite: 11]
 // ==========================================
 function startRealGpsTracking() {
     if (!navigator.geolocation) return;
@@ -211,6 +218,7 @@ function updateRealPosition() {
     const drawingEl = document.getElementById('drawing-container');
     const isDrawingMode = drawingEl && drawingEl.style.display === 'block';
     
+    // מפה עוקבת תמיד אחרי השחקן[cite: 11]
     if (!isDrawingMode) {
         map.panTo([myLat, myLng], { animate: true, duration: 1.0 });
     }
@@ -237,18 +245,18 @@ function updateRealPosition() {
 }
 
 // ==========================================
-// 6. Tactical Taser & Catch Logic[cite: 7, 13]
+// 6. Tactical Taser & Feedback Fix[cite: 1, 11]
 // ==========================================
 function triggerCapture() {
     if (!isBriefingComplete || (typeof isGameFrozen !== 'undefined' && isGameFrozen)) return;
     const btn = document.getElementById('capture-btn');
     if (btn.disabled) return;
 
-    console.log("Taser Fired!");
+    // חיווי ויזואלי מיידי
+    console.log("Firing Taser...");
     btn.disabled = true;
-    btn.classList.add('active-capture'); // מפעיל אנימציה ב-CSS[cite: 13]
+    btn.classList.add('active-capture'); 
     
-    // אפקט חשמלי על המפה[cite: 7]
     if (taserVisualRing) map.removeLayer(taserVisualRing);
     taserVisualRing = L.circle([myLat, myLng], {
         radius: 10,
@@ -259,7 +267,7 @@ function triggerCapture() {
         className: 'electric-arc-pulse' 
     }).addTo(map);
 
-    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    if (navigator.vibrate) navigator.vibrate([150, 50, 150]);
     
     if (typeof broadcastCapture === "function") broadcastCapture();
 
@@ -374,15 +382,6 @@ function triggerSnitch() {
 
         if (foundThief) {
             if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-        } else {
-            const text = document.getElementById('briefing-status');
-            const overlay = document.getElementById('briefing-overlay');
-            if (overlay && text) {
-                text.innerText = window.currentLang === 'he' ? "לא נמצאו גנבים קרובים!" : "No thieves nearby!";
-                overlay.style.display = 'block';
-                overlay.style.borderColor = "#ef4444";
-                setTimeout(() => { overlay.style.display = 'none'; overlay.style.borderColor = "#facc15"; }, 2000);
-            }
         }
     });
 
@@ -398,7 +397,6 @@ function startCooldown(seconds) {
     
     let left = seconds;
     const totalOffset = 358; 
-    circle.style.strokeDashoffset = 0; 
 
     const interval = setInterval(() => {
         left--;
@@ -418,7 +416,7 @@ function startCooldown(seconds) {
 }
 
 // ==========================================
-// 7. Technical Victory & Offline Checks[cite: 7]
+// 7. Technical Victory & Offline Checks[cite: 1]
 // ==========================================
 function checkOfflinePlayers() {
     if (!window.isHost || !window.currentRoom) return;
@@ -431,7 +429,6 @@ function checkOfflinePlayers() {
 
         Object.keys(players).forEach(id => {
             const p = players[id];
-            // חוק ה-3 דקות לניתוק[cite: 7]
             if (p.isOffline && p.disconnectedAt && (now - p.disconnectedAt > 180000)) {
                 window.db.ref(`rooms/${window.currentRoom}/players/${id}`).remove();
                 window.db.ref(`game/${window.currentRoom}/players/${id}`).remove();
@@ -481,9 +478,6 @@ function listenToOtherPlayers() {
             let activeCount = 0;
             let thievesCount = 0;
             let isThiefNearby = false; 
-            
-            const isCopRadarActive = window.copRadarActiveUntil && window.copRadarActiveUntil > Date.now();
-            const isLawEnforcement = window.playerRole === 'cop' || window.playerRole === 'snitch';
 
             Object.keys(gamePlayers).forEach(id => {
                 const gp = gamePlayers[id];
@@ -497,24 +491,12 @@ function listenToOtherPlayers() {
                     if (role === 'thief') thievesCount++;
                 }
 
-                if (isLawEnforcement && role === 'thief' && !isOffline && myLat && myLng) {
-                    if (map.distance([myLat, myLng], [gp.lat, gp.lng]) <= 30) {
-                        isThiefNearby = true;
-                    }
+                if (window.playerRole === 'cop' && role === 'thief' && !isOffline && myLat && myLng) {
+                    if (map.distance([myLat, myLng], [gp.lat, gp.lng]) <= 30) isThiefNearby = true;
                 }
                 
-                let isRevealedByDrone = false;
-                if (window.droneActiveData && role === 'thief' && !isOffline) {
-                    const distToDrone = map.distance([gp.lat, gp.lng], [window.droneActiveData.lat, window.droneActiveData.lng]);
-                    if (distToDrone <= window.droneActiveData.radius) {
-                        isRevealedByDrone = true;
-                    }
-                }
-                
-                if (isLawEnforcement && role === 'thief' && id !== window.playerId && !isFlashing && !isCopRadarActive && !isRevealedByDrone) return;
-                
-                // כוכב זהב לשחקן המקומי[cite: 10]
                 if (id === window.playerId) {
+                    // כוכב זהב לשחקן המקומי[cite: 11]
                     const starIcon = L.divIcon({
                         html: `<div style="font-size: 32px; filter: drop-shadow(0 0 8px gold); animation: star-glow 2s infinite alternate;">⭐</div>`,
                         className: '',
@@ -528,25 +510,21 @@ function listenToOtherPlayers() {
                     if (role === 'snitch') markerColor = '#f59e0b'; 
                     if (isOffline) markerColor = '#6b7280'; 
                     
-                    const markerOptions = {
-                        radius: 15, 
-                        fillColor: markerColor, 
-                        fillOpacity: isOffline ? 0.5 : 1,
-                        color: (isFlashing || isRevealedByDrone) ? '#ffff00' : '#fff',
-                        weight: (isFlashing || isRevealedByDrone) ? 6 : 3 
-                    };
-                    playerMarkers[id] = L.circleMarker([gp.lat, gp.lng], markerOptions).addTo(map);
+                    if ((window.playerRole === 'cop' || window.playerRole === 'snitch') && role === 'thief' && !isFlashing) return;
+
+                    playerMarkers[id] = L.circleMarker([gp.lat, gp.lng], {
+                        radius: 15, fillColor: markerColor, fillOpacity: isOffline ? 0.5 : 1,
+                        color: isFlashing ? '#ffff00' : '#fff', weight: isFlashing ? 6 : 3 
+                    }).addTo(map);
                 }
             });
 
             if (playersCountEl) playersCountEl.innerText = `שחקנים: ${activeCount}`;
             if (thievesCount > 0) hasSeenThief = true;
             
-            if (isLawEnforcement) {
+            if (window.playerRole === 'cop' || window.playerRole === 'snitch') {
                 const radar = document.getElementById('radar-overlay');
-                if (radar) {
-                    radar.style.display = (isThiefNearby || isCopRadarActive) ? 'block' : 'none';
-                }
+                if (radar) radar.style.display = isThiefNearby ? 'block' : 'none';
             }
         });
     });
@@ -554,12 +532,6 @@ function listenToOtherPlayers() {
 
 function startThiefMechanics() {
     if (trailLayer) map.removeLayer(trailLayer);
-    trailLayer = L.polyline([], { 
-        color: '#dc2626', 
-        weight: 6, 
-        dashArray: '5, 10',
-        lineCap: 'round',
-        opacity: 0.8
-    }).addTo(map);
-    console.log("Thief trail initialized.");
+    trailLayer = L.polyline([], { color: '#dc2626', weight: 6, dashArray: '5, 10', opacity: 0.8 }).addTo(map);
+    console.log("Thief Trail Active.");
 }
