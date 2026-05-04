@@ -1,4 +1,4 @@
-// game.js - Phase 8.5: Taser Visibility & Reactivity Fix, 10k SQM Sync[cite: 1, 11]
+// game.js - Phase 8.6: Taser Fire Reactivity & Role-Based UI Visibility[cite: 1, 11]
 
 // ==========================================
 // 1. Game Globals
@@ -25,7 +25,7 @@ let arenaPolygonLayer = null;
 // 2. Game Scene Initialization
 // ==========================================
 function enterGameScene() {
-    console.log("Initializing Tactical Map...");
+    console.log("Tactical Scene Initializing...");
     document.getElementById('lobby-screen').style.display = 'none';
     
     const floatingStats = document.getElementById('floating-stats');
@@ -91,7 +91,7 @@ function zoomMap(delta) {
 }
 
 // ==========================================
-// 4. Arena Setup & Role-Based UI[cite: 1, 11]
+// 4. Arena Setup & Role-Based UI Display[cite: 1, 11]
 // ==========================================
 function checkArenaStatus() {
     window.db.ref(`game/${window.currentRoom}/arena`).on('value', snap => {
@@ -129,27 +129,30 @@ function checkArenaStatus() {
                 }
             });
             
-            // הצגת בקרים לפי תפקיד בלבד[cite: 1, 11]
-            document.getElementById('controls-container').style.display = 'block';
+            // בקרת נראות בקרים לפי תפקיד שחקן[cite: 1, 11]
+            const controls = document.getElementById('controls-container');
+            const captureContainer = document.getElementById('capture-btn-container');
+            const snitchContainer = document.getElementById('snitch-btn-container');
+            const micBtn = document.getElementById('chat-mic-btn');
+
+            if (controls) controls.style.display = 'block';
+            if (micBtn) micBtn.style.display = 'flex'; // הווקי-טוקי תמיד מוצג
+
+            if (window.playerRole === 'cop') {
+                if (captureContainer) captureContainer.style.display = 'block'; // רק שוטר רואה טייזר[cite: 11]
+                if (snitchContainer) snitchContainer.style.display = 'none';
+            } else if (window.playerRole === 'snitch') {
+                if (captureContainer) captureContainer.style.display = 'none';
+                if (snitchContainer) snitchContainer.style.display = 'block';
+            } else {
+                // גנב לא רואה טייזר ולא כפתור מלשין[cite: 11]
+                if (captureContainer) captureContainer.style.display = 'none';
+                if (snitchContainer) snitchContainer.style.display = 'none';
+                if (isBriefingComplete) startThiefMechanics();
+            }
 
             if (typeof toggleChatVisibility === "function") {
                 toggleChatVisibility(true);
-                const micBtn = document.getElementById('chat-mic-btn');
-                if (micBtn) micBtn.style.display = 'flex';
-            }
-
-            if (window.playerRole === 'cop') {
-                // רק שוטר רואה טייזר[cite: 1, 11]
-                document.getElementById('capture-btn-container').style.display = 'block';
-                document.getElementById('snitch-btn-container').style.display = 'none';
-            } else if (window.playerRole === 'snitch') {
-                document.getElementById('capture-btn-container').style.display = 'none';
-                document.getElementById('snitch-btn-container').style.display = 'block';
-            } else {
-                // גנב לא רואה טייזר ולא כפתור מלשין[cite: 11]
-                document.getElementById('capture-btn-container').style.display = 'none';
-                document.getElementById('snitch-btn-container').style.display = 'none';
-                if (isBriefingComplete) startThiefMechanics();
             }
         }
     });
@@ -188,7 +191,7 @@ function setupPoliceStation() {
 }
 
 // ==========================================
-// 5. GPS & Movement Logic (Auto-Pan for Thief)[cite: 11]
+// 5. GPS & Movement Logic (Auto-Pan)[cite: 11]
 // ==========================================
 function startRealGpsTracking() {
     if (!navigator.geolocation) return;
@@ -218,7 +221,7 @@ function updateRealPosition() {
     const drawingEl = document.getElementById('drawing-container');
     const isDrawingMode = drawingEl && drawingEl.style.display === 'block';
     
-    // מפה עוקבת תמיד אחרי השחקן[cite: 11]
+    // מפה עוקבת תמיד אחרי הכוכב של השחקן[cite: 11]
     if (!isDrawingMode) {
         map.panTo([myLat, myLng], { animate: true, duration: 1.0 });
     }
@@ -245,18 +248,19 @@ function updateRealPosition() {
 }
 
 // ==========================================
-// 6. Tactical Taser & Feedback Fix[cite: 1, 11]
+// 6. Tactical Taser & Feedback Reactivity[cite: 11]
 // ==========================================
 function triggerCapture() {
     if (!isBriefingComplete || (typeof isGameFrozen !== 'undefined' && isGameFrozen)) return;
     const btn = document.getElementById('capture-btn');
-    if (btn.disabled) return;
+    if (!btn || btn.disabled) return;
 
-    // חיווי ויזואלי מיידי
-    console.log("Firing Taser...");
+    // שלב 1: חיווי ויזואלי מיידי ללחיצה[cite: 11]
+    console.log("Taser Activation Confirmed");
     btn.disabled = true;
     btn.classList.add('active-capture'); 
     
+    // שלב 2: אפקטים פיזיים (רטט) וסונאר ויזואלי על המפה[cite: 11]
     if (taserVisualRing) map.removeLayer(taserVisualRing);
     taserVisualRing = L.circle([myLat, myLng], {
         radius: 10,
@@ -271,6 +275,7 @@ function triggerCapture() {
     
     if (typeof broadcastCapture === "function") broadcastCapture();
 
+    // שלב 3: שידור אות המעצר לשרת[cite: 1]
     const timestamp = Date.now();
     window.db.ref(`game/${window.currentRoom}/captureSignal`).set({
         sender: window.playerId,
@@ -279,6 +284,7 @@ function triggerCapture() {
         lng: myLng
     });
 
+    // שלב 4: מנוע מעקב GPS למשך 10 שניות[cite: 1]
     let gpsChecks = 0;
     const gpsInterval = setInterval(() => {
         checkGpsCatch(myLat, myLng, timestamp);
@@ -289,6 +295,7 @@ function triggerCapture() {
         }
     }, 1000);
 
+    // שלב 5: הסרת חיווי ירי והתחלת קירור (Cooldown)[cite: 1, 11]
     setTimeout(() => {
         btn.classList.remove('active-capture');
         startCooldown(60); 
@@ -380,9 +387,7 @@ function triggerSnitch() {
             }
         });
 
-        if (foundThief) {
-            if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-        }
+        if (foundThief && navigator.vibrate) navigator.vibrate([100, 50, 100]);
     });
 
     setTimeout(() => {
@@ -416,7 +421,7 @@ function startCooldown(seconds) {
 }
 
 // ==========================================
-// 7. Technical Victory & Offline Checks[cite: 1]
+// 7. Technical Victory & Offline Checks[cite: 1, 7]
 // ==========================================
 function checkOfflinePlayers() {
     if (!window.isHost || !window.currentRoom) return;
@@ -429,6 +434,7 @@ function checkOfflinePlayers() {
 
         Object.keys(players).forEach(id => {
             const p = players[id];
+            // חוק ה-3 דקות לניתוק[cite: 7]
             if (p.isOffline && p.disconnectedAt && (now - p.disconnectedAt > 180000)) {
                 window.db.ref(`rooms/${window.currentRoom}/players/${id}`).remove();
                 window.db.ref(`game/${window.currentRoom}/players/${id}`).remove();
@@ -496,7 +502,7 @@ function listenToOtherPlayers() {
                 }
                 
                 if (id === window.playerId) {
-                    // כוכב זהב לשחקן המקומי[cite: 11]
+                    // אייקון כוכב זהב לשחקן המקומי[cite: 10, 11]
                     const starIcon = L.divIcon({
                         html: `<div style="font-size: 32px; filter: drop-shadow(0 0 8px gold); animation: star-glow 2s infinite alternate;">⭐</div>`,
                         className: '',
@@ -533,5 +539,5 @@ function listenToOtherPlayers() {
 function startThiefMechanics() {
     if (trailLayer) map.removeLayer(trailLayer);
     trailLayer = L.polyline([], { color: '#dc2626', weight: 6, dashArray: '5, 10', opacity: 0.8 }).addTo(map);
-    console.log("Thief Trail Active.");
+    console.log("Thief Trail Engine Active.");
 }
