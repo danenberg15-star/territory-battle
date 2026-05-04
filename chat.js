@@ -1,21 +1,11 @@
-// chat.js - Phase 5.2: Operational Chat & Voice-to-Text Engine
+// chat.js - Phase 5.2: Voice-Only Operational Chat (Walkie-Talkie)[cite: 9]
 
 let recognition = null;
 
 document.addEventListener('DOMContentLoaded', () => {
-    const chatInput = document.getElementById('chat-input');
-    const sendBtn = document.getElementById('chat-send-btn');
     const micBtn = document.getElementById('chat-mic-btn');
 
-    // מאזינים למקלדת וכפתור שליחה רגיל
-    if (sendBtn && chatInput) {
-        sendBtn.addEventListener('click', sendMessage);
-        chatInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') sendMessage();
-        });
-    }
-
-    // מאזין לכפתור הכתבה קולית
+    // מאזין רק לכפתור מכשיר הקשר (הכתבה קולית)
     if (micBtn) {
         initSpeechRecognition();
         micBtn.addEventListener('click', toggleSpeechRecognition);
@@ -49,11 +39,9 @@ function initSpeechRecognition() {
 
     recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
-        const chatInput = document.getElementById('chat-input');
-        if (chatInput) {
-            chatInput.value = transcript;
-            // שליחה אוטומטית מיד עם סיום ההכתבה לחיסכון בזמן בזירה
-            sendMessage(); 
+        if (transcript && transcript.trim() !== "") {
+            // שליחה ישירה לשרת ללא צורך בשורת קלט[cite: 9]
+            sendMessage(transcript.trim()); 
         }
     };
 
@@ -98,11 +86,9 @@ function initChat(roomId) {
 
 /**
  * שליחת הודעה לשרת
+ * @param {string} text - הטקסט שזוהה על ידי המיקרופון
  */
-function sendMessage() {
-    const chatInput = document.getElementById('chat-input');
-    const text = chatInput.value.trim();
-
+function sendMessage(text) {
     if (!text || !window.currentRoom || !window.db) return;
 
     const newMessage = {
@@ -114,24 +100,20 @@ function sendMessage() {
     };
 
     window.db.ref(`game/${window.currentRoom}/chat`).push(newMessage)
-        .then(() => {
-            chatInput.value = ""; 
-        })
         .catch(err => console.error("Chat sync error:", err));
 }
 
 /**
- * הצגת ההודעה בממשק המשתמש (עיצוב מינימליסטי וזהה לכל ההודעות)
+ * הצגת ההודעה בממשק המשתמש (עיצוב מינימליסטי)
  */
 function renderChatMessage(data) {
     const messagesDiv = document.getElementById('chat-messages');
     if (!messagesDiv) return;
 
     const msgEl = document.createElement('div');
-    // עיצוב אחיד ללא תלות במי השולח[cite: 10]
     msgEl.className = 'msg';
 
-    // הצגת שם השולח בכל הודעה (כולל הודעות עצמיות)
+    // הצגת שם השולח בכל הודעה[cite: 9]
     const senderHtml = `<span class="msg-sender">${data.senderName}:</span>`;
     
     msgEl.innerHTML = `
