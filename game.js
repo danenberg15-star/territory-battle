@@ -1,4 +1,4 @@
-// game.js - Phase 7.1: Arrest Animation & Snitch Mechanics
+// game.js - Phase 7.2: QA Sandbox Integration & Briefing Bypass
 
 // ==========================================
 // 1. Game Globals
@@ -89,7 +89,7 @@ function zoomMap(delta) {
 }
 
 // ==========================================
-// 4. Arena Setup & UI Activation
+// 4. Arena Setup & QA Bypass
 // ==========================================
 function checkArenaStatus() {
     window.db.ref(`game/${window.currentRoom}/arena`).on('value', snap => {
@@ -120,7 +120,15 @@ function checkArenaStatus() {
                 initTreasuresMaster();
             }
 
-            if (typeof listenToBriefing === "function") listenToBriefing();
+            // QA Bypass Logic: בדיקה אם שרת ה-QA פתר מראש את התדריך[cite: 5, 7]
+            window.db.ref(`game/${window.currentRoom}/briefing/complete`).once('value', bSnap => {
+                if (bSnap.val() === true) {
+                    isBriefingComplete = true; // פותח את כל המכניקות
+                    document.getElementById('briefing-overlay').style.display = 'none';
+                } else {
+                    if (typeof listenToBriefing === "function") listenToBriefing();
+                }
+            });
             
             document.getElementById('controls-container').style.display = 'block';
 
@@ -128,7 +136,6 @@ function checkArenaStatus() {
                 toggleChatVisibility(true);
             }
 
-            // חלוקת הממשק לפי תפקיד: שוטר, מלשין או גנב
             if (window.playerRole === 'cop') {
                 document.getElementById('capture-btn-container').style.display = 'block';
             } else if (window.playerRole === 'snitch') {
@@ -204,13 +211,13 @@ function updateRealPosition() {
     const isDrawingMode = document.getElementById('drawing-container').style.display === 'block';
     if (!isDrawingMode) map.panTo([myLat, myLng]);
 
-    // גם שוטרים וגם מלשינים צריכים לחזור לתחנה במצבים מסוימים
     if ((window.playerRole === 'cop' || window.playerRole === 'snitch') && arenaData) {
         const dist = map.distance([myLat, myLng], [arenaData.policeStation.lat, arenaData.policeStation.lng]);
         const inStation = dist <= arenaData.policeStation.radius;
         window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/inStation`).set(inStation);
     }
 
+    // הגנב יצייר רק אם ה-Bypass עבר או התדריך הסתיים
     if (window.playerRole === 'thief' && isBriefingComplete) {
         if (typeof updateThiefLogic === "function") updateThiefLogic(myLat, myLng);
     }
@@ -301,7 +308,6 @@ function confirmCatch(victimId, signalTime) {
         }, (error, committed) => {
             if (committed) {
                 if (victimId === window.playerId) {
-                    // הפעלת אנימציית מעצר והפיכה למלשין
                     playArrestAnimation(() => {
                         window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'snitch' })
                             .then(() => location.reload());
@@ -330,7 +336,7 @@ function playArrestAnimation(callback) {
 
     setTimeout(() => {
         if (callback) callback();
-    }, 3500); // 3.5 שניות של חוויית מעצר לפני ריענון המסך
+    }, 3500); 
 }
 
 function triggerSnitch() {
@@ -349,7 +355,6 @@ function triggerSnitch() {
             const p = players[id];
             if (p.role === 'thief' && !p.isOffline) {
                 const dist = map.distance([myLat, myLng], [p.lat, p.lng]);
-                // רדיוס החשיפה של מלשין - 15 מטרים
                 if (dist <= 15) {
                     window.db.ref(`game/${window.currentRoom}/players/${id}/flashUntil`).set(Date.now() + 3000);
                     foundThief = true;
@@ -371,7 +376,6 @@ function triggerSnitch() {
         }
     });
 
-    // 10 שניות קירור לכפתור המלשין
     setTimeout(() => {
         btn.disabled = false;
         btn.style.opacity = '1';
@@ -472,13 +476,12 @@ function listenToOtherPlayers() {
                     }
                 }
                 
-                // כוחות האכיפה לא רואים גנבים אלא אם הם נחשפו או שיש מכ"ם פעיל
                 if (isLawEnforcement && role === 'thief' && id !== window.playerId && !isFlashing && !isCopRadarActive) return;
                 
-                let markerColor = '#dc2626'; // אדום לגנב
-                if (role === 'cop') markerColor = '#2563eb'; // כחול לשוטר
-                if (role === 'snitch') markerColor = '#f59e0b'; // כתום למלשין
-                if (isOffline) markerColor = '#6b7280'; // אפור למנותק
+                let markerColor = '#dc2626'; 
+                if (role === 'cop') markerColor = '#2563eb'; 
+                if (role === 'snitch') markerColor = '#f59e0b'; 
+                if (isOffline) markerColor = '#6b7280'; 
                 
                 const markerOptions = {
                     radius: id === window.playerId ? 25 : 15, 
@@ -493,9 +496,12 @@ function listenToOtherPlayers() {
 
             if (playersCountEl) playersCountEl.innerText = `שחקנים: ${activeCount}`;
             if (thievesCount > 0) hasSeenThief = true;
-            // ניצחון: אם היו גנבים וכולם נתפסו (או הפכו למלשינים)
-            if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
-                window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
+            
+            // במצב QA לא מכריזים על ניצחון כשהבוטים מתים/נעלמים, כדי להשאיר את המפה פתוחה לבדיקות
+            if (window.currentRoom !== '99999' && window.currentRoom !== '88888') {
+                if (activeCount > 0 && hasSeenThief && thievesCount === 0) {
+                    window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
+                }
             }
 
             if (isLawEnforcement) {

@@ -1,7 +1,7 @@
-// qa.js - QA Sandbox Environment (Rooms 99999 / 88888) - Fix: Ancestor Path Conflict
+// qa.js - Automated QA Sandbox Simulator (Rooms 99999 / 88888)[cite: 7]
 
 function initQARoom(roomId) {
-    console.log("Starting QA Init for room:", roomId);
+    console.log("Starting Automated QA Simulator for room:", roomId);
     window.currentRoom = roomId;
     window.playerId = localStorage.getItem('tb_uuid') || 'p_qa_' + Date.now();
     window.playerName = localStorage.getItem('tb_name') || "QA Tester";
@@ -14,7 +14,7 @@ function initQARoom(roomId) {
         return;
     }
 
-    document.getElementById('briefing-status').innerText = "מייצר סביבת QA וטריטוריה של 2 קמ\"ר...";
+    document.getElementById('briefing-status').innerText = "מייצר זירת סימולציה ובוטים...";
     document.getElementById('briefing-overlay').style.display = 'block';
 
     navigator.geolocation.getCurrentPosition((pos) => {
@@ -38,11 +38,12 @@ function initQARoom(roomId) {
 
 function setupQAServerData(roomId, centerLat, centerLng) {
     try {
+        // יצירת ריבוע של 1 ק"מ רבוע (500 מטר לכל כיוון מהמרכז)[cite: 7]
         const center = turf.point([centerLng, centerLat]);
-        const ne = turf.destination(center, 1, 45, {units: 'kilometers'}).geometry.coordinates;
-        const se = turf.destination(center, 1, 135, {units: 'kilometers'}).geometry.coordinates;
-        const sw = turf.destination(center, 1, 225, {units: 'kilometers'}).geometry.coordinates;
-        const nw = turf.destination(center, 1, 315, {units: 'kilometers'}).geometry.coordinates;
+        const ne = turf.destination(center, 0.5, 45, {units: 'kilometers'}).geometry.coordinates;
+        const se = turf.destination(center, 0.5, 135, {units: 'kilometers'}).geometry.coordinates;
+        const sw = turf.destination(center, 0.5, 225, {units: 'kilometers'}).geometry.coordinates;
+        const nw = turf.destination(center, 0.5, 315, {units: 'kilometers'}).geometry.coordinates;
         
         const arenaPoints = [
             [ne[1], ne[0]],
@@ -53,33 +54,28 @@ function setupQAServerData(roomId, centerLat, centerLng) {
 
         const arenaData = {
             points: arenaPoints,
-            totalArea: 2000000, 
-            policeStation: { lat: centerLat, lng: centerLng, radius: 178 } 
+            totalArea: 1000000, // 1 קמ"ר
+            policeStation: { lat: centerLat, lng: centerLng, radius: 50 } 
         };
 
         const bots = {};
+        // חדר 99999 = אתה גנב נגד 4 שוטרים. חדר 88888 = אתה שוטר נגד 4 גנבים.[cite: 7]
+        const botRole = (roomId === '99999') ? 'cop' : 'thief';
+        window.playerRole = (roomId === '99999') ? 'thief' : 'cop';
+
         for (let i = 1; i <= 4; i++) {
-            bots['bot_cop_' + i] = { 
-                name: 'שוטר בוט ' + i, 
-                role: 'cop', 
+            bots[`bot_${botRole}_${i}`] = { 
+                name: `בוט ${botRole === 'cop' ? 'שוטר' : 'גנב'} ${i}`, 
+                role: botRole, 
                 lat: centerLat + (Math.random() - 0.5)*0.005, 
                 lng: centerLng + (Math.random() - 0.5)*0.005, 
                 t: Date.now(), 
-                inStation: true,
-                isOffline: false 
-            };
-            bots['bot_thief_' + i] = { 
-                name: 'גנב בוט ' + i, 
-                role: 'thief', 
-                lat: centerLat + (Math.random() - 0.5)*0.005, 
-                lng: centerLng + (Math.random() - 0.5)*0.005, 
-                t: Date.now(),
                 isOffline: false,
-                flashUntil: 0 
+                inStation: (botRole === 'cop'),
+                flashUntil: 0
             };
         }
         
-        window.playerRole = (roomId === '99999') ? 'thief' : 'cop';
         window.isHost = false; 
         bots[window.playerId] = { 
             name: window.playerName + ' (QA)', 
@@ -92,7 +88,6 @@ function setupQAServerData(roomId, centerLat, centerLng) {
         if (window.playerRole === 'cop') bots[window.playerId].inStation = true;
 
         const updates = {};
-        // עדכון שדות ספציפיים בחדר כדי למנוע התנגשות נתיבים[cite: 5]
         updates[`rooms/${roomId}/status`] = 'playing';
         updates[`rooms/${roomId}/gameStartTime`] = Date.now();
         updates[`rooms/${roomId}/host`] = 'qa_host';
@@ -100,20 +95,27 @@ function setupQAServerData(roomId, centerLat, centerLng) {
         
         updates[`game/${roomId}/arena`] = arenaData;
         updates[`game/${roomId}/players`] = bots;
+        
+        // עקיפה אגרסיבית של מנגנון התחקיר (Briefing)[cite: 7]
         updates[`game/${roomId}/briefing`] = { active: false, timeLeft: 0, complete: true }; 
 
         window.db.ref().update(updates).then(() => {
             document.getElementById('briefing-overlay').style.display = 'none';
+            // טעינת הזירה מיד
             if (typeof enterGameScene === 'function') enterGameScene();
-            startBotEngine(roomId);
+            // הפעלת מנוע הבוטים
+            startBotEngine(roomId, arenaData);
         });
 
     } catch (e) {
-        alert("שגיאת חישוב: " + e.message);
+        alert("שגיאת חישוב QA: " + e.message);
     }
 }
 
-function startBotEngine(roomId) {
+function startBotEngine(roomId, arenaData) {
+    const polygon = turf.polygon([[...arenaData.points.map(p => [p[1], p[0]]), [arenaData.points[0][1], arenaData.points[0][0]]]]);
+    
+    // מזיז את הבוטים כל 3 שניות
     setInterval(() => {
         if (!window.db) return;
         window.db.ref(`game/${roomId}/players`).once('value', snap => {
@@ -123,14 +125,23 @@ function startBotEngine(roomId) {
             const botUpdates = {};
             Object.keys(players).forEach(id => {
                 if (id.startsWith('bot_')) {
-                    const latChange = (Math.random() - 0.5) * 0.0002;
-                    const lngChange = (Math.random() - 0.5) * 0.0002;
-                    botUpdates[`game/${roomId}/players/${id}/lat`] = (players[id].lat) + latChange;
-                    botUpdates[`game/${roomId}/players/${id}/lng`] = (players[id].lng) + lngChange;
+                    // תזוזה אקראית קטנה
+                    let newLat = (players[id].lat) + (Math.random() - 0.5) * 0.0003;
+                    let newLng = (players[id].lng) + (Math.random() - 0.5) * 0.0003;
+                    
+                    // מניעת יציאה מגבולות הזירה (בוט חוקי)
+                    const pt = turf.point([newLng, newLat]);
+                    if (!turf.booleanPointInPolygon(pt, polygon)) {
+                        newLat = players[id].lat; // ביטול תזוזה
+                        newLng = players[id].lng;
+                    }
+
+                    botUpdates[`game/${roomId}/players/${id}/lat`] = newLat;
+                    botUpdates[`game/${roomId}/players/${id}/lng`] = newLng;
                     botUpdates[`game/${roomId}/players/${id}/t`] = Date.now(); 
                 }
             });
             window.db.ref().update(botUpdates);
         });
-    }, 4000);
+    }, 3000);
 }

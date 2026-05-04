@@ -123,7 +123,7 @@ function joinRoomLogic(roomId) {
     document.getElementById('lobby-screen').style.display = 'flex';
     document.getElementById('display-room-code').innerText = roomId;
     
-    // קריאה מקדימה כדי למנוע דריסת נתוני שחקן בחיבור מחדש למשחק פעיל[cite: 9]
+    // קריאה מקדימה כדי למנוע דריסת נתוני שחקן בחיבור מחדש למשחק פעיל
     window.db.ref(`rooms/${roomId}`).once('value', snap => {
         const roomData = snap.val();
         if (!roomData) return;
@@ -140,7 +140,7 @@ function joinRoomLogic(roomId) {
                 disconnectedAt: null
             });
         } else {
-            // התחברות מחדש (Reconnect) - עדכון סטטוס חיבור בלבד[cite: 9]
+            // התחברות מחדש (Reconnect) - עדכון סטטוס חיבור בלבד
             window.db.ref(`rooms/${roomId}/players/${playerId}`).update({ 
                 isOffline: false,
                 disconnectedAt: null,
@@ -148,7 +148,7 @@ function joinRoomLogic(roomId) {
             });
         }
 
-        // במקום מחיקה מיידית, מסמנים כלא מקוון לטובת חוק ה-3 דקות[cite: 9]
+        // במקום מחיקה מיידית, מסמנים כלא מקוון לטובת חוק ה-3 דקות
         window.db.ref(`rooms/${roomId}/players/${playerId}`).onDisconnect().update({
             isOffline: true,
             disconnectedAt: firebase.database.ServerValue.TIMESTAMP
