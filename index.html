@@ -6,8 +6,8 @@
     <title>Territory Battle</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* Base Styles */
-        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: sans-serif; background-color: #0f172a; color: white; user-select: none; -webkit-user-select: none; }
+        /* Base Styles - Responsive Mobile Design */
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: white; user-select: none; -webkit-user-select: none; }
         #map { height: 100%; width: 100%; position: absolute; top: 0; z-index: 1; display: none; }
         
         /* Drawing Layer */
@@ -19,19 +19,19 @@
         #lobby-screen { display: none; justify-content: flex-start; padding-top: 50px; }
         
         /* Typography & Inputs */
-        h1 { color: #38bdf8; font-size: 28px; margin-bottom: 30px; text-align: center; }
+        h1 { color: #38bdf8; font-size: 28px; margin-bottom: 30px; text-align: center; text-shadow: 0 0 10px rgba(56, 189, 248, 0.5); }
         h2 { color: #e2e8f0; font-size: 20px; margin-bottom: 15px; }
         input { width: 100%; max-width: 300px; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: 1px solid #38bdf8; background: #1e293b; color: white; font-size: 18px; text-align: center; box-sizing: border-box; user-select: auto; }
         
-        .btn { width: 100%; max-width: 300px; padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; margin-bottom: 15px; transition: 0.2s; text-align: center; display: flex; align-items: center; justify-content: center; }
+        .btn { width: 100%; max-width: 300px; padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; margin-bottom: 15px; transition: 0.2s; text-align: center; display: flex; align-items: center; justify-content: center; box-shadow: 0 4px 6px rgba(0,0,0,0.3); }
         .btn-blue { background: #1e40af; }
         .btn-red { background: #991b1b; }
         .btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; max-width: 350px; width: 100%; margin: 15px 0 0 0; }
         
-        /* Map Controls */
+        /* Compass Map Controls */
         #map-controls { position: absolute; left: 15px; bottom: 80px; z-index: 3000; display: none; flex-direction: column; align-items: center; gap: 5px; }
         .compass-row { display: flex; flex-direction: row; direction: ltr; gap: 5px; }
-        .ctrl-btn { width: 45px; height: 45px; background: rgba(30, 41, 59, 0.9); border: 2px solid #38bdf8; color: white; border-radius: 10px; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; }
+        .ctrl-btn { width: 45px; height: 45px; background: rgba(30, 41, 59, 0.85); border: 2px solid #38bdf8; color: white; border-radius: 10px; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; backdrop-filter: blur(5px); }
         .ctrl-btn:active { background: #38bdf8; color: #0f172a; }
 
         #zoom-controls { position: absolute; right: 15px; bottom: 80px; z-index: 3000; display: none; flex-direction: column; gap: 8px; }
@@ -40,62 +40,80 @@
         .room-header-container { display: flex; flex-direction: row; align-items: center; justify-content: center; width: 100%; max-width: 350px; margin-bottom: 20px; }
         .room-code-box { background: #1e293b; border: 2px dashed #38bdf8; padding: 15px; border-radius: 12px; font-size: 24px; font-weight: bold; letter-spacing: 2px; text-align: center; flex-grow: 1; }
         .btn-whatsapp-icon { background: #25D366; border: none; border-radius: 50%; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-right: 15px; flex-shrink: 0; }
-        .btn-whatsapp-icon svg { width: 30px; height: 30px; fill: white; }
         
         .lists-container { display: flex; flex-direction: row; width: 100%; max-width: 350px; gap: 10px; flex-grow: 1; overflow-y: auto; align-items: stretch; }
         .team-list { background: #1e293b; border-radius: 12px; padding: 10px; flex: 1; display: flex; flex-direction: column; }
-        .team-title { font-size: 16px; font-weight: bold; margin-bottom: 10px; text-align: center; }
         .player-item { background: #334155; padding: 10px; border-radius: 6px; margin-bottom: 8px; font-size: 14px; text-align: center; touch-action: none; }
 
-        /* Compact Setup UI Overlay */
+        /* Compact Setup UI */
         #setup-ui { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 95%; max-width: 400px; display: none; flex-direction: row; align-items: center; gap: 8px; pointer-events: auto; }
-        .setup-msg { background: rgba(30, 41, 59, 0.95); padding: 10px; border-radius: 8px; border: 1px solid #38bdf8; text-align: center; font-size: 12px; color: white; flex: 1; box-shadow: 0 0 10px rgba(0,0,0,0.5); margin: 0; }
-        .setup-btn { padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; border: none; color: white; cursor: pointer; margin: 0; height: 100%; display: flex; align-items: center; justify-content: center; }
+        .setup-msg { background: rgba(30, 41, 59, 0.95); padding: 10px; border-radius: 8px; border: 1px solid #38bdf8; text-align: center; font-size: 12px; color: white; flex: 1; box-shadow: 0 0 10px rgba(0,0,0,0.5); }
 
-        /* In-Game UI */
-        .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 3100; background: rgba(220, 38, 38, 0.9); color: white; border: 2px solid white; border-radius: 50%; width: 40px; height: 40px; font-weight: bold; font-size: 20px; cursor: pointer; display: none; align-items: center; justify-content: center; }
-        .header { position: absolute; top: 10px; left: 10px; right: 10px; padding: 10px; background: rgba(15, 23, 42, 0.95); border-radius: 12px; text-align: center; z-index: 2000; border: 1px solid #38bdf8; display: none; }
-        .status-row { display: flex; justify-content: space-around; font-size: 11px; margin-bottom: 5px; font-weight: bold; }
-        #gps-status { color: #ef4444; }
-        #audio-status { color: #facc15; }
-        #players-count { color: #10b981; }
+        /* -------------------------------------------
+           NEW UI: Floating Top Stats (No Header Box)
+           ------------------------------------------- */
+        #floating-stats { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: none; flex-direction: row; justify-content: center; gap: 15px; z-index: 2000; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); padding: 8px 20px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 12px; font-weight: bold; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .stat-item { display: flex; align-items: center; gap: 5px; }
+        #gps-status { color: #ef4444; } /* Red until active */
+        #audio-status { color: #facc15; } /* Yellow until active */
+        #players-count { color: #38bdf8; } /* Light Blue */
+
+        /* Floating Exit Button */
+        .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 3100; background: rgba(220, 38, 38, 0.8); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; font-weight: bold; font-size: 16px; cursor: pointer; display: none; align-items: center; justify-content: center; backdrop-filter: blur(5px); box-shadow: 0 2px 6px rgba(0,0,0,0.3); }
         
-        /* 5.2 Operational Chat UI[cite: 18] */
-        #chat-container { position: absolute; bottom: 130px; right: 10px; width: 45%; max-width: 220px; height: 180px; z-index: 2600; display: none; flex-direction: column; pointer-events: auto; }
-        #chat-messages { flex: 1; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 8px; margin-bottom: 5px; overflow-y: auto; padding: 8px; font-size: 12px; display: flex; flex-direction: column; gap: 6px; box-shadow: inset 0 0 10px rgba(0,0,0,0.5); }
-        .msg { padding: 6px 10px; border-radius: 6px; max-width: 90%; word-wrap: break-word; line-height: 1.4; }
-        .msg-self { align-self: flex-start; background: rgba(37, 99, 235, 0.4); border: 1px solid #2563eb; color: #e2e8f0; }
-        .msg-other { align-self: flex-end; background: rgba(51, 65, 85, 0.7); border: 1px solid rgba(255,255,255,0.2); color: #f8fafc; }
-        .msg-sender { font-weight: bold; font-size: 10px; display: block; color: #38bdf8; margin-bottom: 2px; }
+        /* -------------------------------------------
+           5.2 Operational Chat UI - Refined Design
+           ------------------------------------------- */
+        #chat-container { position: absolute; bottom: 150px; left: 50%; transform: translateX(-50%); width: 92%; max-width: 400px; height: 180px; z-index: 2600; display: none; flex-direction: column; pointer-events: auto; }
         
-        #chat-input-row { display: flex; gap: 5px; height: 40px; align-items: center; }
-        #chat-input { flex: 1; background: #1e293b; border: 1px solid #38bdf8; border-radius: 8px; color: white; padding: 0 12px; font-size: 14px; margin: 0; width: auto; max-width: none; text-align: right; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+        #chat-messages { flex: 1; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); border: 1px solid rgba(56, 189, 248, 0.2); border-radius: 12px 12px 4px 4px; margin-bottom: 6px; overflow-y: auto; padding: 10px; font-size: 13px; display: flex; flex-direction: column; gap: 8px; box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37); }
         
-        /* Voice-to-Text Button Styles[cite: 18] */
-        #chat-mic-btn { width: 40px; height: 40px; background: #1e293b; border: 1px solid #38bdf8; border-radius: 8px; color: #38bdf8; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: 0.3s; flex-shrink: 0; }
+        .msg { padding: 8px 12px; border-radius: 14px; max-width: 85%; word-wrap: break-word; line-height: 1.4; font-size: 13px; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .msg-self { align-self: flex-start; background: linear-gradient(135deg, rgba(37, 99, 235, 0.8), rgba(29, 78, 216, 0.8)); border: 1px solid rgba(255,255,255,0.1); color: white; border-bottom-right-radius: 2px; }
+        .msg-other { align-self: flex-end; background: rgba(51, 65, 85, 0.8); border: 1px solid rgba(255,255,255,0.1); color: #f8fafc; border-bottom-left-radius: 2px; }
+        .msg-sender { font-weight: bold; font-size: 10px; display: block; color: #7dd3fc; margin-bottom: 3px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        #chat-input-row { display: flex; gap: 8px; height: 45px; align-items: center; }
+        #chat-input { flex: 1; background: rgba(30, 41, 59, 0.8); backdrop-filter: blur(5px); border: 1px solid #38bdf8; border-radius: 25px; color: white; padding: 0 15px; font-size: 14px; margin: 0; width: auto; max-width: none; text-align: right; height: 100%; box-shadow: 0 4px 12px rgba(0,0,0,0.2); outline: none; }
+        
+        #chat-mic-btn { width: 45px; height: 45px; background: rgba(30, 41, 59, 0.8); border: 1px solid #38bdf8; border-radius: 50%; color: #38bdf8; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 18px; transition: 0.3s; flex-shrink: 0; backdrop-filter: blur(5px); }
         #chat-mic-btn.recording { background: #ef4444; color: white; border-color: #ef4444; animation: mic-pulse 1.5s infinite; }
-        @keyframes mic-pulse { 0% { opacity: 1; transform: scale(1); } 50% { opacity: 0.7; transform: scale(1.05); } 100% { opacity: 1; transform: scale(1); } }
+        @keyframes mic-pulse { 0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); } 70% { box-shadow: 0 0 0 10px rgba(239, 68, 68, 0); } 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); } }
         
-        #chat-send-btn { width: 40px; height: 40px; background: #38bdf8; color: #0f172a; border: none; border-radius: 8px; font-weight: bold; font-size: 18px; cursor: pointer; flex-shrink: 0; }
+        #chat-send-btn { width: 45px; height: 45px; background: #38bdf8; color: #0f172a; border: none; border-radius: 50%; font-weight: bold; font-size: 18px; cursor: pointer; flex-shrink: 0; box-shadow: 0 4px 12px rgba(56, 189, 248, 0.3); }
 
-        /* Other Overlays */
-        #briefing-overlay { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 2500; background: rgba(30, 41, 59, 0.9); padding: 15px 25px; border-radius: 50px; border: 2px solid #facc15; display: none; text-align: center; width: 80%; max-width: 300px; }
-        #briefing-timer-text { font-size: 22px; font-weight: bold; color: #facc15; }
+        /* Overlays & Controls */
+        #briefing-overlay { position: absolute; top: 80px; left: 50%; transform: translateX(-50%); z-index: 2500; background: rgba(30, 41, 59, 0.9); padding: 15px 25px; border-radius: 50px; border: 2px solid #facc15; display: none; text-align: center; width: 80%; max-width: 300px; backdrop-filter: blur(5px); }
+        
+        /* -------------------------------------------
+           5.1 The Tactical Taser Button[cite: 18]
+           ------------------------------------------- */
+        #controls-container { display: none; position: absolute; bottom: 15px; left: 0; right: 0; z-index: 2000; padding: 10px; pointer-events: none; }
+        #capture-btn-container { position: relative; width: 120px; height: 120px; margin: 0 auto; pointer-events: auto; display: none; }
+        
+        /* Tactical Body */
+        #capture-btn { position: absolute; top: 10px; left: 10px; width: 100px; height: 100px; background: linear-gradient(145deg, #334155, #0f172a); color: #38bdf8; border: 3px solid #1e293b; border-radius: 50%; font-weight: bold; font-size: 32px; z-index: 5; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; box-shadow: inset 0 0 15px rgba(0,0,0,0.8), 0 5px 15px rgba(0,0,0,0.5); }
+        
+        /* Cooldown State (Transparent) */
+        #capture-btn:disabled:not(.active-capture) { background: transparent !important; color: transparent !important; border-color: transparent !important; box-shadow: none !important; }
+        
+        /* Active State: Electric Fire! */
+        #capture-btn.active-capture { animation: taser-fire 0.2s infinite; border-color: #7dd3fc; color: white; background: #0284c7; box-shadow: 0 0 30px #38bdf8, inset 0 0 20px #e0f2fe; transform: scale(1.05); }
+        @keyframes taser-fire { 
+            0% { box-shadow: 0 0 20px #38bdf8; } 
+            50% { box-shadow: 0 0 40px #7dd3fc, inset 0 0 30px white; } 
+            100% { box-shadow: 0 0 20px #38bdf8; } 
+        }
 
-        #controls-container { display: none; position: absolute; bottom: 10px; left: 0; right: 0; z-index: 2000; padding: 10px; pointer-events: none; }
-        #capture-btn-container { position: relative; width: 110px; height: 110px; margin: 0 auto 15px auto; pointer-events: auto; display: none; }
-        #capture-btn { position: absolute; top: 5px; left: 5px; width: 100px; height: 100px; background: #dc2626; color: white; border: none; border-radius: 50%; font-weight: bold; font-size: 18px; z-index: 5; display: flex; align-items: center; justify-content: center; cursor: pointer; transition: 0.2s; }
-        #capture-btn:disabled:not(.active-capture) { background-color: transparent !important; color: transparent !important; box-shadow: none !important; }
-        #capture-btn.active-capture { animation: pulse-red 1s infinite; transform: scale(1.1); box-shadow: 0 0 20px #ef4444; }
-        @keyframes pulse-red { 0% { background-color: #dc2626; } 50% { background-color: #ef4444; } 100% { background-color: #dc2626; } }
+        /* Battery Charging Ring */
+        .progress-ring { position: absolute; top: 0; left: 0; width: 120px; height: 120px; transform: rotate(-90deg); z-index: 1; }
+        /* Changed to Electric Cyan for charging effect */
+        .progress-ring__circle { stroke: #06b6d4; stroke-width: 6; fill: transparent; stroke-dasharray: 358; stroke-dashoffset: 358; transition: stroke-dashoffset 1s linear; filter: drop-shadow(0 0 4px #06b6d4); }
 
-        .progress-ring { position: absolute; top: 0; left: 0; width: 110px; height: 110px; transform: rotate(-90deg); z-index: 1; }
-        .progress-ring__circle { stroke: #dc2626; stroke-width: 6; fill: transparent; stroke-dasharray: 326.7; stroke-dashoffset: 326.7; transition: stroke-dashoffset 1s linear; }
+        #victory-screen { display: none; z-index: 4000; text-align: center; justify-content: center; align-items: center; background: radial-gradient(circle, #1e293b 0%, #0f172a 100%); }
 
-        #victory-screen { display: none; z-index: 4000; text-align: center; justify-content: center; align-items: center; }
-
-        #security-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 5000; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); display: none; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.4); pointer-events: none; }
-        .watermark-text { font-size: 2.5rem; font-weight: bold; transform: rotate(-45deg); text-align: center; white-space: nowrap; user-select: none; line-height: 1.5; }
+        #security-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 5000; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); display: none; flex-direction: column; align-items: center; justify-content: center; color: rgba(255,255,255,0.4); pointer-events: none; }
+        .watermark-text { font-size: 2rem; font-weight: bold; transform: rotate(-30deg); text-align: center; white-space: nowrap; user-select: none; line-height: 1.5; opacity: 0.3; }
     </style>
 </head>
 <body>
@@ -103,7 +121,7 @@
         <div class="watermark-text" id="watermark-content">Territory Battle</div>
     </div>
 
-    <button id="lang-toggle" onclick="toggleLanguage()" style="position:absolute; top:15px; right:15px; z-index:3101; background:#1e293b; color:white; border-radius:50%; width:40px; height:40px; border:1px solid #38bdf8;">🌐</button>
+    <button id="lang-toggle" onclick="toggleLanguage()" style="position:absolute; top:15px; right:15px; z-index:3101; background:rgba(30, 41, 59, 0.8); color:white; border-radius:50%; width:40px; height:40px; border:1px solid #38bdf8; backdrop-filter: blur(5px);">🌐</button>
 
     <!-- 1. Login -->
     <div id="login-screen" class="screen">
@@ -121,18 +139,18 @@
             <div class="room-code-box">
                 <span id="lbl-room-code">קוד חדר:</span> <span id="display-room-code">----</span>
             </div>
-            <button class="btn-whatsapp-icon" onclick="shareWhatsApp()">
-                <svg viewBox="0 0 24 24"><path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.128.552 4.195 1.6 6.02L.053 24l6.113-1.603c1.764.954 3.754 1.458 5.865 1.458 6.646 0 12.031-5.385 12.031-12.031S18.677 0 12.031 0zm3.626 17.15c-.156.44-1.295.992-1.847 1.054-.537.06-1.127.186-3.413-.761-2.92-1.21-4.787-4.225-4.93-4.417-.143-.192-1.178-1.568-1.178-2.986 0-1.418.736-2.115 1.002-2.392.266-.277.674-.352.887-.352.213 0 .426.002.605.009.213.008.497-.083.775.589.284.685.952 2.321 1.036 2.493.084.172.143.376.035.592-.108.216-.164.352-.326.544-.164.192-.345.426-.497.589-.168.176-.347.37-.148.712.199.342.885 1.463 1.895 2.361 1.305 1.159 2.404 1.516 2.748 1.673.344.157.545.132.748-.101.203-.233.882-1.025 1.118-1.378.236-.353.473-.294.787-.176.314.118 1.986.937 2.327 1.107.341.17.568.256.653.398.085.142.085.83-.071 1.27z"/></svg>
+            <button class="btn-whatsapp-icon" onclick="shareWhatsApp()" style="background: #25D366; border: none; border-radius: 50%; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-right: 15px; flex-shrink: 0;">
+                <svg viewBox="0 0 24 24" style="width: 30px; height: 30px; fill: white;"><path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.128.552 4.195 1.6 6.02L.053 24l6.113-1.603c1.764.954 3.754 1.458 5.865 1.458 6.646 0 12.031-5.385 12.031-12.031S18.677 0 12.031 0zm3.626 17.15c-.156.44-1.295.992-1.847 1.054-.537.06-1.127.186-3.413-.761-2.92-1.21-4.787-4.225-4.93-4.417-.143-.192-1.178-1.568-1.178-2.986 0-1.418.736-2.115 1.002-2.392.266-.277.674-.352.887-.352.213 0 .426.002.605.009.213.008.497-.083.775.589.284.685.952 2.321 1.036 2.493.084.172.143.376.035.592-.108.216-.164.352-.326.544-.164.192-.345.426-.497.589-.168.176-.347.37-.148.712.199.342.885 1.463 1.895 2.361 1.305 1.159 2.404 1.516 2.748 1.673.344.157.545.132.748-.101.203-.233.882-1.025 1.118-1.378.236-.353.473-.294.787-.176.314.118 1.986.937 2.327 1.107.341.17.568.256.653.398.085.142.085.83-.071 1.27z"/></svg>
             </button>
         </div>
         <div class="lists-container">
-            <div class="team-list" id="list-cops" style="border: 1px solid #3b82f6;">
-                <div class="team-title" id="lbl-cops">שוטרים 👮‍♂️</div>
-                <div id="players-cops" class="drop-zone"></div>
+            <div class="team-list" id="list-cops" style="border: 1px solid #3b82f6; border-radius: 12px; padding: 10px; flex: 1; display: flex; flex-direction: column;">
+                <div class="team-title" id="lbl-cops" style="font-size: 16px; font-weight: bold; margin-bottom: 10px; text-align: center; color: #3b82f6;">שוטרים 👮‍♂️</div>
+                <div id="players-cops" class="drop-zone" style="min-height: 50px;"></div>
             </div>
-            <div class="team-list" id="list-thieves" style="border: 1px solid #ef4444;">
-                <div class="team-title" id="lbl-thieves">גנבים 🥷</div>
-                <div id="players-thieves" class="drop-zone"></div>
+            <div class="team-list" id="list-thieves" style="border: 1px solid #ef4444; border-radius: 12px; padding: 10px; flex: 1; display: flex; flex-direction: column;">
+                <div class="team-title" id="lbl-thieves" style="font-size: 16px; font-weight: bold; margin-bottom: 10px; text-align: center; color: #ef4444;">גנבים 🥷</div>
+                <div id="players-thieves" class="drop-zone" style="min-height: 50px;"></div>
             </div>
         </div>
         <button class="btn btn-green" id="btn-start-game" style="display: none;" onclick="startGame()">התחל משחק</button>
@@ -159,22 +177,23 @@
 
     <div id="setup-ui">
         <div class="setup-msg" id="setup-msg">מקם מפה וצייר זירה.</div>
-        <button class="setup-btn btn-red" onclick="clearDrawing()">נקה</button>
-        <button class="setup-btn btn-blue" id="btn-confirm-drawing" style="display:none;" onclick="confirmDrawing()">אשר</button>
+        <button class="setup-btn btn-red" onclick="clearDrawing()" style="padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; border: none; color: white; cursor: pointer; background: #991b1b;">נקה</button>
+        <button class="setup-btn btn-blue" id="btn-confirm-drawing" style="display:none; padding: 10px; border-radius: 8px; font-size: 13px; font-weight: bold; border: none; color: white; cursor: pointer; background: #1e40af;" onclick="confirmDrawing()">אשר</button>
     </div>
 
-    <!-- 4. In-Game UI -->
+    <!-- 4. In-Game UI (CLEANED UP HEADER) -->
     <button id="exit-btn" class="exit-btn" onclick="exitGame()">X</button>
-    <div class="header" id="game-header">
-        <div class="status-row">
-            <span id="gps-status">GPS ❌</span>
-            <span id="audio-status">אודיו ⏳</span>
-            <span id="players-count">שחקנים: 0</span>
-        </div>
-        <h1 style="margin:0; font-size:16px; color: #38bdf8;">Territory Battle</h1>
+    
+    <!-- Floating Stats instead of bulky header -->
+    <div id="floating-stats">
+        <div class="stat-item"><span id="gps-status">GPS ❌</span></div>
+        <div class="stat-item">|</div>
+        <div class="stat-item"><span id="audio-status">אודיו ⏳</span></div>
+        <div class="stat-item">|</div>
+        <div class="stat-item"><span id="players-count">שחקנים: 0</span></div>
     </div>
 
-    <!-- 5.2 Operational Chat Interface[cite: 18] -->
+    <!-- 5.2 Operational Chat Interface -->
     <div id="chat-container">
         <div id="chat-messages"></div>
         <div id="chat-input-row">
@@ -191,14 +210,19 @@
 
     <div id="map"></div>
 
+    <!-- 5.1 Tactical Taser Controls -->
     <div id="controls-container">
         <div id="capture-btn-container">
-            <svg class="progress-ring"><circle class="progress-ring__circle" id="cooldown-circle" cx="55" cy="55" r="52"></circle></svg>
-            <button id="capture-btn" onclick="triggerCapture()">תפוס!</button>
+            <svg class="progress-ring"><circle class="progress-ring__circle" id="cooldown-circle" cx="60" cy="60" r="57"></circle></svg>
+            <button id="capture-btn" title="Taser" onclick="triggerCapture()">⚡</button>
         </div>
     </div>
 
-    <div id="victory-screen" class="screen"><h1>ניצחון!</h1></div>
+    <div id="victory-screen" class="screen">
+        <div id="victory-icon" style="font-size: 80px; margin-bottom: 20px;">🏆</div>
+        <h1 id="victory-title">ניצחון!</h1>
+        <button class="btn btn-blue" id="btn-back-lobby" onclick="location.reload()" style="margin-top: 20px;">חזור ללובי</button>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
