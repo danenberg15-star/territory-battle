@@ -1,4 +1,4 @@
-// game.js - Phase 8.2: Player Star Icon, Technical Victory (3-min rule) & Taser Visuals[cite: 7, 10]
+// game.js - Phase 8.3: Thief Navigation Fix, Auto-Pan & QA Synchronization[cite: 23, 24]
 
 // ==========================================
 // 1. Game Globals
@@ -8,7 +8,7 @@ let areaLayers = [];
 let thiefPath = []; 
 let trailLayer = null;
 let map = null;
-let taserVisualRing = null; // טבעת ויזואלית לטייזר
+let taserVisualRing = null; 
 
 let myLat = null;
 let myLng = null;
@@ -36,11 +36,12 @@ function enterGameScene() {
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
+    // אתחול מפה בסיסי[cite: 23]
     map = L.map('map', { 
         zoomControl: false, 
         attributionControl: false,
-        dragging: false,      
-        touchZoom: false,     
+        dragging: true,      
+        touchZoom: true,     
         doubleClickZoom: false,
         scrollWheelZoom: false,
         boxZoom: false,
@@ -121,10 +122,12 @@ function checkArenaStatus() {
                 initTreasuresMaster();
             }
 
+            // QA Bypass: מאפשר כניסה מיידית למשחק בסביבת בדיקות[cite: 23, 24]
             window.db.ref(`game/${window.currentRoom}/briefing/complete`).once('value', bSnap => {
                 if (bSnap.val() === true) {
                     isBriefingComplete = true; 
                     document.getElementById('briefing-overlay').style.display = 'none';
+                    if (window.playerRole === 'thief') startThiefMechanics(); // הפעלת השובל מידית[cite: 23]
                 } else {
                     if (typeof listenToBriefing === "function") listenToBriefing();
                 }
@@ -141,7 +144,8 @@ function checkArenaStatus() {
             } else if (window.playerRole === 'snitch') {
                 document.getElementById('snitch-btn-container').style.display = 'block';
             } else {
-                startThiefMechanics();
+                // גנב רגיל - אם התדריך לא הושלם ב-Bypass, הוא יופעל דרך listenToBriefing[cite: 23]
+                if (isBriefingComplete) startThiefMechanics();
             }
         }
     });
@@ -183,7 +187,7 @@ function setupPoliceStation() {
 }
 
 // ==========================================
-// 5. GPS & Movement Logic
+// 5. GPS & Movement Logic (Thief Map Fix)[cite: 23]
 // ==========================================
 function startRealGpsTracking() {
     if (!navigator.geolocation) return;
@@ -210,8 +214,13 @@ function startRealGpsTracking() {
 function updateRealPosition() {
     if(!map || myLat === null) return;
     
-    const isDrawingMode = document.getElementById('drawing-container').style.display === 'block';
-    if (!isDrawingMode) map.panTo([myLat, myLng]);
+    // תיקון: המפה תמיד זזה עם השחקן אלא אם הוא באמצע ציור זירה[cite: 23]
+    const drawingEl = document.getElementById('drawing-container');
+    const isDrawingMode = drawingEl && drawingEl.style.display === 'block';
+    
+    if (!isDrawingMode) {
+        map.panTo([myLat, myLng], { animate: true, duration: 1.0 });
+    }
 
     if ((window.playerRole === 'cop' || window.playerRole === 'snitch') && arenaData) {
         const dist = map.distance([myLat, myLng], [arenaData.policeStation.lat, arenaData.policeStation.lng]);
@@ -219,6 +228,7 @@ function updateRealPosition() {
         window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/inStation`).set(inStation);
     }
 
+    // הפעלת לוגיקת הגנב (שובלים וכיבושים)[cite: 23]
     if (window.playerRole === 'thief' && isBriefingComplete) {
         if (typeof updateThiefLogic === "function") updateThiefLogic(myLat, myLng);
     }
@@ -235,7 +245,7 @@ function updateRealPosition() {
 }
 
 // ==========================================
-// 6. Tactical Taser, Snitching & Catch Logic[cite: 7]
+// 6. Tactical Taser, Snitching & Catch Logic[cite: 23]
 // ==========================================
 function triggerCapture() {
     if (!isBriefingComplete || (typeof isGameFrozen !== 'undefined' && isGameFrozen)) return;
@@ -245,7 +255,6 @@ function triggerCapture() {
     btn.disabled = true;
     btn.classList.add('active-capture');
     
-    // אפקט חשמלי על המפה (Electric Blue)[cite: 7]
     if (taserVisualRing) map.removeLayer(taserVisualRing);
     taserVisualRing = L.circle([myLat, myLng], {
         radius: 10,
@@ -253,7 +262,7 @@ function triggerCapture() {
         weight: 5,
         fillColor: '#0ea5e9',
         fillOpacity: 0.4,
-        className: 'electric-arc-pulse' // דורש הגדרה ב-CSS ב-index.html
+        className: 'electric-arc-pulse' 
     }).addTo(map);
 
     if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
@@ -415,7 +424,7 @@ function startCooldown(seconds) {
 }
 
 // ==========================================
-// 7. Technical Victory & Offline Checks[cite: 7]
+// 7. Technical Victory & Offline Checks[cite: 23]
 // ==========================================
 function checkOfflinePlayers() {
     if (!window.isHost || !window.currentRoom) return;
@@ -428,7 +437,6 @@ function checkOfflinePlayers() {
 
         Object.keys(players).forEach(id => {
             const p = players[id];
-            // מחיקה לאחר 3 דקות ניתוק[cite: 7]
             if (p.isOffline && p.disconnectedAt && (now - p.disconnectedAt > 180000)) {
                 window.db.ref(`rooms/${window.currentRoom}/players/${id}`).remove();
                 window.db.ref(`game/${window.currentRoom}/players/${id}`).remove();
@@ -440,7 +448,6 @@ function checkOfflinePlayers() {
             }
         });
 
-        // חוק ה-3 דקות: ניצחון טכני אם כל הקבוצה נעלמה[cite: 7]
         if (activeThieves === 0 && hasSeenThief) {
             window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
         } else if (activeCops === 0 && activeThieves > 0) {
@@ -511,7 +518,6 @@ function listenToOtherPlayers() {
                 
                 if (isLawEnforcement && role === 'thief' && id !== window.playerId && !isFlashing && !isCopRadarActive && !isRevealedByDrone) return;
                 
-                // הפיכת השחקן המקומי לכוכב[cite: 10]
                 if (id === window.playerId) {
                     const starIcon = L.divIcon({
                         html: `<div style="font-size: 32px; filter: drop-shadow(0 0 8px gold); animation: star-glow 2s infinite alternate;">⭐</div>`,
@@ -550,6 +556,17 @@ function listenToOtherPlayers() {
     });
 }
 
+/**
+ * מאתחל את השובל של הגנב ומוסיף אותו למפה[cite: 23]
+ */
 function startThiefMechanics() {
-    trailLayer = L.polyline([], { color: '#dc2626', weight: 4, dashArray: '5, 10' }).addTo(map);
+    if (trailLayer) map.removeLayer(trailLayer);
+    trailLayer = L.polyline([], { 
+        color: '#dc2626', 
+        weight: 6, 
+        dashArray: '5, 10',
+        lineCap: 'round',
+        opacity: 0.8
+    }).addTo(map);
+    console.log("Thief mechanics started: trail visible.");
 }

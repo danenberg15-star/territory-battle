@@ -1,5 +1,8 @@
-// qa.js - Automated QA Sandbox Simulator (Rooms 99999 / 88888)[cite: 7]
+// qa.js - Automated QA Sandbox Simulator (Rooms 99999 / 88888)[cite: 7, 24]
 
+/**
+ * מאתחל חדר QA לפי מספר החדר (99999 או 88888)
+ */
 function initQARoom(roomId) {
     console.log("Starting Automated QA Simulator for room:", roomId);
     window.currentRoom = roomId;
@@ -36,6 +39,9 @@ function initQARoom(roomId) {
     });
 }
 
+/**
+ * הקמת נתוני השרת לסימולציה
+ */
 function setupQAServerData(roomId, centerLat, centerLng) {
     try {
         // יצירת ריבוע של 1 ק"מ רבוע (500 מטר לכל כיוון מהמרכז)[cite: 7]
@@ -59,16 +65,26 @@ function setupQAServerData(roomId, centerLat, centerLng) {
         };
 
         const bots = {};
-        // חדר 99999 = אתה גנב נגד 4 שוטרים. חדר 88888 = אתה שוטר נגד 4 גנבים.[cite: 7]
-        const botRole = (roomId === '99999') ? 'cop' : 'thief';
-        window.playerRole = (roomId === '99999') ? 'thief' : 'cop';
+        
+        // הגדרת תפקידים לפי דרישה:
+        // חדר 99999: שחקן = גנב, בוטים = 4 שוטרים
+        // חדר 88888: שחקן = שוטר, בוטים = 4 גנבים
+        if (roomId === '99999') {
+            window.playerRole = 'thief';
+            var botRole = 'cop';
+        } else {
+            window.playerRole = 'cop';
+            var botRole = 'thief';
+        }
 
+        // יצירת 4 בוטים פעילים[cite: 7]
         for (let i = 1; i <= 4; i++) {
-            bots[`bot_${botRole}_${i}`] = { 
+            const botId = `bot_${botRole}_${i}`;
+            bots[botId] = { 
                 name: `בוט ${botRole === 'cop' ? 'שוטר' : 'גנב'} ${i}`, 
                 role: botRole, 
-                lat: centerLat + (Math.random() - 0.5)*0.005, 
-                lng: centerLng + (Math.random() - 0.5)*0.005, 
+                lat: centerLat + (Math.random() - 0.5) * 0.004, 
+                lng: centerLng + (Math.random() - 0.5) * 0.004, 
                 t: Date.now(), 
                 isOffline: false,
                 inStation: (botRole === 'cop'),
@@ -76,6 +92,7 @@ function setupQAServerData(roomId, centerLat, centerLng) {
             };
         }
         
+        // הוספת השחקן האנושי למערך השחקנים בשרת
         window.isHost = false; 
         bots[window.playerId] = { 
             name: window.playerName + ' (QA)', 
@@ -83,9 +100,9 @@ function setupQAServerData(roomId, centerLat, centerLng) {
             lat: centerLat, 
             lng: centerLng, 
             t: Date.now(),
-            isOffline: false
+            isOffline: false,
+            inStation: (window.playerRole === 'cop')
         };
-        if (window.playerRole === 'cop') bots[window.playerId].inStation = true;
 
         const updates = {};
         updates[`rooms/${roomId}/status`] = 'playing';
@@ -95,15 +112,13 @@ function setupQAServerData(roomId, centerLat, centerLng) {
         
         updates[`game/${roomId}/arena`] = arenaData;
         updates[`game/${roomId}/players`] = bots;
-        
-        // עקיפה אגרסיבית של מנגנון התחקיר (Briefing)[cite: 7]
         updates[`game/${roomId}/briefing`] = { active: false, timeLeft: 0, complete: true }; 
 
         window.db.ref().update(updates).then(() => {
             document.getElementById('briefing-overlay').style.display = 'none';
-            // טעינת הזירה מיד
             if (typeof enterGameScene === 'function') enterGameScene();
-            // הפעלת מנוע הבוטים
+            
+            // הפעלת מנוע הבוטים עם שמירה על גבולות הגזרה[cite: 24]
             startBotEngine(roomId, arenaData);
         });
 
@@ -112,12 +127,17 @@ function setupQAServerData(roomId, centerLat, centerLng) {
     }
 }
 
+/**
+ * מנוע תנועת בוטים - מוודא שהם תמיד בזירה ולא יוצאים ממנה[cite: 24]
+ */
 function startBotEngine(roomId, arenaData) {
-    const polygon = turf.polygon([[...arenaData.points.map(p => [p[1], p[0]]), [arenaData.points[0][1], arenaData.points[0][0]]]]);
+    const polyCoords = [...arenaData.points.map(p => [p[1], p[0]]), [arenaData.points[0][1], arenaData.points[0][0]]];
+    const polygon = turf.polygon([polyCoords]);
     
-    // מזיז את הבוטים כל 3 שניות
+    // תנועה רציפה כל 2.5 שניות
     setInterval(() => {
-        if (!window.db) return;
+        if (!window.db || !window.currentRoom) return;
+        
         window.db.ref(`game/${roomId}/players`).once('value', snap => {
             const players = snap.val();
             if (!players) return;
@@ -125,23 +145,27 @@ function startBotEngine(roomId, arenaData) {
             const botUpdates = {};
             Object.keys(players).forEach(id => {
                 if (id.startsWith('bot_')) {
-                    // תזוזה אקראית קטנה
-                    let newLat = (players[id].lat) + (Math.random() - 0.5) * 0.0003;
-                    let newLng = (players[id].lng) + (Math.random() - 0.5) * 0.0003;
+                    const b = players[id];
                     
-                    // מניעת יציאה מגבולות הזירה (בוט חוקי)
-                    const pt = turf.point([newLng, newLat]);
-                    if (!turf.booleanPointInPolygon(pt, polygon)) {
-                        newLat = players[id].lat; // ביטול תזוזה
-                        newLng = players[id].lng;
+                    // חישוב צעד רנדומלי
+                    let nextLat = b.lat + (Math.random() - 0.5) * 0.0006;
+                    let nextLng = b.lng + (Math.random() - 0.5) * 0.0006;
+                    
+                    // בדיקה: האם הבוט חורג מהטריטוריה?[cite: 24]
+                    const nextPt = turf.point([nextLng, nextLat]);
+                    if (turf.booleanPointInPolygon(nextPt, polygon)) {
+                        botUpdates[`game/${roomId}/players/${id}/lat`] = nextLat;
+                        botUpdates[`game/${roomId}/players/${id}/lng`] = nextLng;
+                        botUpdates[`game/${roomId}/players/${id}/t`] = Date.now();
+                    } else {
+                        // אם חרג, הבוט מחשב מסלול מחדש לכיוון המרכז
+                        botUpdates[`game/${roomId}/players/${id}/lat`] = arenaData.policeStation.lat;
+                        botUpdates[`game/${roomId}/players/${id}/lng`] = arenaData.policeStation.lng;
+                        botUpdates[`game/${roomId}/players/${id}/t`] = Date.now();
                     }
-
-                    botUpdates[`game/${roomId}/players/${id}/lat`] = newLat;
-                    botUpdates[`game/${roomId}/players/${id}/lng`] = newLng;
-                    botUpdates[`game/${roomId}/players/${id}/t`] = Date.now(); 
                 }
             });
             window.db.ref().update(botUpdates);
         });
-    }, 3000);
+    }, 2500);
 }
