@@ -1,0 +1,81 @@
+/* styles.css - Full tactical UI styles for Territory Battle[cite: 1] */
+
+/* 1. Base Styles - Global UI Integrity[cite: 1] */
+body, html { 
+    margin: 0; padding: 0; height: 100%; width: 100%; 
+    overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+    background-color: #0f172a; color: white; user-select: none; -webkit-user-select: none; 
+}
+#map { height: 100%; width: 100%; position: absolute; top: 0; z-index: 1; display: none; }
+
+/* 2. Drawing Layer[cite: 1] */
+#drawing-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2500; display: none; background: rgba(15, 23, 42, 0.2); touch-action: none; }
+#drawing-canvas { width: 100%; height: 100%; cursor: crosshair; }
+
+/* 3. Screens[cite: 1] */
+.screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; padding: 20px; box-sizing: border-box; }
+#lobby-screen { display: none; justify-content: flex-start; padding-top: 50px; }
+
+/* 4. Typography & Inputs[cite: 1] */
+h1 { color: #38bdf8; font-size: 28px; margin-bottom: 30px; text-align: center; text-shadow: 0 0 10px rgba(56, 189, 248, 0.5); }
+input { width: 100%; max-width: 300px; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: 1px solid #38bdf8; background: #1e293b; color: white; font-size: 18px; text-align: center; box-sizing: border-box; user-select: auto; }
+
+.btn { width: 100%; max-width: 300px; padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; margin-bottom: 15px; transition: 0.2s; text-align: center; display: flex; align-items: center; justify-content: center; }
+.btn-blue { background: #1e40af; }
+.btn-red { background: #991b1b; }
+.btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; max-width: 350px; width: 100%; margin: 15px 0 0 0; }
+
+/* 5. Map Controls (Raised by 10vh)[cite: 1] */
+#map-controls { position: absolute; left: 15px; bottom: calc(80px + 10vh); z-index: 3000; display: none; flex-direction: column; align-items: center; gap: 5px; }
+.ctrl-btn { width: 45px; height: 45px; background: rgba(30, 41, 59, 0.85); border: 2px solid #38bdf8; color: white; border-radius: 10px; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; backdrop-filter: blur(5px); }
+#zoom-controls { position: absolute; right: 15px; bottom: calc(80px + 10vh); z-index: 3000; display: none; flex-direction: column; gap: 8px; }
+
+/* 6. Lobby Elements[cite: 1] */
+.room-code-box { background: #1e293b; border: 2px dashed #38bdf8; padding: 15px; border-radius: 12px; font-size: 24px; font-weight: bold; text-align: center; flex-grow: 1; }
+.btn-whatsapp-icon { background: #25D366; border: none; border-radius: 50%; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-right: 15px; }
+.team-list { background: #1e293b; border-radius: 12px; padding: 10px; flex: 1; display: flex; flex-direction: column; margin: 5px; }
+
+/* 7. Setup UI (Raised by 10vh)[cite: 1] */
+#setup-ui { position: absolute; bottom: calc(15px + 10vh); left: 50%; transform: translateX(-50%); z-index: 3000; width: 95%; max-width: 450px; display: none; flex-direction: column; align-items: center; gap: 8px; pointer-events: auto; background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; }
+
+/* 8. Top Bar Stats[cite: 1] */
+#floating-stats { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: none; flex-direction: row; justify-content: center; gap: 15px; z-index: 4000; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); padding: 8px 20px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 12px; font-weight: bold; }
+.exit-btn { position: absolute; top: 15px; left: 15px; z-index: 4100; background: rgba(220, 38, 38, 0.8); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; font-weight: bold; display: none; align-items: center; justify-content: center; }
+
+/* 9. Intense RED Radar[cite: 1] */
+#radar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2400; display: none; pointer-events: none; background: rgba(239, 68, 68, 0.2); animation: radar-flash 0.6s infinite alternate; }
+@keyframes radar-flash { 0% { box-shadow: inset 0 0 30px rgba(239, 68, 68, 0.5); opacity: 0.4; } 100% { box-shadow: inset 0 0 150px rgba(239, 68, 68, 1); opacity: 1; } }
+
+/* 10. Overlays[cite: 1] */
+#freeze-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 4500; background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(8px); display: none; flex-direction: column; align-items: center; justify-content: center; }
+#arrest-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 4600; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); }
+.jail-bars { position: absolute; top: -100%; left: 0; width: 100%; height: 100%; background: repeating-linear-gradient(90deg, #111, #111 20px, transparent 20px, transparent 60px); z-index: 2; transition: top 0.5s ease-in; }
+
+/* 11. Tactical Chat Positioning[cite: 1] */
+#chat-container { position: absolute; top: 70px; width: 45%; max-width: 210px; z-index: 5000; display: none; flex-direction: column; pointer-events: auto; }
+[dir="rtl"] #chat-container { right: 10px; left: auto; align-items: flex-end; }
+[dir="ltr"] #chat-container { left: 10px; right: auto; align-items: flex-start; }
+#chat-messages { width: 100%; height: 150px; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(4px); border-radius: 12px; overflow-y: auto; padding: 10px; font-size: 13px; border: 2px solid rgba(56, 189, 248, 0.3); margin-bottom: 8px; box-sizing: border-box; }
+
+/* 12. Microphone Button[cite: 1] */
+#chat-mic-btn { width: 52px; height: 52px; background: #1e293b; border: 3px solid #38bdf8; border-radius: 50%; cursor: pointer; display: none; align-items: center; justify-content: center; transition: 0.2s; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.8)); outline: none; pointer-events: auto; margin-right: 5px; }
+#chat-mic-btn svg { fill: #38bdf8; width: 32px; height: 32px; }
+#chat-mic-btn.recording { animation: mic-pulse 1.5s infinite; background: #991b1b; border-color: #ef4444; }
+#chat-mic-btn.recording svg { fill: white; }
+@keyframes mic-pulse { 0% { transform: scale(1); } 50% { transform: scale(1.1); } 100% { transform: scale(1); } }
+
+/* 13. Centered Tactical Taser[cite: 1] */
+#controls-container { display: none; position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%); z-index: 5500; pointer-events: none; width: 140px; height: 140px; }
+#capture-btn-container { position: relative; width: 120px; height: 120px; margin: 0 auto; display: none; pointer-events: auto; }
+#capture-btn { position: absolute; top: 10px; left: 10px; width: 100px; height: 100px; background: linear-gradient(145deg, #1e293b, #0f172a); border: 3px solid #38bdf8; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; transition: 0.1s; box-shadow: 0 12px 24px rgba(0,0,0,0.8); z-index: 5501; pointer-events: auto; }
+#capture-btn .bolt { font-size: 34px; color: #38bdf8; line-height: 1; }
+#capture-btn .label { font-size: 13px; font-weight: bold; color: #38bdf8; margin-top: 2px; }
+#capture-btn.active-capture { animation: taser-fire 0.2s infinite; background: #0284c7; box-shadow: 0 0 40px #38bdf8; }
+.progress-ring { position: absolute; top: 0; left: 0; width: 120px; height: 120px; transform: rotate(-90deg); z-index: 5400; }
+.progress-ring__circle { stroke: #06b6d4; stroke-width: 6; fill: transparent; stroke-dasharray: 358; stroke-dashoffset: 358; }
+
+/* 14. Victory & Security[cite: 1] */
+#snitch-btn-container { position: relative; width: 120px; height: 120px; margin: 25px auto 0; display: none; pointer-events: auto; }
+#snitch-btn { width: 100px; height: 100px; background: linear-gradient(145deg, #b45309, #78350f); color: white; border: 3px solid #fcd34d; border-radius: 50%; font-weight: bold; font-size: 16px; cursor: pointer; }
+#victory-screen { display: none; z-index: 6000; text-align: center; justify-content: center; align-items: center; background: radial-gradient(circle, #1e293b 0%, #0f172a 100%); }
+#security-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 7000; background: rgba(15, 23, 42, 0.8); backdrop-filter: blur(20px); display: none; pointer-events: none; }
