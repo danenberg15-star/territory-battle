@@ -43,8 +43,7 @@
 
         /* 7. Setup UI & Safety */
         #setup-ui { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 95%; max-width: 450px; display: none; flex-direction: column; align-items: center; gap: 8px; pointer-events: auto; background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; }
-        .safety-check-row { display: flex; align-items: center; gap: 10px; background: rgba(239, 68, 68, 0.2); padding: 8px; border-radius: 8px; width: 100%; }
-
+        
         /* 8. Top Bar Stats */
         #floating-stats { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: none; flex-direction: row; justify-content: center; gap: 15px; z-index: 4000; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); padding: 8px 20px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 12px; font-weight: bold; }
         .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 4100; background: rgba(220, 38, 38, 0.8); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; font-weight: bold; display: none; align-items: center; justify-content: center; }
@@ -121,8 +120,10 @@
 
     <div id="setup-ui">
         <div id="setup-msg" style="text-align:center; font-size:13px; margin-bottom:5px;">מקם מפה וצייר זירה.</div>
-        <div class="safety-check-row"><input type="checkbox" id="safety-confirm-checkbox"><label style="font-size:12px; color:#fca5a5;">אני מאשר שכל השחקנים מעל גיל 16</label></div>
-        <div style="display:flex; gap:8px; width:100%;"><button class="btn-red" onclick="clearDrawing()" style="flex:1; padding:10px; border-radius:8px; border:none; color:white;">נקה</button><button class="btn-blue" id="btn-confirm-drawing" style="display:none; flex:2; padding:10px; border-radius:8px; border:none; color:white;" onclick="confirmDrawing()">אשר זירה</button></div>
+        <div style="display:flex; gap:8px; width:100%;">
+            <button class="btn-red" onclick="clearDrawing()" style="flex:1; padding:10px; border-radius:8px; border:none; color:white;">נקה</button>
+            <button class="btn-blue" id="btn-confirm-drawing" style="display:none; flex:2; padding:10px; border-radius:8px; border:none; color:white;" onclick="confirmDrawing()">אשר זירה</button>
+        </div>
     </div>
 
     <button id="exit-btn" class="exit-btn" onclick="exitGame()">X</button>
@@ -173,6 +174,7 @@
     <script src="chat.js"></script>
     <script src="treasures.js"></script>
     <script src="victory.js"></script>
+    <script src="bot-ai.js"></script>
     <!-- New Separated Scripts -->
     <script src="game-core.js"></script>
     <script src="game-arena.js"></script>

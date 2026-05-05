@@ -1,4 +1,21 @@
-// game-arena.js - Arena Management & Drawing
+// game-arena.js - Arena Management, Drawing & Early GPS Load
+
+// ==========================================
+// 0. Early GPS Activation (Login Screen)
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    const nameInput = document.getElementById('player-name');
+    if (nameInput) {
+        // ברגע שהשחקן מתחיל להקליד את שמו, ה-GPS מתחיל לעבוד ברקע
+        nameInput.addEventListener('input', () => {
+            if (typeof startRealGpsTracking === 'function' && !window.earlyGpsStarted) {
+                window.earlyGpsStarted = true;
+                console.log("Early GPS tracking started from login screen...");
+                startRealGpsTracking();
+            }
+        }, { once: true });
+    }
+});
 
 // ==========================================
 // 4. Arena Setup & Role-Based Visibility
@@ -11,8 +28,8 @@ function checkArenaStatus() {
             else {
                 const overlay = document.getElementById('briefing-overlay');
                 const status = document.getElementById('briefing-status');
-                if (overlay) overlay.style.display = 'block';
-                if (status) status.innerText = window.currentLang === 'he' ? "ממתין למנהל..." : "Waiting for host...";
+                if (overlay) overlay.style.display = 'flex';
+                if (status) status.innerText = window.currentLang === 'he' ? "ממתין למנהל שיצייר זירה..." : "Waiting for host...";
             }
         } else {
             arenaData = data;
@@ -20,16 +37,26 @@ function checkArenaStatus() {
             document.getElementById('drawing-container').style.display = 'none';
             document.getElementById('map-controls').style.display = 'none';
             document.getElementById('zoom-controls').style.display = 'none';
-            
+
             map.dragging.enable();
             map.touchZoom.enable();
 
             drawArenaOnMap();
             setupPoliceStation();
-            
+
             if (window.isHost && typeof initTreasuresMaster === 'function') {
                 initTreasuresMaster();
             }
+
+            // הפעלת מנוע הבוטים לשחקן יחיד
+            window.db.ref(`rooms/${window.currentRoom}`).once('value', rSnap => {
+                const rData = rSnap.val();
+                if (rData && rData.gameMode === 'single' && window.isHost) {
+                    if (typeof startSinglePlayerAI === 'function') {
+                        startSinglePlayerAI(window.currentRoom, rData.difficulty || 'skilled', arenaData);
+                    }
+                }
+            });
 
             window.db.ref(`game/${window.currentRoom}/briefing/complete`).once('value', bSnap => {
                 if (bSnap.val() === true) {
@@ -70,7 +97,11 @@ function checkArenaStatus() {
 }
 
 function setupHostDrawingMode() {
-    if (myLat && myLng) map.setView([myLat, myLng], 14);
+    // הסרת מסך ה-briefing הכהה שנתקע
+    const overlay = document.getElementById('briefing-overlay');
+    if (overlay) overlay.style.display = 'none';
+
+    if (myLat && myLng) map.setView([myLat, myLng], 17); // זום קרוב לציור
     document.getElementById('setup-ui').style.display = 'flex';
     document.getElementById('map-controls').style.display = 'flex';
     document.getElementById('zoom-controls').style.display = 'flex';
@@ -80,7 +111,29 @@ function setupHostDrawingMode() {
 function confirmDrawing() {
     if (typeof finalizeDrawing === "function") {
         const results = finalizeDrawing(); 
-        if (results) window.db.ref(`game/${window.currentRoom}/arena`).set(results);
+        if (results) {
+            window.db.ref(`game/${window.currentRoom}/arena`).set(results).then(() => {
+                // העלמה מיידית של ממשק הציור
+                document.getElementById('setup-ui').style.display = 'none';
+                document.getElementById('drawing-container').style.display = 'none';
+
+                // בדיקה אם זה משחק מרובה משתתפים או שחקן יחיד
+                window.db.ref(`rooms/${window.currentRoom}`).once('value', snap => {
+                    const roomData = snap.val();
+                    if (roomData && roomData.gameMode === 'single') {
+                        // בשחקן יחיד מדלגים על טיימר התדריך ומתחילים ישר
+                        window.db.ref(`game/${window.currentRoom}/briefing/complete`).set(true);
+                    } else {
+                        // ברב משתתפים, מפעילים את טיימר התדריך של ה-30 שניות כרגיל
+                        if (typeof window.startBriefingTimer === 'function') {
+                            window.startBriefingTimer();
+                        } else {
+                            window.db.ref(`game/${window.currentRoom}/briefing/complete`).set(true);
+                        }
+                    }
+                });
+            });
+        }
     }
 }
 
