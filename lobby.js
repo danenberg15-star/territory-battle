@@ -1,8 +1,6 @@
-// lobby.js - Refined UI Injection with Symmetrical Layout[cite: 4]
+// lobby.js - Complete Logic with UI Symmetry & Drag-Drop[cite: 4]
 
-// ==========================================
 // 1. Globals & Persistence
-// ==========================================
 let playerId = localStorage.getItem('tb_uuid');
 if (!playerId) {
     playerId = 'p_' + Math.floor(Math.random() * 999999);
@@ -19,9 +17,7 @@ let activeTouchElement = null;
 let initialX = 0;
 let initialY = 0;
 
-// ==========================================
 // 2. Language & Terminology[cite: 4]
-// ==========================================
 let currentLang = 'he'; 
 const i18n = {
     'he': {
@@ -61,9 +57,7 @@ window.onload = () => {
     setLanguage('he'); 
 };
 
-// ==========================================
 // 3. UI Injections[cite: 4]
-// ==========================================
 function injectAdvancedToggle() {
     const wrapper = document.getElementById('mode-toggle-wrapper');
     const t = i18n[currentLang];
@@ -127,8 +121,6 @@ function setLanguage(lang) {
     document.getElementById('room-code-input').placeholder = t.roomCodePlaceholder;
     document.getElementById('btn-join-room').innerHTML = t.btnJoin;
     document.getElementById('btn-create-room').innerHTML = t.btnCreate;
-    document.getElementById('lbl-lobby-title').innerHTML = t.lobbyTitle;
-    document.getElementById('btn-start-game').innerHTML = t.btnStart;
 }
 
 function toggleLanguage() { setLanguage(currentLang === 'he' ? 'en' : 'he'); }
@@ -138,9 +130,7 @@ async function enableWakeLock() {
     catch (err) { console.warn("WakeLock failed"); }
 }
 
-// ==========================================
-// 4. Room & Lobby Actions (v30.0 Stability)[cite: 4]
-// ==========================================
+// 4. Room Actions (v30.0 Stability)[cite: 4]
 function createRoom() {
     const inputName = document.getElementById('player-name').value.trim();
     if (!inputName) return alert("הכנס שם");
