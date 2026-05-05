@@ -1,7 +1,7 @@
-// lobby.js - Complete Logic with UI Symmetry & Drag-Drop Stability[cite: 4]
+// lobby.js - Adaptive UI Logic with Full Game Functionality[cite: 4]
 
 // ==========================================
-// 1. Globals & Persistence[cite: 4]
+// 1. Globals & Persistence
 // ==========================================
 let playerId = localStorage.getItem('tb_uuid');
 if (!playerId) {
@@ -15,7 +15,7 @@ let isHost = false;
 let wakeLock = null;
 let selectedGameMode = 'multi'; 
 
-// Mobile Drag Globals[cite: 4]
+// Mobile Drag Globals
 let activeTouchElement = null;
 let initialX = 0;
 let initialY = 0;
@@ -63,7 +63,7 @@ window.onload = () => {
 };
 
 // ==========================================
-// 3. UI Injections (Symmetrical Bot Options)[cite: 4]
+// 3. UI Injections[cite: 4]
 // ==========================================
 function injectAdvancedToggle() {
     const wrapper = document.getElementById('mode-toggle-wrapper');
@@ -140,7 +140,7 @@ async function enableWakeLock() {
 }
 
 // ==========================================
-// 4. Room & Lobby Actions (v30.0 Logic)[cite: 4]
+// 4. Room & Lobby Actions (Full Stability)[cite: 4]
 // ==========================================
 function createRoom() {
     const inputName = document.getElementById('player-name').value.trim();
@@ -217,18 +217,27 @@ function renderLobbyPlayers(players) {
     const copsDiv = document.getElementById('players-cops');
     const thievesDiv = document.getElementById('players-thieves');
     copsDiv.innerHTML = ""; thievesDiv.innerHTML = "";
+    
     Object.keys(players).forEach(id => {
         const p = players[id];
         const div = document.createElement('div');
         div.className = 'player-item';
-        div.style.padding = '12px'; div.style.marginBottom = '8px'; div.style.borderRadius = '20px'; div.style.background = '#334155';
+        // עיצוב פריט שחקן בלובי[cite: 4]
+        div.style.padding = '12px'; 
+        div.style.marginBottom = '8px'; 
+        div.style.borderRadius = '20px'; 
+        div.style.background = '#334155';
+        div.style.fontSize = '14px';
+        div.style.textAlign = 'center';
         div.innerText = p.name + (id === playerId ? " (אתה)" : "");
+        
         if (isHost && !id.startsWith('bot_')) {
-            div.classList.add('draggable');
+            div.style.cursor = 'grab';
             div.addEventListener('touchstart', (e) => handleTouchStart(e, id, div), { passive: false });
             div.addEventListener('touchmove', handleTouchMove, { passive: false });
             div.addEventListener('touchend', (e) => handleTouchEnd(e, id, div));
         }
+        
         if (p.role === 'cop') copsDiv.appendChild(div); else thievesDiv.appendChild(div);
     });
 }
