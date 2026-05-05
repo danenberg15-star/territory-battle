@@ -26,7 +26,10 @@ let arenaPolygonLayer = null;
 // ==========================================
 function enterGameScene() {
     console.log("Tactical Scene Initializing...");
+    
+    // ניקוי מסכים קודמים
     document.getElementById('lobby-screen').style.display = 'none';
+    document.getElementById('login-screen').style.display = 'none';
     
     const floatingStats = document.getElementById('floating-stats');
     if (floatingStats) floatingStats.style.display = 'flex';
@@ -37,7 +40,7 @@ function enterGameScene() {
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    // אתחול מפה
+    // אתחול מפה - הגדרות אופטימליות למובייל
     map = L.map('map', { 
         zoomControl: false, 
         attributionControl: false,
@@ -53,19 +56,23 @@ function enterGameScene() {
         maxZoom: 20 
     }).addTo(map);
 
+    // סנכרון זמן התחלה ובדיקת סטטוס ארנה
     window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
         gameStartTime = snap.val() || Date.now();
-        checkArenaStatus();
+        if (typeof checkArenaStatus === 'function') checkArenaStatus();
     });
 
+    // הפעלת מאזינים גלובליים
     startRealGpsTracking();
-    listenToOtherPlayers();
-    listenToCapturedAreas();
-    listenToVictory(); 
-    listenForCaptureSignals(); 
+    
+    if (typeof listenToOtherPlayers === 'function') listenToOtherPlayers();
+    if (typeof listenToCapturedAreas === 'function') listenToCapturedAreas();
+    if (typeof listenToVictory === 'function') listenToVictory(); 
+    if (typeof listenForCaptureSignals === 'function') listenForCaptureSignals(); 
     
     if (typeof listenToTreasures === 'function') listenToTreasures();
 
+    // ניהול שחקנים לא מקוונים על ידי המארח
     if (window.isHost) {
         setInterval(checkOfflinePlayers, 10000); 
     }
@@ -96,6 +103,7 @@ function zoomMap(delta) {
 // ==========================================
 function startRealGpsTracking() {
     if (!navigator.geolocation) return;
+    
     gpsWatchId = navigator.geolocation.watchPosition((pos) => {
         myLat = pos.coords.latitude;
         myLng = pos.coords.longitude;
@@ -108,12 +116,24 @@ function startRealGpsTracking() {
             gpsEl.style.color = "#10b981"; 
         }
 
+        // מיקום ראשוני של המפה על השחקן
         if (map && !window.firstLoadDone) {
             map.setView([myLat, myLng], 18);
             window.firstLoadDone = true;
         }
         updateRealPosition();
-    }, null, { enableHighAccuracy: true });
+    }, (err) => {
+        console.warn("GPS Error:", err);
+        const gpsEl = document.getElementById('gps-status');
+        if (gpsEl) {
+            gpsEl.innerText = "GPS ❌";
+            gpsEl.style.color = "#ef4444";
+        }
+    }, { 
+        enableHighAccuracy: true,
+        maximumAge: 1000,
+        timeout: 5000
+    });
 }
 
 function updateRealPosition() {
@@ -122,28 +142,36 @@ function updateRealPosition() {
     const drawingEl = document.getElementById('drawing-container');
     const isDrawingMode = drawingEl && drawingEl.style.display === 'block';
     
-    // מעקב מפה תמידי
+    // מעקב מפה אוטומי - רק כשלא במצב ציור
     if (!isDrawingMode) {
         map.panTo([myLat, myLng], { animate: true, duration: 1.0 });
     }
 
+    // בדיקת שהייה בתחנת משטרה לשוטרים ומלשינים
     if ((window.playerRole === 'cop' || window.playerRole === 'snitch') && arenaData) {
         const dist = map.distance([myLat, myLng], [arenaData.policeStation.lat, arenaData.policeStation.lng]);
         const inStation = dist <= arenaData.policeStation.radius;
         window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/inStation`).set(inStation);
     }
 
+    // הפעלת לוגיקת גנב אם רלוונטי
     if (window.playerRole === 'thief' && isBriefingComplete) {
         if (typeof updateThiefLogic === "function") updateThiefLogic(myLat, myLng);
     }
     
-    if (typeof checkTreasureInCapturedArea === 'function') {
-        // Checking for treasures in current movement
+    // בדיקת אוצרות בקרבת מקום
+    if (typeof checkTreasureProximity === 'function') {
+        checkTreasureProximity(myLat, myLng);
     }
 
+    // עדכון מיקום ב-Firebase
     window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({ 
-        lat: myLat, lng: myLng, t: Date.now(), role: window.playerRole 
+        lat: myLat, 
+        lng: myLng, 
+        t: Date.now(),
+        role: window.playerRole 
     });
 
+    // ניהול תדריך ע"י המארח
     if (window.isHost && typeof manageBriefingLogic === "function") manageBriefingLogic();
 }
