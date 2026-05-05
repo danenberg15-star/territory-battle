@@ -1,4 +1,4 @@
-// game-play.js - Gameplay Logic, Interactions & Listeners
+// game-play.js - Gameplay Logic, Interactions, Bot Rendering & Chat Privacy
 
 // ==========================================
 // 6. Taser Trigger & Feedback
@@ -8,7 +8,6 @@ function triggerCapture() {
     const btn = document.getElementById('capture-btn');
     if (!btn || btn.disabled) return;
 
-    // חיווי ויזואלי מיידי
     console.log("Taser Pulse Sent");
     btn.disabled = true;
     btn.classList.add('active-capture'); 
@@ -205,6 +204,16 @@ function listenToCapturedAreas() {
 function listenToOtherPlayers() {
     window.db.ref(`rooms/${window.currentRoom}/players`).on('value', snapRooms => {
         const roomPlayers = snapRooms.val() || {};
+        
+        // בדיקת חוק שחקן יחיד לצ'אט
+        const humanPlayers = Object.keys(roomPlayers).filter(id => !id.startsWith('bot_'));
+        const chatContainer = document.getElementById('chat-container');
+        const micBtn = document.getElementById('chat-mic-btn');
+        if (humanPlayers.length <= 1) {
+            if (chatContainer) chatContainer.style.display = 'none';
+            if (micBtn) micBtn.style.display = 'none';
+        }
+
         window.db.ref(`game/${window.currentRoom}/players`).on('value', snapGame => {
             const gamePlayers = snapGame.val();
             for (let id in playerMarkers) map.removeLayer(playerMarkers[id]);
@@ -226,13 +235,14 @@ function listenToOtherPlayers() {
                 const role = rp.role || gp.role;
                 const isOffline = rp.isOffline || false;
                 const isFlashing = gp.flashUntil && gp.flashUntil > Date.now();
+                const isBot = id.startsWith('bot_');
                 
-                if (!isOffline) {
+                if (!isOffline || isBot) {
                     activeCount++;
                     if (role === 'thief') thievesCount++;
                 }
 
-                if (window.playerRole === 'cop' && role === 'thief' && !isOffline && myLat && myLng) {
+                if (window.playerRole === 'cop' && role === 'thief' && (!isOffline || isBot) && myLat && myLng) {
                     if (map.distance([myLat, myLng], [gp.lat, gp.lng]) <= 30) isThiefNearby = true;
                 }
                 
@@ -248,12 +258,12 @@ function listenToOtherPlayers() {
                     let markerColor = '#dc2626'; 
                     if (role === 'cop') markerColor = '#2563eb'; 
                     if (role === 'snitch') markerColor = '#f59e0b'; 
-                    if (isOffline) markerColor = '#6b7280'; 
+                    if (isOffline && !isBot) markerColor = '#6b7280'; 
                     
                     if ((window.playerRole === 'cop' || window.playerRole === 'snitch') && role === 'thief' && !isFlashing) return;
 
                     playerMarkers[id] = L.circleMarker([gp.lat, gp.lng], {
-                        radius: 15, fillColor: markerColor, fillOpacity: isOffline ? 0.5 : 1,
+                        radius: 15, fillColor: markerColor, fillOpacity: (isOffline && !isBot) ? 0.5 : 1,
                         color: isFlashing ? '#ffff00' : '#fff', weight: isFlashing ? 6 : 3 
                     }).addTo(map);
                 }

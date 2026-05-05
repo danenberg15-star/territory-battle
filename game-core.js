@@ -137,12 +137,12 @@ function updateRealPosition() {
         if (typeof updateThiefLogic === "function") updateThiefLogic(myLat, myLng);
     }
     
-    if (typeof checkTreasureProximity === 'function') {
-        checkTreasureProximity(myLat, myLng);
+    if (typeof checkTreasureInCapturedArea === 'function') {
+        // Checking for treasures in current movement
     }
 
     window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({ 
-        lat: myLat, lng: myLng, t: Date.now() 
+        lat: myLat, lng: myLng, t: Date.now(), role: window.playerRole 
     });
 
     if (window.isHost && typeof manageBriefingLogic === "function") manageBriefingLogic();
