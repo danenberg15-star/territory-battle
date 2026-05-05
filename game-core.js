@@ -1,4 +1,4 @@
-// game-core.js - Infrastructure, Map & GPS Tracking
+// game-core.js - Infrastructure, Global Boundaries & Stability Locks
 
 // ==========================================
 // 1. Game Globals
@@ -21,10 +21,19 @@ let arenaData = null;
 let policeStationCircle = null;
 let arenaPolygonLayer = null;
 
+// תיקון יציבות: מנעול למניעת טעינה כפולה של המפה
+let isGameSceneLoaded = false;
+let outOfBoundsTimer = null;
+let outOfBoundsSeconds = 10;
+
 // ==========================================
 // 2. Game Scene Initialization
 // ==========================================
 function enterGameScene() {
+    // מנעול יציבות: אם הסצנה כבר נטענה, אל תטען אותה שוב (מונע קריסת Double Trigger)
+    if (isGameSceneLoaded) return;
+    isGameSceneLoaded = true;
+
     console.log("Tactical Scene Initializing...");
     document.getElementById('lobby-screen').style.display = 'none';
     
@@ -37,7 +46,9 @@ function enterGameScene() {
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    // אתחול מפה
+    // ניקוי מפה קודמת אם קיימת בזיכרון
+    if (map !== null) { map.remove(); map = null; }
+
     map = L.map('map', { 
         zoomControl: false, 
         attributionControl: false,
@@ -53,9 +64,14 @@ function enterGameScene() {
         maxZoom: 20 
     }).addTo(map);
 
-    window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
-        gameStartTime = snap.val() || Date.now();
-        checkArenaStatus();
+    // וידוא מנהל אקטיבי: שולף מהשרת כדי למנוע את מצב "ממתין למנהל"
+    window.db.ref(`rooms/${window.currentRoom}/host`).once('value', snap => {
+        if (snap.val() === window.playerId) window.isHost = true;
+        
+        window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', tSnap => {
+            gameStartTime = tSnap.val() || Date.now();
+            checkArenaStatus(); 
+        });
     });
 
     startRealGpsTracking();
@@ -72,27 +88,68 @@ function enterGameScene() {
 }
 
 // ==========================================
-// 3. Map Control Functions
+// 3. Global Boundaries Logic (אכיפה לכולם)
 // ==========================================
-function panMap(direction) {
-    if (!map) return;
-    const offset = 100; 
-    switch (direction) {
-        case 'up': map.panBy([0, -offset]); break;
-        case 'down': map.panBy([0, offset]); break;
-        case 'left': map.panBy([-offset, 0]); break;
-        case 'right': map.panBy([offset, 0]); break;
+function checkArenaBoundaries(lat, lng) {
+    if (!arenaData || !isBriefingComplete) return;
+
+    try {
+        const point = turf.point([lng, lat]);
+        const coords = arenaData.points.map(p => [p[1], p[0]]);
+        
+        // סגירת פוליגון לצורך החישוב
+        if (coords[0][0] !== coords[coords.length - 1][0] || coords[0][1] !== coords[coords.length - 1][1]) {
+            coords.push([...coords[0]]);
+        }
+        
+        const polygon = turf.polygon([coords]);
+        const isInside = turf.booleanPointInPolygon(point, polygon);
+
+        if (!isInside) {
+            if (!outOfBoundsTimer) startOutOfBoundsTimer();
+        } else {
+            if (outOfBoundsTimer) stopOutOfBoundsTimer();
+        }
+    } catch (e) {
+        console.error("Boundary Check Error:", e);
     }
 }
 
-function zoomMap(delta) {
-    if (!map) return;
-    if (delta > 0) map.zoomIn();
-    else map.zoomOut();
+function startOutOfBoundsTimer() {
+    outOfBoundsSeconds = 10;
+    const overlay = document.getElementById('briefing-overlay');
+    if(overlay) overlay.style.display = 'flex'; 
+    
+    const timerText = document.getElementById('briefing-timer-text');
+    if(timerText) timerText.style.color = "#ef4444";
+    
+    outOfBoundsTimer = setInterval(() => {
+        outOfBoundsSeconds--;
+        const statusText = document.getElementById('briefing-status');
+        if(statusText) statusText.innerText = window.currentLang === 'he' ? "חזור לזירה מיד!" : "Return to Arena!";
+        
+        if(timerText) timerText.innerText = `00:${outOfBoundsSeconds < 10 ? '0' : ''}${outOfBoundsSeconds}`;
+        
+        if (outOfBoundsSeconds <= 0) {
+            stopOutOfBoundsTimer();
+            alert(window.currentLang === 'he' ? "נפסלת עקב יציאה מהזירה!" : "Disqualified for leaving the arena!");
+            exitGame(); 
+        }
+    }, 1000);
+}
+
+function stopOutOfBoundsTimer() {
+    clearInterval(outOfBoundsTimer);
+    outOfBoundsTimer = null;
+    const overlay = document.getElementById('briefing-overlay');
+    if(overlay) overlay.style.display = 'none';
+    
+    const timerText = document.getElementById('briefing-timer-text');
+    if(timerText) timerText.style.color = "#facc15";
 }
 
 // ==========================================
-// 5. GPS Tracking & Auto-Pan
+// 4. GPS Tracking & Auto-Pan
 // ==========================================
 function startRealGpsTracking() {
     if (!navigator.geolocation) return;
@@ -122,9 +179,13 @@ function updateRealPosition() {
     const drawingEl = document.getElementById('drawing-container');
     const isDrawingMode = drawingEl && drawingEl.style.display === 'block';
     
-    // מעקב מפה תמידי
     if (!isDrawingMode) {
         map.panTo([myLat, myLng], { animate: true, duration: 1.0 });
+    }
+
+    // אכיפת גבולות לכולם
+    if (isBriefingComplete && arenaData) {
+        checkArenaBoundaries(myLat, myLng);
     }
 
     if ((window.playerRole === 'cop' || window.playerRole === 'snitch') && arenaData) {
@@ -147,3 +208,25 @@ function updateRealPosition() {
 
     if (window.isHost && typeof manageBriefingLogic === "function") manageBriefingLogic();
 }
+
+// ==========================================
+// 5. Shared UI Controls
+// ==========================================
+function panMap(direction) {
+    if (!map) return;
+    const offset = 100; 
+    switch (direction) {
+        case 'up': map.panBy([0, -offset]); break;
+        case 'down': map.panBy([0, offset]); break;
+        case 'left': map.panBy([-offset, 0]); break;
+        case 'right': map.panBy([offset, 0]); break;
+    }
+}
+
+function zoomMap(delta) {
+    if (!map) return;
+    if (delta > 0) map.zoomIn();
+    else map.zoomOut();
+}
+
+function exitGame() { location.reload(); }

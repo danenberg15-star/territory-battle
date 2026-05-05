@@ -1,172 +1,55 @@
-// qa.js - Automated QA Sandbox Simulator (Rooms 99999 / 88888) - Large Arena (10,000 sqm)[cite: 10, 21]
+// qa.js - QA Room Initialization with GPS Failsafe
 
-/**
- * מאתחל חדר QA לפי מספר החדר (99999 או 88888)
- */
 function initQARoom(roomId) {
-    console.log("Starting Automated QA Simulator for room:", roomId);
     window.currentRoom = roomId;
-    window.playerId = localStorage.getItem('tb_uuid') || 'p_qa_' + Date.now();
-    window.playerName = localStorage.getItem('tb_name') || "QA Tester";
-    window.currentLang = typeof currentLang !== 'undefined' ? currentLang : 'he';
-
+    window.playerId = 'p_qa_' + Date.now();
+    window.playerName = "QA Tester";
     document.getElementById('login-screen').style.display = 'none';
+    document.getElementById('briefing-overlay').style.display = 'flex';
+    document.getElementById('briefing-status').innerText = "מכין זירת QA...";
 
-    if (!navigator.geolocation) {
-        alert("לא ניתן לגשת ל-GPS. חובה לאשר מיקום לטובת סביבת ה-QA.");
-        return;
-    }
+    let locationResolved = false;
 
-    document.getElementById('briefing-status').innerText = "מייצר זירת סימולציה (10,000 מ\"ר) ובוטים...";
-    document.getElementById('briefing-overlay').style.display = 'block';
-
-    navigator.geolocation.getCurrentPosition((pos) => {
-        const lat = pos.coords.latitude;
-        const lng = pos.coords.longitude;
+    // הפונקציה שבונה את המפה - מופעלת בין אם ה-GPS עבד ובין אם נכשל
+    const setupQA = (lat, lng) => {
+        if (locationResolved) return;
+        locationResolved = true;
         
-        if (typeof turf === 'undefined') {
-            alert("שגיאה: ספריית החישובים (Turf.js) לא נטענה. אנא רענן את העמוד.");
-            return;
-        }
-        
-        setupQAServerData(roomId, lat, lng);
-    }, (err) => {
-        alert("שגיאת GPS: " + err.message);
-    }, { 
-        enableHighAccuracy: true,
-        timeout: 10000,
-        maximumAge: 0
-    });
-}
-
-/**
- * הקמת נתוני השרת לסימולציה עם זירה של 10,000 מ"ר[cite: 21]
- */
-function setupQAServerData(roomId, centerLat, centerLng) {
-    try {
-        // יצירת ריבוע בשטח של 10,000 מ"ר סביב המיקום הנוכחי
-        // צלע הריבוע = 100 מטר.
-        // המרחק מהמרכז לפינה (אלכסון) הוא שורש של (5000) = כ-70.71 מטר[cite: 21].
-        const center = turf.point([centerLng, centerLat]);
-        const distToCornerKm = Math.sqrt(5000) / 1000; 
-
-        const ne = turf.destination(center, distToCornerKm, 45, {units: 'kilometers'}).geometry.coordinates;
-        const se = turf.destination(center, distToCornerKm, 135, {units: 'kilometers'}).geometry.coordinates;
-        const sw = turf.destination(center, distToCornerKm, 225, {units: 'kilometers'}).geometry.coordinates;
-        const nw = turf.destination(center, distToCornerKm, 315, {units: 'kilometers'}).geometry.coordinates;
-        
-        const arenaPoints = [
-            [ne[1], ne[0]],
-            [se[1], se[0]],
-            [sw[1], sw[0]],
-            [nw[1], nw[0]]
-        ];
-
+        // יצירת זירה מיידית בשרת סביב נקודת הציון
         const arenaData = {
-            points: arenaPoints,
-            totalArea: 10000, // הגדרת השטח המעודכן ל-10,000 מ"ר
-            policeStation: { lat: centerLat, lng: centerLng, radius: 25 } // תחנה בגודל 25 מטר רדיוס
-        };
-
-        const bots = {};
-        
-        // חדר 99999: שחקן = גנב, בוטים = 4 שוטרים
-        // חדר 88888: שחקן = שוטר, בוטים = 4 גנבים[cite: 10]
-        if (roomId === '99999') {
-            window.playerRole = 'thief';
-            var botRole = 'cop';
-        } else {
-            window.playerRole = 'cop';
-            var botRole = 'thief';
-        }
-
-        // יצירת 4 בוטים ממוקמים בתוך הזירה המורחבת
-        for (let i = 1; i <= 4; i++) {
-            const botId = `bot_${botRole}_${i}`;
-            bots[botId] = { 
-                name: `בוט ${botRole === 'cop' ? 'שוטר' : 'גנב'} ${i}`, 
-                role: botRole, 
-                // מיקום ראשוני מבוזר בתוך הזירה
-                lat: centerLat + (Math.random() - 0.5) * 0.0006, 
-                lng: centerLng + (Math.random() - 0.5) * 0.0006, 
-                t: Date.now(), 
-                isOffline: false,
-                inStation: (botRole === 'cop'),
-                flashUntil: 0
-            };
-        }
-        
-        window.isHost = false; 
-        bots[window.playerId] = { 
-            name: window.playerName + ' (QA)', 
-            role: window.playerRole, 
-            lat: centerLat, 
-            lng: centerLng, 
-            t: Date.now(),
-            isOffline: false,
-            inStation: (window.playerRole === 'cop')
+            points: [[lat+0.001, lng+0.001], [lat+0.001, lng-0.001], [lat-0.001, lng-0.001], [lat-0.001, lng+0.001]],
+            policeStation: { lat: lat, lng: lng, radius: 20 }
         };
 
         const updates = {};
-        updates[`rooms/${roomId}/status`] = 'playing';
-        updates[`rooms/${roomId}/gameStartTime`] = Date.now();
-        updates[`rooms/${roomId}/host`] = 'qa_host';
-        updates[`rooms/${roomId}/players`] = bots; 
-        
         updates[`game/${roomId}/arena`] = arenaData;
-        updates[`game/${roomId}/players`] = bots;
-        updates[`game/${roomId}/briefing`] = { active: false, timeLeft: 0, complete: true }; 
+        updates[`game/${roomId}/briefing/complete`] = true;
+        updates[`rooms/${roomId}/status`] = 'playing';
+        updates[`rooms/${roomId}/host`] = window.playerId; 
+        updates[`rooms/${roomId}/players/${window.playerId}`] = { 
+            name: "QA", 
+            role: roomId === '99999' ? 'thief' : 'cop', 
+            lat: lat, 
+            lng: lng 
+        };
 
         window.db.ref().update(updates).then(() => {
-            document.getElementById('briefing-overlay').style.display = 'none';
-            if (typeof enterGameScene === 'function') enterGameScene();
-            
-            // הפעלת מנוע הבוטים עם שמירה על גבולות ה-10,000 מ"ר[cite: 21]
-            startBotEngine(roomId, arenaData);
+            enterGameScene();
         });
+    };
 
-    } catch (e) {
-        alert("שגיאת חישוב QA: " + e.message);
-    }
-}
+    // GPS Failsafe: אם תוך 3 שניות אין תשובה מה-GPS, כנס לדיפולט
+    setTimeout(() => {
+        if (!locationResolved) {
+            console.warn("GPS Timeout - Using default location");
+            setupQA(32.0853, 34.7818); // תל אביב
+        }
+    }, 3000);
 
-/**
- * מנוע תנועת בוטים - מותאם לזירה של 10,000 מ"ר[cite: 21]
- */
-function startBotEngine(roomId, arenaData) {
-    const polyCoords = [...arenaData.points.map(p => [p[1], p[0]]), [arenaData.points[0][1], arenaData.points[0][0]]];
-    const polygon = turf.polygon([polyCoords]);
-    
-    setInterval(() => {
-        if (!window.db || !window.currentRoom) return;
-        
-        window.db.ref(`game/${roomId}/players`).once('value', snap => {
-            const players = snap.val();
-            if (!players) return;
-            
-            const botUpdates = {};
-            Object.keys(players).forEach(id => {
-                if (id.startsWith('bot_')) {
-                    const b = players[id];
-                    
-                    // תזוזה בצעדים בינוניים (כ-7 עד 12 מטר לכל עדכון)[cite: 21]
-                    let nextLat = b.lat + (Math.random() - 0.5) * 0.00015;
-                    let nextLng = b.lng + (Math.random() - 0.5) * 0.00015;
-                    
-                    const nextPt = turf.point([nextLng, nextLat]);
-                    if (turf.booleanPointInPolygon(nextPt, polygon)) {
-                        botUpdates[`game/${roomId}/players/${id}/lat`] = nextLat;
-                        botUpdates[`game/${roomId}/players/${id}/lng`] = nextLng;
-                        botUpdates[`game/${roomId}/players/${id}/t`] = Date.now();
-                    } else {
-                        // אם הבוט עומד לצאת, הוא חוזר לכיוון המרכז
-                        botUpdates[`game/${roomId}/players/${id}/lat`] = arenaData.policeStation.lat;
-                        botUpdates[`game/${roomId}/players/${id}/lng`] = arenaData.policeStation.lng;
-                        botUpdates[`game/${roomId}/players/${id}/t`] = Date.now();
-                    }
-                }
-            });
-            window.db.ref().update(botUpdates);
-        });
-    }, 2500);
+    // ניסיון משיכת GPS אמיתי
+    navigator.geolocation.getCurrentPosition(
+        (pos) => setupQA(pos.coords.latitude, pos.coords.longitude),
+        (err) => setupQA(32.0853, 34.7818),
+        { enableHighAccuracy: true, timeout: 2500 }
+    );
 }
