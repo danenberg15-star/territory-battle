@@ -6,7 +6,7 @@
     <title>Cops Vs. Thieves: Territory Battle</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* 1. Base Styles & General Design Consistency[cite: 4] */
+        /* 1. Base Styles & General Design Consistency */
         body, html { 
             margin: 0; padding: 0; height: 100%; width: 100%; 
             overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
@@ -14,21 +14,21 @@
         }
         #map { height: 100%; width: 100%; position: absolute; top: 0; z-index: 1; display: none; }
         
-        /* 2. Screens & Layout[cite: 4] */
+        /* 2. Screens & Layout */
         .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; padding: 20px; box-sizing: border-box; }
         #lobby-screen { display: none; justify-content: flex-start; padding-top: 50px; }
         
-        /* 3. Rounded Design Consistency (Inputs & Buttons)[cite: 4] */
+        /* 3. Rounded Design Consistency (Inputs & Buttons) */
         input { 
             width: 100%; max-width: 300px; padding: 15px; margin-bottom: 15px; 
-            border-radius: 50px; /* מעוגל מלא[cite: 4] */
+            border-radius: 50px; 
             border: 1px solid #38bdf8; background: #1e293b; color: white; 
             font-size: 18px; text-align: center; box-sizing: border-box; 
         }
         
         .btn { 
             width: 100%; max-width: 300px; padding: 18px; 
-            border-radius: 50px; /* מעוגל מלא[cite: 4] */
+            border-radius: 50px; 
             border: none; font-size: 18px; font-weight: bold; color: white; 
             cursor: pointer; margin-bottom: 15px; transition: 0.2s; 
             text-align: center; display: flex; align-items: center; justify-content: center; 
@@ -37,16 +37,17 @@
         .btn-red { background: #991b1b; border-bottom: 4px solid #7f1d1d; }
         .btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; max-width: 350px; width: 100%; margin: 15px 0 0 0; }
         
-        /* 4. Brand Elements[cite: 4] */
+        /* 4. Brand Elements - Fixed Title Alignment */
         .game-logo { width: 140px; height: 140px; margin-bottom: 10px; border-radius: 30px; filter: drop-shadow(0 0 15px #38bdf8); }
         h1 { color: #38bdf8; font-size: 22px; margin-bottom: 25px; text-align: center; text-shadow: 0 0 10px rgba(56, 189, 248, 0.5); line-height: 1.2; }
+        h1 b { display: inline-block; direction: ltr; } /* מבטיח שהפיסוק באנגלית יישאר מימין למילה */
         h1 span { font-size: 28px; display: block; color: white; }
 
-        /* 5. Advanced Rounded Toggle[cite: 4] */
+        /* 5. Advanced Rounded Toggle - Fixed RTL Direction */
         .mode-toggle-container {
             display: flex; background: #1e293b; border-radius: 50px; padding: 4px; 
             width: 100%; max-width: 300px; margin-bottom: 20px; position: relative; 
-            border: 1px solid #38bdf8; box-sizing: border-box;
+            border: 1px solid #38bdf8; box-sizing: border-box; direction: rtl;
         }
         .mode-option {
             flex: 1; text-align: center; padding: 12px 0; font-size: 14px; 
@@ -54,15 +55,14 @@
         }
         .mode-option.active { color: white; }
         .mode-slider {
-            position: absolute; top: 4px; left: 4px; width: calc(50% - 4px); 
+            position: absolute; top: 4px; right: 4px; width: calc(50% - 4px); 
             height: calc(100% - 8px); background: #38bdf8; border-radius: 50px; 
             transition: 0.3s ease-in-out; z-index: 0;
         }
-        [dir="rtl"] .mode-slider { left: auto; right: 4px; }
+        /* במצב RTL: הזזה שמאלה (מינוס 100%) עבור המצב השני */
         .mode-toggle-container.single-active .mode-slider { transform: translateX(-100%); }
-        [dir="rtl"] .mode-toggle-container.single-active .mode-slider { transform: translateX(100%); }
 
-        /* 6. Functional Layers (Unchanged from index_28.html)[cite: 4] */
+        /* 6. Functional Layers (Unchanged) */
         #map { position: absolute; top: 0; z-index: 1; }
         #drawing-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2500; display: none; }
         #chat-container { position: absolute; top: 70px; width: 45%; max-width: 210px; z-index: 5000; display: none; }
@@ -75,20 +75,16 @@
 
     <div id="login-screen" class="screen">
         <img src="LOGO 512.webp" alt="Logo" class="game-logo">
-        <h1 id="lbl-main-title">Cops Vs. Thieves:<br><span>Territory Battle</span></h1>
+        <h1 id="lbl-main-title"><b>Cops Vs. Thieves:</b><br><span>Territory Battle</span></h1>
         
         <input type="text" id="player-name" placeholder="שם השחקן" />
-        
-        <!-- עטיפה לטוגל שיוזרק ע"י ה-JS -->
         <div id="mode-toggle-wrapper" style="width: 100%; display: flex; justify-content: center;"></div>
-        
         <input type="number" id="room-code-input" placeholder="קוד המשחק" />
         
         <button class="btn btn-blue" id="btn-join-room" onclick="joinRoom()">הצטרף למשחק קיים</button>
         <button class="btn btn-red" id="btn-create-room" onclick="createRoom()">התחל משחק חדש</button>
     </div>
 
-    <!-- מסך הלובי נשאר זהה במבנה שלו מ-index_28.html[cite: 4] -->
     <div id="lobby-screen" class="screen">
         <h2 id="lbl-lobby-title">לובי המתנה</h2>
         <div style="display: flex; align-items: center; width: 100%; max-width: 350px; margin-bottom: 20px;">
@@ -108,7 +104,6 @@
     <div id="chat-container"></div>
     <div id="controls-container"></div>
 
-    <!-- סקריפטים[cite: 4] -->
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

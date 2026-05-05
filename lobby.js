@@ -1,4 +1,4 @@
-// lobby.js - Updated First Screen with Advanced Toggle & New Terminology[cite: 5]
+// lobby.js - Fixed Directional Issues and Title Punctuation
 
 // ==========================================
 // 1. Globals & Persistence
@@ -13,7 +13,7 @@ let playerName = localStorage.getItem('tb_name') || "";
 let currentRoom = null;
 let isHost = false;
 let wakeLock = null;
-let selectedGameMode = 'multi'; // ברירת מחדל: קבוצה מול קבוצה[cite: 5]
+let selectedGameMode = 'multi'; 
 
 // Mobile Drag Globals
 let activeTouchElement = null;
@@ -21,12 +21,12 @@ let initialX = 0;
 let initialY = 0;
 
 // ==========================================
-// 2. Language & Terminology[cite: 5]
+// 2. Language & Terminology
 // ==========================================
 let currentLang = 'he'; 
 const i18n = {
     'he': {
-        mainTitle: "Cops Vs. Thieves:<br><span>Territory Battle</span>",
+        mainTitle: "<b>Cops Vs. Thieves:</b><br><span>Territory Battle</span>",
         lobbyTitle: "לובי המתנה",
         btnJoin: "הצטרף למשחק קיים",
         btnCreate: "התחל משחק חדש",
@@ -39,7 +39,7 @@ const i18n = {
         btnStart: "התחל משחק<br><span style='font-size:12px; font-weight:normal;'>(לחוויה מיטבית וודא שאינך במצב חיסכון סוללה)</span>"
     },
     'en': {
-        mainTitle: "Cops Vs. Thieves:<br><span>Territory Battle</span>",
+        mainTitle: "<b>Cops Vs. Thieves:</b><br><span>Territory Battle</span>",
         lobbyTitle: "Waiting Lobby",
         btnJoin: "Join Existing Game",
         btnCreate: "Start New Game",
@@ -58,14 +58,12 @@ window.onload = () => {
     if(urlParams.has('room')) {
         document.getElementById('room-code-input').value = urlParams.get('room');
     }
-    
-    // הזרקת הטוגל המעוגל למסך הראשון[cite: 5]
     injectAdvancedToggle();
     setLanguage('he'); 
 };
 
 // ==========================================
-// 3. UI Injections (First Screen Only)[cite: 5]
+// 3. UI Injections
 // ==========================================
 function injectAdvancedToggle() {
     const wrapper = document.getElementById('mode-toggle-wrapper');
@@ -148,7 +146,7 @@ async function enableWakeLock() {
 }
 
 // ==========================================
-// 4. Lobby & Room Actions (v30.0 Logic)[cite: 5]
+// 4. Lobby & Room Actions (v30.0 Logic)
 // ==========================================
 function createRoom() {
     const inputName = document.getElementById('player-name').value.trim();
@@ -257,7 +255,7 @@ function renderLobbyPlayers(players) {
         div.className = 'player-item';
         div.style.padding = '12px';
         div.style.marginBottom = '8px';
-        div.style.borderRadius = '20px'; // עיצוב מעוגל לשמות בלובי
+        div.style.borderRadius = '20px'; 
         div.style.background = '#334155';
         div.innerText = p.name + (id === playerId ? " (אתה)" : "");
         
@@ -274,7 +272,7 @@ function renderLobbyPlayers(players) {
 }
 
 // ==========================================
-// 5. Drag & Drop Logic (v30.0 Logic)[cite: 5]
+// 5. Drag & Drop Logic
 // ==========================================
 function handleTouchStart(e, id, el) {
     activeTouchElement = el;
