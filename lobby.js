@@ -1,4 +1,4 @@
-// lobby.js - Full Version with Drag & Drop, Persistence, QA, and Single Player AI Logic
+// lobby.js - Full Version with Single Player Fix, Drag & Drop, Persistence, QA, and AI Logic
 
 // ==========================================
 // 1. Globals & Persistence
@@ -45,8 +45,7 @@ window.onload = () => {
     if(urlParams.has('room')) document.getElementById('room-code-input').value = urlParams.get('room');
     setLanguage('he'); 
     
-    // Add Game Mode Radio Buttons to HTML dynamically for cleaner injection
-    const loginScreen = document.getElementById('login-screen');
+    // הזרקת כפתורי הרדיו ובחירת כמות הבוטים למסך הראשי
     const controlsHtml = `
         <div style="margin-bottom: 15px; text-align: center;">
             <label style="color: white; font-weight: bold; margin-left: 15px;">
@@ -67,7 +66,6 @@ window.onload = () => {
             </select>
         </div>
     `;
-    // Insert before the join button
     document.getElementById('room-code-input').insertAdjacentHTML('beforebegin', controlsHtml);
 };
 
@@ -123,11 +121,14 @@ function createRoom() {
     enableWakeLock();
 
     const gameMode = document.querySelector('input[name="gameMode"]:checked').value;
+    
+    // יצירת אובייקט חדר מלא כדי למנוע קריסה בפעולת update מקוננת
     const roomData = { 
         status: 'lobby', 
         host: playerId, 
         createdAt: Date.now(),
-        gameMode: gameMode 
+        gameMode: gameMode,
+        players: {} 
     };
 
     if (gameMode === 'single') {
@@ -135,10 +136,8 @@ function createRoom() {
         roomData.botCount = parseInt(document.getElementById('bot-count').value) || 3;
     }
 
-    // Zero-Latency: Define updates and transition immediately
-    const updates = {};
-    updates[`rooms/${roomId}`] = roomData;
-    updates[`rooms/${roomId}/players/${playerId}`] = { 
+    // הוספת השחקן האנושי
+    roomData.players[playerId] = { 
         name: playerName, 
         role: 'thief', 
         t: Date.now(),
@@ -146,9 +145,10 @@ function createRoom() {
         disconnectedAt: null
     };
 
+    // הוספת הבוטים למבנה הנתונים אם זה מצב בוטים
     if (gameMode === 'single') {
         for (let i = 1; i <= roomData.botCount; i++) {
-            updates[`rooms/${roomId}/players/bot_cop_${i}`] = { 
+            roomData.players[`bot_cop_${i}`] = { 
                 name: `שוטר ${i} (בוט)`, 
                 role: 'cop', 
                 t: Date.now() 
@@ -156,7 +156,13 @@ function createRoom() {
         }
     }
 
-    window.db.ref().update(updates).then(() => joinRoomLogic(roomId));
+    // שימוש בפקודת set נקייה שכותבת את כל האובייקט בבת אחת
+    window.db.ref(`rooms/${roomId}`).set(roomData).then(() => {
+        joinRoomLogic(roomId);
+    }).catch(err => {
+        console.error("Error creating room:", err);
+        alert("שגיאה ביצירת החדר, נסה שוב.");
+    });
 }
 
 function joinRoom() {
@@ -311,7 +317,6 @@ function handleTouchEnd(e, id, el) {
 
 // Zero-Latency start game transition
 function startGame() {
-    // We update status to 'playing' directly without waiting for a remove operation to resolve first.
     window.db.ref(`rooms/${currentRoom}`).update({ status: 'playing', gameStartTime: Date.now() });
 }
 
