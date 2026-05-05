@@ -1,4 +1,4 @@
-// login.js - Screen 1: Globals, Auth, Language, and Room Creation
+// login.js - Screen 1: Initialization, Language, and Advanced Pill Toggle[cite: 12]
 
 // ==========================================
 // 1. Globals & Persistence
@@ -13,8 +13,9 @@ let playerName = localStorage.getItem('tb_name') || "";
 let currentRoom = null;
 let isHost = false;
 let wakeLock = null;
+let selectedGameMode = 'multi'; // ברירת מחדל
 
-// Mobile Drag Globals (Shared with lobby.js)
+// Mobile Drag Globals (Shared)
 let activeTouchElement = null;
 let initialX = 0;
 let initialY = 0;
@@ -25,70 +26,95 @@ let initialY = 0;
 let currentLang = 'he'; 
 const i18n = {
     'he': {
-        mainTitle: "Territory Battle",
+        mainTitle: "<b>Cops Vs. Thieves:</b><span>Territory Battle</span>",
         lobbyTitle: "לובי המתנה",
-        btnJoin: "הצטרף לחדר",
-        btnCreate: "צור חדר חדש",
-        roomCodeLbl: "קוד חדר:",
-        copsLbl: "שוטרים 👮‍♂️",
-        thievesLbl: "גנבים 🥷",
-        btnStart: "התחל משחק<br><span style='font-size:12px; font-weight:normal;'>(לחוויה מיטבית וודא שאינך במצב חיסכון סוללה)</span>"
+        btnJoin: "הצטרף למשחק קיים",
+        btnCreate: "התחל משחק חדש",
+        roomCodePlaceholder: "קוד המשחק",
+        namePlaceholder: "שם השחקן",
+        modeMulti: "רב משתתפים",
+        modeSingle: "שחקן יחיד (בוטים)"
     },
     'en': {
-        mainTitle: "Territory Battle",
+        mainTitle: "<b>Cops Vs. Thieves:</b><span>Territory Battle</span>",
         lobbyTitle: "Waiting Lobby",
         btnJoin: "Join Room",
         btnCreate: "Create Room",
-        roomCodeLbl: "Room Code:",
-        copsLbl: "Cops 👮‍♂️",
-        thievesLbl: "Thieves 🥷",
-        btnStart: "Start Game<br><span style='font-size:12px; font-weight:normal;'>(Turn off Low Power Mode)</span>"
+        roomCodePlaceholder: "Game Code",
+        namePlaceholder: "Player Name",
+        modeMulti: "Multiplayer",
+        modeSingle: "VS Bots"
     }
 };
 
 window.onload = () => {
     const urlParams = new URLSearchParams(window.location.search);
     if(urlParams.has('room')) {
-        document.getElementById('room-code-input').value = urlParams.get('room');
+        const roomInput = document.getElementById('room-code-input');
+        if (roomInput) roomInput.value = urlParams.get('room');
     }
+    injectAdvancedToggle();
     setLanguage('he'); 
-    
-    // הזרקת כפתורי בחירת מצב משחק
-    const controlsHtml = `
-        <div style="margin-bottom: 15px; text-align: center;">
-            <label style="color: white; font-weight: bold; margin-left: 15px;">
-                <input type="radio" name="gameMode" value="multi" checked onchange="toggleSinglePlayerOpts()"> רב משתתפים
-            </label>
-            <label style="color: white; font-weight: bold;">
-                <input type="radio" name="gameMode" value="single" onchange="toggleSinglePlayerOpts()"> שחקן יחיד (בוטים)
-            </label>
-        </div>
-        <div id="single-player-opts" style="display: none; width: 100%; max-width: 300px; margin-bottom: 15px;">
-            <label style="color: #38bdf8; font-size: 14px;">כמות בוטים (שוטרים):</label>
-            <input type="number" id="bot-count" value="3" min="1" max="5" style="margin-bottom: 10px;">
-            <label style="color: #38bdf8; font-size: 14px;">רמת קושי:</label>
-            <select id="bot-difficulty" style="width: 100%; padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; background: #1e293b; color: white;">
-                <option value="rookie">טירון</option>
-                <option value="skilled" selected>מיומן</option>
-                <option value="elite">עילית</option>
-            </select>
-        </div>
-    `;
-    document.getElementById('room-code-input').insertAdjacentHTML('beforebegin', controlsHtml);
 };
 
-function toggleSinglePlayerOpts() {
-    const mode = document.querySelector('input[name="gameMode"]:checked').value;
-    const opts = document.getElementById('single-player-opts');
+// הזרקת הטוגל המעוגל והאלגנטי[cite: 12]
+function injectAdvancedToggle() {
+    const loginScreen = document.getElementById('login-screen');
+    const roomInput = document.getElementById('room-code-input');
+    const t = i18n[currentLang];
+    
+    const toggleHtml = `
+        <div class="mode-toggle-container" id="game-mode-toggle" onclick="toggleGameMode()">
+            <div class="mode-slider"></div>
+            <div class="mode-option active" id="opt-multi">${t.modeMulti}</div>
+            <div class="mode-option" id="opt-single">${t.modeSingle}</div>
+        </div>
+        <div id="single-player-opts" style="display: none;">
+            <div class="opt-group">
+                <span class="opt-label">כמות בוטים (שוטרים):</span>
+                <input type="number" id="bot-count" value="3" min="1" max="5">
+            </div>
+            <div class="opt-group">
+                <span class="opt-label">רמת קושי:</span>
+                <select id="bot-difficulty">
+                    <option value="rookie">טירון</option>
+                    <option value="skilled" selected>מיומן</option>
+                    <option value="elite">עילית</option>
+                </select>
+            </div>
+        </div>
+    `;
+    
+    // הזרקה לפני שדה קוד החדר[cite: 12]
+    roomInput.insertAdjacentHTML('beforebegin', toggleHtml);
+}
+
+function toggleGameMode() {
+    const newMode = selectedGameMode === 'multi' ? 'single' : 'multi';
+    setGameMode(newMode);
+}
+
+function setGameMode(mode) {
+    selectedGameMode = mode;
+    const container = document.getElementById('game-mode-toggle');
+    const optMulti = document.getElementById('opt-multi');
+    const optSingle = document.getElementById('opt-single');
+    const optsPanel = document.getElementById('single-player-opts');
     const roomInput = document.getElementById('room-code-input');
     const joinBtn = document.querySelector('button[onclick="joinRoom()"]');
 
     if (mode === 'single') {
-        opts.style.display = 'block';
+        container.classList.add('single-active');
+        optSingle.classList.add('active');
+        optMulti.classList.remove('active');
+        optsPanel.style.display = 'flex';
         roomInput.style.display = 'none';
         joinBtn.style.display = 'none';
     } else {
-        opts.style.display = 'none';
+        container.classList.remove('single-active');
+        optMulti.classList.add('active');
+        optSingle.classList.remove('active');
+        optsPanel.style.display = 'none';
         roomInput.style.display = 'block';
         joinBtn.style.display = 'block';
     }
@@ -99,24 +125,21 @@ function setLanguage(lang) {
     document.dir = lang === 'he' ? 'rtl' : 'ltr';
     const t = i18n[lang];
     document.getElementById('lbl-main-title').innerHTML = t.mainTitle;
-    document.getElementById('lbl-lobby-title').innerHTML = t.lobbyTitle;
-    document.querySelector('button[onclick="joinRoom()"]').innerHTML = t.btnJoin;
-    document.querySelector('button[onclick="createRoom()"]').innerHTML = t.btnCreate;
-    document.getElementById('btn-start-game').innerHTML = t.btnStart;
+    document.getElementById('player-name').placeholder = t.namePlaceholder;
+    document.getElementById('room-code-input').placeholder = t.roomCodePlaceholder;
+    document.querySelector('button[onclick="joinRoom()"]').innerText = t.btnJoin;
+    document.querySelector('button[onclick="createRoom()"]').innerText = t.btnCreate;
 }
 
 function toggleLanguage() { setLanguage(currentLang === 'he' ? 'en' : 'he'); }
 
 async function enableWakeLock() {
-    try { 
-        if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); 
-    } catch (err) {
-        console.warn("WakeLock failed");
-    }
+    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } 
+    catch (err) { console.warn("WakeLock failed"); }
 }
 
 // ==========================================
-// 4. Lobby Actions (Auth & Setup)
+// 3. Room Actions[cite: 12]
 // ==========================================
 function createRoom() {
     const inputName = document.getElementById('player-name').value.trim();
@@ -129,42 +152,28 @@ function createRoom() {
     isHost = true;
     enableWakeLock();
 
-    const gameMode = document.querySelector('input[name="gameMode"]:checked').value;
     const roomData = { 
         status: 'lobby', 
         host: playerId, 
         createdAt: Date.now(),
-        gameMode: gameMode,
+        gameMode: selectedGameMode,
         players: {} 
     };
 
-    if (gameMode === 'single') {
+    if (selectedGameMode === 'single') {
         roomData.difficulty = document.getElementById('bot-difficulty').value;
         roomData.botCount = parseInt(document.getElementById('bot-count').value) || 3;
     }
 
-    // הוספת השחקן היוצר
-    roomData.players[playerId] = { 
-        name: playerName, 
-        role: 'thief', 
-        t: Date.now(),
-        isOffline: false,
-        disconnectedAt: null
-    };
+    roomData.players[playerId] = { name: playerName, role: 'thief', t: Date.now(), isOffline: false };
 
-    // הזרקת בוטים ראשונית ללובי
-    if (gameMode === 'single') {
+    if (selectedGameMode === 'single') {
         for (let i = 1; i <= roomData.botCount; i++) {
-            roomData.players[`bot_cop_${i}`] = { 
-                name: `שוטר ${i} (בוט)`, 
-                role: 'cop', 
-                t: Date.now() 
-            };
+            roomData.players[`bot_cop_${i}`] = { name: `שוטר ${i} (בוט)`, role: 'cop', t: Date.now() };
         }
     }
 
     window.db.ref(`rooms/${roomId}`).set(roomData).then(() => {
-        // קריאה לפונקציה שקיימת בקובץ lobby.js
         joinRoomLogic(roomId);
     });
 }
@@ -172,22 +181,13 @@ function createRoom() {
 function joinRoom() {
     const inputName = document.getElementById('player-name').value.trim();
     const roomId = document.getElementById('room-code-input').value.trim();
-    if (!inputName) return alert("הכנס שם");
-    
-    if (roomId === '99999' || roomId === '88888') {
-        playerName = inputName;
-        currentRoom = roomId;
-        enableWakeLock();
-        if (typeof initQARoom === 'function') initQARoom(roomId); 
-        return;
-    }
+    if (!inputName || !roomId) return alert("הכנס שם וקוד");
     
     playerName = inputName;
     currentRoom = roomId;
     enableWakeLock();
     window.db.ref(`rooms/${roomId}/status`).once('value', snap => {
         if (!snap.exists()) return alert("חדר לא נמצא");
-        // קריאה לפונקציה שקיימת בקובץ lobby.js
         joinRoomLogic(roomId);
     });
 }

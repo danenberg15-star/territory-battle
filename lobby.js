@@ -1,4 +1,4 @@
-// lobby.js - Screen 2: Waiting Lobby, Player Rendering, and Drag & Drop
+// lobby.js - Screen 2: Waiting Lobby, Player Rendering, and Symmetry[cite: 9]
 
 // ==========================================
 // 4. Lobby Logic & Rendering
@@ -39,6 +39,15 @@ function renderLobbyPlayers(players) {
         const p = players[id];
         const div = document.createElement('div');
         div.className = 'player-item';
+        
+        // עיצוב מעוגל וסימטרי לכל פריט שחקן[cite: 10]
+        div.style.borderRadius = '25px';
+        div.style.padding = '12px 20px';
+        div.style.marginBottom = '10px';
+        div.style.background = 'rgba(255, 255, 255, 0.08)';
+        div.style.border = '1px solid rgba(56, 189, 248, 0.2)';
+        div.style.fontWeight = '500';
+        
         div.innerText = p.name + (id === playerId ? " (אתה)" : "");
         
         if (isHost && !id.startsWith('bot_')) {
@@ -54,7 +63,7 @@ function renderLobbyPlayers(players) {
 }
 
 // ==========================================
-// 5. Drag & Drop Logic
+// 5. Drag & Drop Logic (Stable)[cite: 9]
 // ==========================================
 function handleTouchStart(e, id, el) {
     activeTouchElement = el;
@@ -108,7 +117,7 @@ function handleTouchEnd(e, id, el) {
 }
 
 // ==========================================
-// 6. Game Start & Bot Injection
+// 6. Game Actions[cite: 9]
 // ==========================================
 function startGame() {
     window.db.ref(`rooms/${currentRoom}`).once('value', snap => {
@@ -116,7 +125,6 @@ function startGame() {
         if (!roomData) return;
 
         const gamePlayers = {};
-        // העברת כל השחקנים (כולל בוטים) למבנה המשחק הפעיל
         Object.keys(roomData.players).forEach(id => {
             gamePlayers[id] = {
                 role: roomData.players[id].role,
