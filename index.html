@@ -37,16 +37,24 @@
         .btn-red { background: #991b1b; border-bottom: 4px solid #7f1d1d; }
         .btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; max-width: 350px; width: 100%; margin: 15px 0 0 0; }
         
-        /* 4. Brand Elements - Fixed Title Alignment */
+        /* 4. Brand Elements - Fixed Title & Logo */
         .game-logo { width: 140px; height: 140px; margin-bottom: 10px; border-radius: 30px; filter: drop-shadow(0 0 15px #38bdf8); }
         h1 { color: #38bdf8; font-size: 22px; margin-bottom: 25px; text-align: center; text-shadow: 0 0 10px rgba(56, 189, 248, 0.5); line-height: 1.2; }
-        h1 b { display: inline-block; direction: ltr; } /* מבטיח שהפיסוק באנגלית יישאר מימין למילה */
+        h1 b { display: inline-block; direction: ltr; }
         h1 span { font-size: 28px; display: block; color: white; }
 
-        /* 5. Advanced Rounded Toggle - Fixed RTL Direction */
+        /* 5. Advanced Rounded Toggle - Responsive Column Fix */
+        #mode-toggle-wrapper {
+            width: 100%;
+            display: flex;
+            flex-direction: column; /* סידור בטור במקום שורה */
+            align-items: center;
+            gap: 15px; /* ריווח בין הטוגל לאפשרויות הבוטים */
+        }
+
         .mode-toggle-container {
             display: flex; background: #1e293b; border-radius: 50px; padding: 4px; 
-            width: 100%; max-width: 300px; margin-bottom: 20px; position: relative; 
+            width: 100%; max-width: 300px; position: relative; 
             border: 1px solid #38bdf8; box-sizing: border-box; direction: rtl;
         }
         .mode-option {
@@ -54,13 +62,15 @@
             font-weight: bold; color: #94a3b8; cursor: pointer; z-index: 1; transition: 0.3s;
         }
         .mode-option.active { color: white; }
+        
+        /* סליידר עם שליטה במיקום מימין למניעת טעויות כיוון ב-RTL */
         .mode-slider {
             position: absolute; top: 4px; right: 4px; width: calc(50% - 4px); 
             height: calc(100% - 8px); background: #38bdf8; border-radius: 50px; 
             transition: 0.3s ease-in-out; z-index: 0;
         }
-        /* במצב RTL: הזזה שמאלה (מינוס 100%) עבור המצב השני */
-        .mode-toggle-container.single-active .mode-slider { transform: translateX(-100%); }
+        /* כשהבוטים פעילים (צד שמאל ב-RTL), נזיז את ה-right ב-50% */
+        .mode-toggle-container.single-active .mode-slider { right: calc(50% + 0px); }
 
         /* 6. Functional Layers (Unchanged) */
         #map { position: absolute; top: 0; z-index: 1; }
@@ -78,7 +88,7 @@
         <h1 id="lbl-main-title"><b>Cops Vs. Thieves:</b><br><span>Territory Battle</span></h1>
         
         <input type="text" id="player-name" placeholder="שם השחקן" />
-        <div id="mode-toggle-wrapper" style="width: 100%; display: flex; justify-content: center;"></div>
+        <div id="mode-toggle-wrapper"></div>
         <input type="number" id="room-code-input" placeholder="קוד המשחק" />
         
         <button class="btn btn-blue" id="btn-join-room" onclick="joinRoom()">הצטרף למשחק קיים</button>

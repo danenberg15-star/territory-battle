@@ -1,4 +1,4 @@
-// lobby.js - Fixed Directional Issues and Title Punctuation
+// lobby.js - Fixed Responsive Layout for Modern Phones
 
 // ==========================================
 // 1. Globals & Persistence
@@ -75,11 +75,11 @@ function injectAdvancedToggle() {
             <div class="mode-option active" id="opt-multi" onclick="setGameMode('multi')">${t.modeMulti}</div>
             <div class="mode-option" id="opt-single" onclick="setGameMode('single')">${t.modeSingle}</div>
         </div>
-        <div id="single-player-opts" style="display: none; width: 100%; max-width: 300px; margin-bottom: 20px;">
+        <div id="single-player-opts" style="display: none; width: 100%; max-width: 300px;">
             <label style="color: #38bdf8; font-size: 14px; display: block; margin-bottom: 5px; text-align: right;">כמות בוטים (שוטרים):</label>
             <input type="number" id="bot-count" value="3" min="1" max="5" style="margin-bottom: 10px;">
             <label style="color: #38bdf8; font-size: 14px; display: block; margin-bottom: 5px; text-align: right;">רמת קושי:</label>
-            <select id="bot-difficulty" style="width: 100%; padding: 12px; border-radius: 50px; border: 1px solid #38bdf8; background: #1e293b; color: white; text-align: center;">
+            <select id="bot-difficulty" style="width: 100%; padding: 12px; border-radius: 50px; border: 1px solid #38bdf8; background: #1e293b; color: white; text-align: center; font-size: 16px;">
                 <option value="rookie">טירון</option>
                 <option value="skilled" selected>מיומן</option>
                 <option value="elite">עילית</option>
@@ -146,7 +146,7 @@ async function enableWakeLock() {
 }
 
 // ==========================================
-// 4. Lobby & Room Actions (v30.0 Logic)
+// 4. Lobby & Room Actions
 // ==========================================
 function createRoom() {
     const inputName = document.getElementById('player-name').value.trim();
