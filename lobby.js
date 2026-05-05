@@ -1,4 +1,4 @@
-// lobby.js - Full Version with Single Player Fix, Drag & Drop, Persistence, QA, and AI Logic
+// lobby.js - Full Version with Bot Injection, Single Player UI, and Chat Rules
 
 // ==========================================
 // 1. Globals & Persistence
@@ -25,27 +25,35 @@ let initialY = 0;
 let currentLang = 'he'; 
 const i18n = {
     'he': {
-        mainTitle: "Territory Battle", lobbyTitle: "לובי המתנה",
-        btnJoin: "הצטרף לחדר", btnCreate: "צור חדר חדש",
+        mainTitle: "Territory Battle",
+        lobbyTitle: "לובי המתנה",
+        btnJoin: "הצטרף לחדר",
+        btnCreate: "צור חדר חדש",
         roomCodeLbl: "קוד חדר:",
-        copsLbl: "שוטרים 👮‍♂️", thievesLbl: "גנבים 🥷",
+        copsLbl: "שוטרים 👮‍♂️",
+        thievesLbl: "גנבים 🥷",
         btnStart: "התחל משחק<br><span style='font-size:12px; font-weight:normal;'>(לחוויה מיטבית וודא שאינך במצב חיסכון סוללה)</span>"
     },
     'en': {
-        mainTitle: "Territory Battle", lobbyTitle: "Waiting Lobby",
-        btnJoin: "Join Room", btnCreate: "Create Room",
+        mainTitle: "Territory Battle",
+        lobbyTitle: "Waiting Lobby",
+        btnJoin: "Join Room",
+        btnCreate: "Create Room",
         roomCodeLbl: "Room Code:",
-        copsLbl: "Cops 👮‍♂️", thievesLbl: "Thieves 🥷",
+        copsLbl: "Cops 👮‍♂️",
+        thievesLbl: "Thieves 🥷",
         btnStart: "Start Game<br><span style='font-size:12px; font-weight:normal;'>(Turn off Low Power Mode)</span>"
     }
 };
 
 window.onload = () => {
     const urlParams = new URLSearchParams(window.location.search);
-    if(urlParams.has('room')) document.getElementById('room-code-input').value = urlParams.get('room');
+    if(urlParams.has('room')) {
+        document.getElementById('room-code-input').value = urlParams.get('room');
+    }
     setLanguage('he'); 
     
-    // הזרקת כפתורי הרדיו ובחירת כמות הבוטים למסך הראשי
+    // הזרקת כפתורי בחירת מצב משחק
     const controlsHtml = `
         <div style="margin-bottom: 15px; text-align: center;">
             <label style="color: white; font-weight: bold; margin-left: 15px;">
@@ -99,15 +107,16 @@ function setLanguage(lang) {
 
 function toggleLanguage() { setLanguage(currentLang === 'he' ? 'en' : 'he'); }
 
-// ==========================================
-// 3. Wake Lock Logic
-// ==========================================
 async function enableWakeLock() {
-    try { if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); } catch (err) {}
+    try { 
+        if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); 
+    } catch (err) {
+        console.warn("WakeLock failed");
+    }
 }
 
 // ==========================================
-// 4. Lobby Actions & Single Player Injection
+// 4. Lobby Actions
 // ==========================================
 function createRoom() {
     const inputName = document.getElementById('player-name').value.trim();
@@ -121,8 +130,6 @@ function createRoom() {
     enableWakeLock();
 
     const gameMode = document.querySelector('input[name="gameMode"]:checked').value;
-    
-    // יצירת אובייקט חדר מלא כדי למנוע קריסה בפעולת update מקוננת
     const roomData = { 
         status: 'lobby', 
         host: playerId, 
@@ -136,7 +143,7 @@ function createRoom() {
         roomData.botCount = parseInt(document.getElementById('bot-count').value) || 3;
     }
 
-    // הוספת השחקן האנושי
+    // הוספת השחקן היוצר
     roomData.players[playerId] = { 
         name: playerName, 
         role: 'thief', 
@@ -145,7 +152,7 @@ function createRoom() {
         disconnectedAt: null
     };
 
-    // הוספת הבוטים למבנה הנתונים אם זה מצב בוטים
+    // הזרקת בוטים ראשונית ללובי
     if (gameMode === 'single') {
         for (let i = 1; i <= roomData.botCount; i++) {
             roomData.players[`bot_cop_${i}`] = { 
@@ -156,35 +163,25 @@ function createRoom() {
         }
     }
 
-    // שימוש בפקודת set נקייה שכותבת את כל האובייקט בבת אחת
     window.db.ref(`rooms/${roomId}`).set(roomData).then(() => {
         joinRoomLogic(roomId);
-    }).catch(err => {
-        console.error("Error creating room:", err);
-        alert("שגיאה ביצירת החדר, נסה שוב.");
     });
 }
 
 function joinRoom() {
     const inputName = document.getElementById('player-name').value.trim();
     const roomId = document.getElementById('room-code-input').value.trim();
-    
     if (!inputName) return alert("הכנס שם");
-
+    
     if (roomId === '99999' || roomId === '88888') {
         playerName = inputName;
-        localStorage.setItem('tb_name', playerName);
         currentRoom = roomId;
         enableWakeLock();
         if (typeof initQARoom === 'function') initQARoom(roomId); 
-        else alert("שגיאה: קובץ בדיקות (QA) לא נטען כראוי.");
         return;
     }
-
-    if (roomId.length !== 4) return alert("בדוק קוד חדר (4 ספרות)");
     
     playerName = inputName;
-    localStorage.setItem('tb_name', playerName);
     currentRoom = roomId;
     enableWakeLock();
     window.db.ref(`rooms/${roomId}/status`).once('value', snap => {
@@ -198,73 +195,48 @@ function joinRoomLogic(roomId) {
     document.getElementById('lobby-screen').style.display = 'flex';
     document.getElementById('display-room-code').innerText = roomId;
     
-    window.db.ref(`rooms/${roomId}`).once('value', snap => {
+    window.db.ref(`rooms/${roomId}`).on('value', snap => {
         const roomData = snap.val();
         if (!roomData) return;
-
-        const isReconnecting = roomData.status === 'playing' && roomData.players && roomData.players[playerId];
-
-        if (!isReconnecting && roomData.gameMode !== 'single') {
-            window.db.ref(`rooms/${roomId}/players/${playerId}`).set({ 
-                name: playerName, 
-                role: 'thief', 
-                t: Date.now(),
-                isOffline: false,
-                disconnectedAt: null
-            });
-        } else if (isReconnecting) {
-            window.db.ref(`rooms/${roomId}/players/${playerId}`).update({ 
-                isOffline: false,
-                disconnectedAt: null,
-                t: Date.now()
-            });
+        
+        isHost = (roomData.host === playerId);
+        if (isHost) document.getElementById('btn-start-game').style.display = 'block';
+        
+        if (roomData.status === 'playing') {
+            window.db.ref(`rooms/${roomId}`).off(); 
+            window.isHost = isHost; 
+            window.playerRole = roomData.players[playerId]?.role || 'thief';
+            window.currentRoom = currentRoom;
+            window.playerId = playerId;
+            window.currentLang = currentLang;
+            if(typeof enterGameScene === 'function') enterGameScene();
+            return;
         }
-
-        window.db.ref(`rooms/${roomId}/players/${playerId}`).onDisconnect().update({
-            isOffline: true,
-            disconnectedAt: firebase.database.ServerValue.TIMESTAMP
-        });
-
-        window.db.ref(`rooms/${roomId}`).on('value', snap => {
-            const updatedRoom = snap.val();
-            if (!updatedRoom) return;
-            
-            isHost = (updatedRoom.host === playerId);
-            if (isHost) document.getElementById('btn-start-game').style.display = 'block';
-            
-            if (updatedRoom.status === 'playing') {
-                window.db.ref(`rooms/${roomId}`).off(); 
-                window.isHost = isHost; 
-                window.playerRole = updatedRoom.players[playerId]?.role || 'thief';
-                window.currentRoom = currentRoom;
-                window.playerId = playerId;
-                window.currentLang = currentLang;
-                if(typeof enterGameScene === 'function') enterGameScene();
-                return;
-            }
-            renderLobbyPlayers(updatedRoom.players || {});
-        });
+        renderLobbyPlayers(roomData.players || {});
     });
 }
 
 function renderLobbyPlayers(players) {
     const copsDiv = document.getElementById('players-cops');
     const thievesDiv = document.getElementById('players-thieves');
-    copsDiv.innerHTML = ""; thievesDiv.innerHTML = "";
+    copsDiv.innerHTML = ""; 
+    thievesDiv.innerHTML = "";
+    
     Object.keys(players).forEach(id => {
         const p = players[id];
         const div = document.createElement('div');
         div.className = 'player-item';
         div.innerText = p.name + (id === playerId ? " (אתה)" : "");
         
-        if (isHost) {
+        if (isHost && !id.startsWith('bot_')) {
             div.classList.add('draggable');
             div.addEventListener('touchstart', (e) => handleTouchStart(e, id, div), { passive: false });
             div.addEventListener('touchmove', handleTouchMove, { passive: false });
             div.addEventListener('touchend', (e) => handleTouchEnd(e, id, div));
         }
-
-        if (p.role === 'cop') copsDiv.appendChild(div); else thievesDiv.appendChild(div);
+        
+        if (p.role === 'cop') copsDiv.appendChild(div); 
+        else thievesDiv.appendChild(div);
     });
 }
 
@@ -278,9 +250,9 @@ function handleTouchStart(e, id, el) {
     const rect = el.getBoundingClientRect();
     initialX = touch.clientX - rect.left;
     initialY = touch.clientY - rect.top;
+    
     el.style.position = 'fixed';
     el.style.zIndex = '9999';
-    el.style.width = rect.width + 'px';
     el.style.opacity = '0.8';
     moveTouchElement(touch.clientX, touch.clientY);
 }
@@ -303,21 +275,52 @@ function handleTouchEnd(e, id, el) {
     const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
     el.style.display = 'block';
     
-    el.style.position = ''; el.style.zIndex = ''; el.style.left = ''; el.style.top = ''; el.style.width = ''; el.style.opacity = '';
+    el.style.position = '';
+    el.style.zIndex = '';
+    el.style.left = '';
+    el.style.top = '';
+    el.style.opacity = '';
     activeTouchElement = null;
 
     if (dropTarget) {
         const copsList = document.getElementById('list-cops');
         const thievesList = document.getElementById('list-thieves');
         const pId = el.dataset.playerId;
-        if (copsList.contains(dropTarget)) window.db.ref(`rooms/${currentRoom}/players/${pId}`).update({ role: 'cop' });
-        else if (thievesList.contains(dropTarget)) window.db.ref(`rooms/${currentRoom}/players/${pId}`).update({ role: 'thief' });
+        if (copsList.contains(dropTarget)) {
+            window.db.ref(`rooms/${currentRoom}/players/${pId}`).update({ role: 'cop' });
+        } else if (thievesList.contains(dropTarget)) {
+            window.db.ref(`rooms/${currentRoom}/players/${pId}`).update({ role: 'thief' });
+        }
     }
 }
 
-// Zero-Latency start game transition
+// ==========================================
+// 6. Game Start & Bot Injection
+// ==========================================
 function startGame() {
-    window.db.ref(`rooms/${currentRoom}`).update({ status: 'playing', gameStartTime: Date.now() });
+    window.db.ref(`rooms/${currentRoom}`).once('value', snap => {
+        const roomData = snap.val();
+        if (!roomData) return;
+
+        const gamePlayers = {};
+        // העברת כל השחקנים (כולל בוטים) למבנה המשחק הפעיל
+        Object.keys(roomData.players).forEach(id => {
+            gamePlayers[id] = {
+                role: roomData.players[id].role,
+                name: roomData.players[id].name,
+                t: Date.now(),
+                lat: 0, 
+                lng: 0
+            };
+        });
+
+        const updates = {};
+        updates[`rooms/${currentRoom}/status`] = 'playing';
+        updates[`rooms/${currentRoom}/gameStartTime`] = Date.now();
+        updates[`game/${currentRoom}/players`] = gamePlayers;
+
+        window.db.ref().update(updates);
+    });
 }
 
 function shareWhatsApp() {
@@ -325,4 +328,6 @@ function shareWhatsApp() {
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent("בואו לשחק! " + link)}`, '_blank');
 }
 
-function exitGame() { location.reload(); }
+function exitGame() { 
+    location.reload(); 
+}
