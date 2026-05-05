@@ -1,4 +1,4 @@
-// lobby.js - Screen 2: Waiting Lobby, Player Rendering, and Symmetry[cite: 9]
+// lobby.js - Screen 2: Waiting Lobby, Player Rendering, and Symmetry[cite: 7]
 
 // ==========================================
 // 4. Lobby Logic & Rendering
@@ -38,15 +38,7 @@ function renderLobbyPlayers(players) {
     Object.keys(players).forEach(id => {
         const p = players[id];
         const div = document.createElement('div');
-        div.className = 'player-item';
-        
-        // עיצוב מעוגל וסימטרי לכל פריט שחקן[cite: 10]
-        div.style.borderRadius = '25px';
-        div.style.padding = '12px 20px';
-        div.style.marginBottom = '10px';
-        div.style.background = 'rgba(255, 255, 255, 0.08)';
-        div.style.border = '1px solid rgba(56, 189, 248, 0.2)';
-        div.style.fontWeight = '500';
+        div.className = 'player-item'; // משתמש בעיצוב המעוגל מה-CSS[cite: 8]
         
         div.innerText = p.name + (id === playerId ? " (אתה)" : "");
         
@@ -63,7 +55,7 @@ function renderLobbyPlayers(players) {
 }
 
 // ==========================================
-// 5. Drag & Drop Logic (Stable)[cite: 9]
+// 5. Drag & Drop Logic (Stable)[cite: 7]
 // ==========================================
 function handleTouchStart(e, id, el) {
     activeTouchElement = el;
@@ -117,7 +109,7 @@ function handleTouchEnd(e, id, el) {
 }
 
 // ==========================================
-// 6. Game Actions[cite: 9]
+// 6. Game Actions[cite: 7]
 // ==========================================
 function startGame() {
     window.db.ref(`rooms/${currentRoom}`).once('value', snap => {

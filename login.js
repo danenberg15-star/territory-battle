@@ -1,4 +1,4 @@
-// login.js - Screen 1: Initialization, Language, and Advanced Pill Toggle[cite: 12]
+// login.js - Screen 1: Initialization, Language, and Advanced Pill Toggle
 
 // ==========================================
 // 1. Globals & Persistence
@@ -13,9 +13,9 @@ let playerName = localStorage.getItem('tb_name') || "";
 let currentRoom = null;
 let isHost = false;
 let wakeLock = null;
-let selectedGameMode = 'multi'; // ברירת מחדל
+let selectedGameMode = 'multi'; // Default mode
 
-// Mobile Drag Globals (Shared)
+// Mobile Drag Globals (Shared context)
 let activeTouchElement = null;
 let initialX = 0;
 let initialY = 0;
@@ -57,9 +57,8 @@ window.onload = () => {
     setLanguage('he'); 
 };
 
-// הזרקת הטוגל המעוגל והאלגנטי[cite: 12]
+// הזרקת הטוגל המעוגל והאלגנטי
 function injectAdvancedToggle() {
-    const loginScreen = document.getElementById('login-screen');
     const roomInput = document.getElementById('room-code-input');
     const t = i18n[currentLang];
     
@@ -85,7 +84,7 @@ function injectAdvancedToggle() {
         </div>
     `;
     
-    // הזרקה לפני שדה קוד החדר[cite: 12]
+    // הזרקה לפני שדה קוד החדר
     roomInput.insertAdjacentHTML('beforebegin', toggleHtml);
 }
 
@@ -139,7 +138,7 @@ async function enableWakeLock() {
 }
 
 // ==========================================
-// 3. Room Actions[cite: 12]
+// 3. Room Actions
 // ==========================================
 function createRoom() {
     const inputName = document.getElementById('player-name').value.trim();
@@ -174,7 +173,7 @@ function createRoom() {
     }
 
     window.db.ref(`rooms/${roomId}`).set(roomData).then(() => {
-        joinRoomLogic(roomId);
+        if (typeof joinRoomLogic === 'function') joinRoomLogic(roomId);
     });
 }
 
@@ -188,6 +187,6 @@ function joinRoom() {
     enableWakeLock();
     window.db.ref(`rooms/${roomId}/status`).once('value', snap => {
         if (!snap.exists()) return alert("חדר לא נמצא");
-        joinRoomLogic(roomId);
+        if (typeof joinRoomLogic === 'function') joinRoomLogic(roomId);
     });
 }

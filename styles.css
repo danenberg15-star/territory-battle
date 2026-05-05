@@ -1,32 +1,33 @@
-/* styles.css - עיצוב מתקדם, סימטרי ומותאם למכשירים מודרניים */
+/* styles.css - עיצוב מעוגל, סימטרי ותמיכה במכשירים מודרניים */
 
-/* 1. Base Styles & Safe Area Support */
+/* 1. Base Styles & Modern Display Support */
 body, html { 
     margin: 0; padding: 0; height: 100%; width: 100%; 
-    overflow: hidden; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
+    overflow: hidden; font-family: 'Segoe UI', system-ui, sans-serif; 
     background-color: #0f172a; color: white; user-select: none; -webkit-user-select: none; 
 }
 
 #map { height: 100%; width: 100%; position: absolute; top: 0; z-index: 1; display: none; }
 
-/* 2. Screens Layout - Equal Spacing & RTL */
+/* 2. Screen Logic - Hide all by default, show login */
 .screen { 
     position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-    z-index: 2000; display: flex; flex-direction: column; 
-    align-items: center; justify-content: space-around; /* פריסה שווה על פני המסך */
+    z-index: 2000; display: none; /* כולם מוסתרים */
+    flex-direction: column; align-items: center; 
+    justify-content: space-around; /* פריסה שווה על המסך */
     background-color: #0f172a; 
-    padding: env(safe-area-inset-top) 25px env(safe-area-inset-bottom) 25px; /* תמיכה במכשירים מודרניים */
+    padding: env(safe-area-inset-top, 20px) 25px env(safe-area-inset-bottom, 20px) 25px; 
     box-sizing: border-box; 
-    text-align: center;
 }
 
-#lobby-screen { display: none; }
+/* רק מסך הפתיחה מוצג בהתחלה */
+#login-screen { display: flex; }
 
-/* 3. Typography */
+/* 3. Typography & RTL Alignment */
 h1 { 
     color: #38bdf8; font-size: 32px; margin: 0; 
     text-shadow: 0 0 15px rgba(56, 189, 248, 0.4); 
-    font-weight: 800; letter-spacing: -0.5px;
+    font-weight: 800; text-align: center;
 }
 h1 span { display: block; font-size: 18px; color: white; opacity: 0.8; font-weight: 400; }
 
@@ -35,15 +36,14 @@ input {
     width: 100%; max-width: 320px; padding: 16px; 
     border-radius: 16px; border: 1px solid rgba(56, 189, 248, 0.5); 
     background: #1e293b; color: white; font-size: 18px; 
-    text-align: center; box-sizing: border-box; outline: none;
+    text-align: center; outline: none;
 }
 
 .mode-toggle-container {
     width: 100%; max-width: 320px; height: 55px;
     background: #1e293b; border-radius: 28px;
     position: relative; display: flex; align-items: center;
-    border: 1px solid rgba(56, 189, 248, 0.3); margin-bottom: 10px;
-    overflow: hidden; cursor: pointer;
+    border: 1px solid rgba(56, 189, 248, 0.3); overflow: hidden; cursor: pointer;
 }
 
 .mode-slider {
@@ -58,43 +58,44 @@ input {
 .mode-option {
     flex: 1; z-index: 2; font-size: 15px; font-weight: bold;
     color: rgba(255,255,255,0.5); transition: 0.3s; pointer-events: none;
+    text-align: center;
 }
 .mode-option.active { color: white; }
 
-/* 5. Buttons */
+/* 5. Buttons (Pill Design) */
 .btn { 
     width: 100%; max-width: 320px; padding: 18px; 
     border-radius: 16px; border: none; font-size: 18px; 
     font-weight: bold; color: white; cursor: pointer; 
-    transition: transform 0.1s, background 0.2s; 
+    transition: transform 0.1s; text-align: center;
 }
 .btn:active { transform: scale(0.98); }
 .btn-blue { background: #1e40af; box-shadow: 0 4px 0 #1e3a8a; }
 .btn-red { background: #991b1b; box-shadow: 0 4px 0 #7f1d1d; }
-.btn-green { background: #10b981; margin-top: 10px; }
 
-/* 6. Lobby Symmetry (Screen 2) */
+/* 6. Lobby & Team Symmetry */
 .team-list { 
     background: #1e293b; border-radius: 20px; padding: 15px; 
     flex: 1; display: flex; flex-direction: column; margin: 8px;
     border: 1px solid rgba(255,255,255,0.05); min-height: 200px;
 }
 .player-item {
-    background: rgba(255,255,255,0.05); padding: 12px;
-    margin-bottom: 8px; border-radius: 12px; font-size: 14px;
+    background: rgba(255,255,255,0.05); padding: 12px 20px;
+    margin-bottom: 8px; border-radius: 25px; font-size: 14px;
+    border: 1px solid rgba(56, 189, 248, 0.2);
 }
 
-/* 7. Other UI Components */
-.room-code-box { background: #1e293b; border: 2px dashed #38bdf8; padding: 15px; border-radius: 16px; font-size: 22px; font-weight: bold; flex-grow: 1; }
-#floating-stats { position: absolute; top: env(safe-area-inset-top, 15px); left: 50%; transform: translateX(-50%); display: none; gap: 15px; z-index: 4000; background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(10px); padding: 8px 20px; border-radius: 30px; border: 1px solid rgba(56, 189, 248, 0.2); font-size: 12px; }
+/* 7. Setup & Stats */
+#floating-stats { 
+    position: absolute; top: env(safe-area-inset-top, 15px); 
+    left: 50%; transform: translateX(-50%); display: none; 
+    background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(10px); 
+    padding: 8px 20px; border-radius: 30px; border: 1px solid rgba(56, 189, 248, 0.2); 
+}
 
-/* Single Player Options Panel */
 #single-player-opts {
-    width: 100%; max-width: 320px; flex-direction: column; gap: 10px;
+    width: 100%; max-width: 320px; display: none; flex-direction: column; gap: 10px;
     background: rgba(56, 189, 248, 0.05); padding: 15px; border-radius: 16px;
-    border: 1px solid rgba(56, 189, 248, 0.1);
 }
 .opt-group { display: flex; justify-content: space-between; align-items: center; width: 100%; }
 .opt-label { font-size: 14px; color: #38bdf8; }
-#bot-count { width: 60px; padding: 8px; margin: 0; }
-#bot-difficulty { padding: 8px; border-radius: 8px; background: #0f172a; color: white; border: 1px solid #38bdf8; }
