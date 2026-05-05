@@ -1,4 +1,4 @@
-// territory.js - Canvas Drawing to GPS Mapping & Arena Math + Safety Logic[cite: 7, 13]
+// territory.js - Canvas Drawing to GPS Mapping & Arena Math
 
 let drawingPath = [];
 let isDrawing = false;
@@ -11,13 +11,13 @@ function initDrawingCanvas(mapInstance) {
     canvas = document.getElementById('drawing-canvas');
     ctx = canvas.getContext('2d');
     
-    // התאמת גודל הקנבס למסך המכשיר[cite: 13]
+    // התאמת גודל הקנבס למסך המכשיר
     canvas.width = window.innerWidth;
     canvas.height = window.innerHeight;
     
     document.getElementById('drawing-container').style.display = 'block';
     
-    // מאזיני מגע לציור חופשי[cite: 13]
+    // מאזיני מגע לציור חופשי
     canvas.addEventListener('touchstart', (e) => startDrawing(e, mapInstance), { passive: false });
     canvas.addEventListener('touchmove', (e) => draw(e, mapInstance), { passive: false });
     canvas.addEventListener('touchend', stopDrawing);
@@ -80,18 +80,9 @@ function clearDrawing() {
 }
 
 // ==========================================
-// 2. Finalize & Calculate Arena (Safety Rule Check)[cite: 7]
+// 2. Finalize & Calculate Arena
 // ==========================================
 function finalizeDrawing() {
-    // 3.1: בדיקת אישור בטיחות גיל (חובה לפי האפיון)[cite: 7]
-    const safetyChecked = document.getElementById('safety-confirm-checkbox').checked;
-    if (!safetyChecked) {
-        alert(window.currentLang === 'he' 
-            ? "עליך לאשר שכל השחקנים מעל גיל 16 לטובת בטיחות בדרכים לפני התחלת המשחק!" 
-            : "You must confirm all players are over 16 for road safety before starting!");
-        return null;
-    }
-
     if (drawingPath.length < 10) return null;
 
     const coords = drawingPath.map(p => [p[1], p[0]]);

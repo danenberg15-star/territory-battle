@@ -31,18 +31,18 @@
         .btn-red { background: #991b1b; }
         .btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; max-width: 350px; width: 100%; margin: 15px 0 0 0; }
         
-        /* 5. Map Controls */
-        #map-controls { position: absolute; left: 15px; bottom: 80px; z-index: 3000; display: none; flex-direction: column; align-items: center; gap: 5px; }
+        /* 5. Map Controls (Raised by 10vh) */
+        #map-controls { position: absolute; left: 15px; bottom: calc(80px + 10vh); z-index: 3000; display: none; flex-direction: column; align-items: center; gap: 5px; }
         .ctrl-btn { width: 45px; height: 45px; background: rgba(30, 41, 59, 0.85); border: 2px solid #38bdf8; color: white; border-radius: 10px; font-size: 20px; font-weight: bold; cursor: pointer; display: flex; align-items: center; justify-content: center; pointer-events: auto; backdrop-filter: blur(5px); }
-        #zoom-controls { position: absolute; right: 15px; bottom: 80px; z-index: 3000; display: none; flex-direction: column; gap: 8px; }
+        #zoom-controls { position: absolute; right: 15px; bottom: calc(80px + 10vh); z-index: 3000; display: none; flex-direction: column; gap: 8px; }
 
         /* 6. Lobby Elements */
         .room-code-box { background: #1e293b; border: 2px dashed #38bdf8; padding: 15px; border-radius: 12px; font-size: 24px; font-weight: bold; text-align: center; flex-grow: 1; }
         .btn-whatsapp-icon { background: #25D366; border: none; border-radius: 50%; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-right: 15px; }
         .team-list { background: #1e293b; border-radius: 12px; padding: 10px; flex: 1; display: flex; flex-direction: column; margin: 5px; }
 
-        /* 7. Setup UI & Safety */
-        #setup-ui { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 95%; max-width: 450px; display: none; flex-direction: column; align-items: center; gap: 8px; pointer-events: auto; background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; }
+        /* 7. Setup UI (Raised by 10vh) */
+        #setup-ui { position: absolute; bottom: calc(15px + 10vh); left: 50%; transform: translateX(-50%); z-index: 3000; width: 95%; max-width: 450px; display: none; flex-direction: column; align-items: center; gap: 8px; pointer-events: auto; background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; }
         
         /* 8. Top Bar Stats */
         #floating-stats { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: none; flex-direction: row; justify-content: center; gap: 15px; z-index: 4000; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); padding: 8px 20px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 12px; font-weight: bold; }
@@ -115,8 +115,19 @@
     <div id="map"></div>
     <div id="drawing-container"><canvas id="drawing-canvas"></canvas></div>
 
-    <div id="map-controls"><button class="ctrl-btn" onclick="panMap('up')">↑</button><div style="display:flex; gap:5px;"><button class="ctrl-btn" onclick="panMap('left')">←</button><button class="ctrl-btn" onclick="panMap('right')">→</button></div><button class="ctrl-btn" onclick="panMap('down')">↓</button></div>
-    <div id="zoom-controls"><button class="ctrl-btn" onclick="zoomMap(1)">+</button><button class="ctrl-btn" onclick="zoomMap(-1)">-</button></div>
+    <div id="map-controls">
+        <button class="ctrl-btn" onclick="panMap('up')">↑</button>
+        <div style="display:flex; gap:5px;">
+            <button class="ctrl-btn" onclick="panMap('left')">←</button>
+            <button class="ctrl-btn" onclick="panMap('right')">→</button>
+        </div>
+        <button class="ctrl-btn" onclick="panMap('down')">↓</button>
+    </div>
+    
+    <div id="zoom-controls">
+        <button class="ctrl-btn" onclick="zoomMap(1)">+</button>
+        <button class="ctrl-btn" onclick="zoomMap(-1)">-</button>
+    </div>
 
     <div id="setup-ui">
         <div id="setup-msg" style="text-align:center; font-size:13px; margin-bottom:5px;">מקם מפה וצייר זירה.</div>
