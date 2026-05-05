@@ -1,4 +1,4 @@
-// lobby.js - Full Version with Drag & Drop & Persistence + QA Interceptor + Offline Persistence
+// lobby.js - Full Version with Drag & Drop, Persistence, QA, and Single Player AI Logic
 
 // ==========================================
 // 1. Globals & Persistence
@@ -44,7 +44,49 @@ window.onload = () => {
     const urlParams = new URLSearchParams(window.location.search);
     if(urlParams.has('room')) document.getElementById('room-code-input').value = urlParams.get('room');
     setLanguage('he'); 
+    
+    // Add Game Mode Radio Buttons to HTML dynamically for cleaner injection
+    const loginScreen = document.getElementById('login-screen');
+    const controlsHtml = `
+        <div style="margin-bottom: 15px; text-align: center;">
+            <label style="color: white; font-weight: bold; margin-left: 15px;">
+                <input type="radio" name="gameMode" value="multi" checked onchange="toggleSinglePlayerOpts()"> רב משתתפים
+            </label>
+            <label style="color: white; font-weight: bold;">
+                <input type="radio" name="gameMode" value="single" onchange="toggleSinglePlayerOpts()"> שחקן יחיד (בוטים)
+            </label>
+        </div>
+        <div id="single-player-opts" style="display: none; width: 100%; max-width: 300px; margin-bottom: 15px;">
+            <label style="color: #38bdf8; font-size: 14px;">כמות בוטים (שוטרים):</label>
+            <input type="number" id="bot-count" value="3" min="1" max="5" style="margin-bottom: 10px;">
+            <label style="color: #38bdf8; font-size: 14px;">רמת קושי:</label>
+            <select id="bot-difficulty" style="width: 100%; padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; background: #1e293b; color: white;">
+                <option value="rookie">טירון</option>
+                <option value="skilled" selected>מיומן</option>
+                <option value="elite">עילית</option>
+            </select>
+        </div>
+    `;
+    // Insert before the join button
+    document.getElementById('room-code-input').insertAdjacentHTML('beforebegin', controlsHtml);
 };
+
+function toggleSinglePlayerOpts() {
+    const mode = document.querySelector('input[name="gameMode"]:checked').value;
+    const opts = document.getElementById('single-player-opts');
+    const roomInput = document.getElementById('room-code-input');
+    const joinBtn = document.querySelector('button[onclick="joinRoom()"]');
+
+    if (mode === 'single') {
+        opts.style.display = 'block';
+        roomInput.style.display = 'none';
+        joinBtn.style.display = 'none';
+    } else {
+        opts.style.display = 'none';
+        roomInput.style.display = 'block';
+        joinBtn.style.display = 'block';
+    }
+}
 
 function setLanguage(lang) {
     currentLang = lang;
@@ -52,11 +94,8 @@ function setLanguage(lang) {
     const t = i18n[lang];
     document.getElementById('lbl-main-title').innerHTML = t.mainTitle;
     document.getElementById('lbl-lobby-title').innerHTML = t.lobbyTitle;
-    document.getElementById('btn-join').innerHTML = t.btnJoin;
-    document.getElementById('btn-create').innerHTML = t.btnCreate;
-    document.getElementById('lbl-room-code').innerHTML = t.roomCodeLbl;
-    document.getElementById('lbl-cops').innerHTML = t.copsLbl;
-    document.getElementById('lbl-thieves').innerHTML = t.thievesLbl;
+    document.querySelector('button[onclick="joinRoom()"]').innerHTML = t.btnJoin;
+    document.querySelector('button[onclick="createRoom()"]').innerHTML = t.btnCreate;
     document.getElementById('btn-start-game').innerHTML = t.btnStart;
 }
 
@@ -70,18 +109,54 @@ async function enableWakeLock() {
 }
 
 // ==========================================
-// 4. Lobby Actions
+// 4. Lobby Actions & Single Player Injection
 // ==========================================
 function createRoom() {
     const inputName = document.getElementById('player-name').value.trim();
     if (!inputName) return alert("הכנס שם");
     playerName = inputName;
     localStorage.setItem('tb_name', playerName);
+    
     const roomId = Math.floor(1000 + Math.random() * 9000).toString();
     currentRoom = roomId;
     isHost = true;
     enableWakeLock();
-    window.db.ref(`rooms/${roomId}`).set({ status: 'lobby', host: playerId, createdAt: Date.now() }).then(() => joinRoomLogic(roomId));
+
+    const gameMode = document.querySelector('input[name="gameMode"]:checked').value;
+    const roomData = { 
+        status: 'lobby', 
+        host: playerId, 
+        createdAt: Date.now(),
+        gameMode: gameMode 
+    };
+
+    if (gameMode === 'single') {
+        roomData.difficulty = document.getElementById('bot-difficulty').value;
+        roomData.botCount = parseInt(document.getElementById('bot-count').value) || 3;
+    }
+
+    // Zero-Latency: Define updates and transition immediately
+    const updates = {};
+    updates[`rooms/${roomId}`] = roomData;
+    updates[`rooms/${roomId}/players/${playerId}`] = { 
+        name: playerName, 
+        role: 'thief', 
+        t: Date.now(),
+        isOffline: false,
+        disconnectedAt: null
+    };
+
+    if (gameMode === 'single') {
+        for (let i = 1; i <= roomData.botCount; i++) {
+            updates[`rooms/${roomId}/players/bot_cop_${i}`] = { 
+                name: `שוטר ${i} (בוט)`, 
+                role: 'cop', 
+                t: Date.now() 
+            };
+        }
+    }
+
+    window.db.ref().update(updates).then(() => joinRoomLogic(roomId));
 }
 
 function joinRoom() {
@@ -90,19 +165,13 @@ function joinRoom() {
     
     if (!inputName) return alert("הכנס שם");
 
-    // ==========================================
-    // QA Sandbox Interception (99999 / 88888)
-    // ==========================================
     if (roomId === '99999' || roomId === '88888') {
         playerName = inputName;
         localStorage.setItem('tb_name', playerName);
         currentRoom = roomId;
         enableWakeLock();
-        if (typeof initQARoom === 'function') {
-            initQARoom(roomId); // מזניק את ה-QA
-        } else {
-            alert("שגיאה: קובץ בדיקות (QA) לא נטען כראוי.");
-        }
+        if (typeof initQARoom === 'function') initQARoom(roomId); 
+        else alert("שגיאה: קובץ בדיקות (QA) לא נטען כראוי.");
         return;
     }
 
@@ -123,15 +192,13 @@ function joinRoomLogic(roomId) {
     document.getElementById('lobby-screen').style.display = 'flex';
     document.getElementById('display-room-code').innerText = roomId;
     
-    // קריאה מקדימה כדי למנוע דריסת נתוני שחקן בחיבור מחדש למשחק פעיל
     window.db.ref(`rooms/${roomId}`).once('value', snap => {
         const roomData = snap.val();
         if (!roomData) return;
 
         const isReconnecting = roomData.status === 'playing' && roomData.players && roomData.players[playerId];
 
-        if (!isReconnecting) {
-            // התחברות לראשונה או ללובי
+        if (!isReconnecting && roomData.gameMode !== 'single') {
             window.db.ref(`rooms/${roomId}/players/${playerId}`).set({ 
                 name: playerName, 
                 role: 'thief', 
@@ -139,8 +206,7 @@ function joinRoomLogic(roomId) {
                 isOffline: false,
                 disconnectedAt: null
             });
-        } else {
-            // התחברות מחדש (Reconnect) - עדכון סטטוס חיבור בלבד
+        } else if (isReconnecting) {
             window.db.ref(`rooms/${roomId}/players/${playerId}`).update({ 
                 isOffline: false,
                 disconnectedAt: null,
@@ -148,13 +214,11 @@ function joinRoomLogic(roomId) {
             });
         }
 
-        // במקום מחיקה מיידית, מסמנים כלא מקוון לטובת חוק ה-3 דקות
         window.db.ref(`rooms/${roomId}/players/${playerId}`).onDisconnect().update({
             isOffline: true,
             disconnectedAt: firebase.database.ServerValue.TIMESTAMP
         });
 
-        // האזנה לשינויים בחדר
         window.db.ref(`rooms/${roomId}`).on('value', snap => {
             const updatedRoom = snap.val();
             if (!updatedRoom) return;
@@ -233,7 +297,6 @@ function handleTouchEnd(e, id, el) {
     const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
     el.style.display = 'block';
     
-    // Reset styles
     el.style.position = ''; el.style.zIndex = ''; el.style.left = ''; el.style.top = ''; el.style.width = ''; el.style.opacity = '';
     activeTouchElement = null;
 
@@ -246,10 +309,10 @@ function handleTouchEnd(e, id, el) {
     }
 }
 
+// Zero-Latency start game transition
 function startGame() {
-    window.db.ref(`game/${currentRoom}`).remove().then(() => {
-        window.db.ref(`rooms/${currentRoom}`).update({ status: 'playing', gameStartTime: Date.now() });
-    });
+    // We update status to 'playing' directly without waiting for a remove operation to resolve first.
+    window.db.ref(`rooms/${currentRoom}`).update({ status: 'playing', gameStartTime: Date.now() });
 }
 
 function shareWhatsApp() {
