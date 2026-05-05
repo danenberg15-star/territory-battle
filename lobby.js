@@ -1,8 +1,6 @@
-// lobby.js - Fixed Responsive Layout for Modern Phones
+// lobby.js - Complete Logic with UI Symmetry & Drag-Drop[cite: 4]
 
-// ==========================================
 // 1. Globals & Persistence
-// ==========================================
 let playerId = localStorage.getItem('tb_uuid');
 if (!playerId) {
     playerId = 'p_' + Math.floor(Math.random() * 999999);
@@ -15,18 +13,15 @@ let isHost = false;
 let wakeLock = null;
 let selectedGameMode = 'multi'; 
 
-// Mobile Drag Globals
 let activeTouchElement = null;
 let initialX = 0;
 let initialY = 0;
 
-// ==========================================
-// 2. Language & Terminology
-// ==========================================
+// 2. Language & Terminology[cite: 4]
 let currentLang = 'he'; 
 const i18n = {
     'he': {
-        mainTitle: "<b>Cops Vs. Thieves:</b><br><span>Territory Battle</span>",
+        mainTitle: "<b>Cops Vs. Thieves:</b><span>Territory Battle</span>",
         lobbyTitle: "לובי המתנה",
         btnJoin: "הצטרף למשחק קיים",
         btnCreate: "התחל משחק חדש",
@@ -35,11 +30,10 @@ const i18n = {
         modeMulti: "קבוצה מול קבוצה",
         modeSingle: "לשחק מול הבוטים",
         copsLbl: "שוטרים 👮‍♂️",
-        thievesLbl: "גנבים 🥷",
-        btnStart: "התחל משחק<br><span style='font-size:12px; font-weight:normal;'>(לחוויה מיטבית וודא שאינך במצב חיסכון סוללה)</span>"
+        thievesLbl: "גנבים 🥷"
     },
     'en': {
-        mainTitle: "<b>Cops Vs. Thieves:</b><br><span>Territory Battle</span>",
+        mainTitle: "<b>Cops Vs. Thieves:</b><span>Territory Battle</span>",
         lobbyTitle: "Waiting Lobby",
         btnJoin: "Join Existing Game",
         btnCreate: "Start New Game",
@@ -48,8 +42,7 @@ const i18n = {
         modeMulti: "Team vs Team",
         modeSingle: "VS Bots",
         copsLbl: "Cops 👮‍♂️",
-        thievesLbl: "Thieves 🥷",
-        btnStart: "Start Game<br><span style='font-size:12px; font-weight:normal;'>(Turn off Low Power Mode)</span>"
+        thievesLbl: "Thieves 🥷"
     }
 };
 
@@ -62,9 +55,7 @@ window.onload = () => {
     setLanguage('he'); 
 };
 
-// ==========================================
-// 3. UI Injections
-// ==========================================
+// 3. UI Injections[cite: 4]
 function injectAdvancedToggle() {
     const wrapper = document.getElementById('mode-toggle-wrapper');
     const t = i18n[currentLang];
@@ -75,15 +66,19 @@ function injectAdvancedToggle() {
             <div class="mode-option active" id="opt-multi" onclick="setGameMode('multi')">${t.modeMulti}</div>
             <div class="mode-option" id="opt-single" onclick="setGameMode('single')">${t.modeSingle}</div>
         </div>
-        <div id="single-player-opts" style="display: none; width: 100%; max-width: 300px;">
-            <label style="color: #38bdf8; font-size: 14px; display: block; margin-bottom: 5px; text-align: right;">כמות בוטים (שוטרים):</label>
-            <input type="number" id="bot-count" value="3" min="1" max="5" style="margin-bottom: 10px;">
-            <label style="color: #38bdf8; font-size: 14px; display: block; margin-bottom: 5px; text-align: right;">רמת קושי:</label>
-            <select id="bot-difficulty" style="width: 100%; padding: 12px; border-radius: 50px; border: 1px solid #38bdf8; background: #1e293b; color: white; text-align: center; font-size: 16px;">
-                <option value="rookie">טירון</option>
-                <option value="skilled" selected>מיומן</option>
-                <option value="elite">עילית</option>
-            </select>
+        <div id="single-player-opts" style="display: none;">
+            <div class="opt-group">
+                <label class="opt-label">כמות בוטים (שוטרים):</label>
+                <input type="number" id="bot-count" value="3" min="1" max="5">
+            </div>
+            <div class="opt-group">
+                <label class="opt-label">רמת קושי:</label>
+                <select id="bot-difficulty">
+                    <option value="rookie">טירון</option>
+                    <option value="skilled" selected>מיומן</option>
+                    <option value="elite">עילית</option>
+                </select>
+            </div>
         </div>
     `;
     wrapper.innerHTML = toggleHtml;
@@ -102,7 +97,7 @@ function setGameMode(mode) {
         toggle.classList.add('single-active');
         optSingle.classList.add('active');
         optMulti.classList.remove('active');
-        opts.style.display = 'block';
+        opts.style.display = 'flex'; 
         roomInput.style.display = 'none';
         joinBtn.style.display = 'none';
     } else {
@@ -119,23 +114,9 @@ function setLanguage(lang) {
     currentLang = lang;
     document.dir = lang === 'he' ? 'rtl' : 'ltr';
     const t = i18n[lang];
-    
     document.getElementById('lbl-main-title').innerHTML = t.mainTitle;
     document.getElementById('player-name').placeholder = t.namePlaceholder;
     document.getElementById('room-code-input').placeholder = t.roomCodePlaceholder;
-    document.getElementById('btn-join-room').innerHTML = t.btnJoin;
-    document.getElementById('btn-create-room').innerHTML = t.btnCreate;
-    
-    const optMulti = document.getElementById('opt-multi');
-    const optSingle = document.getElementById('opt-single');
-    if(optMulti) optMulti.innerText = t.modeMulti;
-    if(optSingle) optSingle.innerText = t.modeSingle;
-
-    const lobbyTitle = document.getElementById('lbl-lobby-title');
-    if(lobbyTitle) lobbyTitle.innerHTML = t.lobbyTitle;
-    
-    const startBtn = document.getElementById('btn-start-game');
-    if(startBtn) startBtn.innerHTML = t.btnStart;
 }
 
 function toggleLanguage() { setLanguage(currentLang === 'he' ? 'en' : 'he'); }
@@ -145,9 +126,7 @@ async function enableWakeLock() {
     catch (err) { console.warn("WakeLock failed"); }
 }
 
-// ==========================================
-// 4. Lobby & Room Actions
-// ==========================================
+// 4. Room Actions
 function createRoom() {
     const inputName = document.getElementById('player-name').value.trim();
     if (!inputName) return alert("הכנס שם");
@@ -172,21 +151,11 @@ function createRoom() {
         roomData.botCount = parseInt(document.getElementById('bot-count').value) || 3;
     }
 
-    roomData.players[playerId] = { 
-        name: playerName, 
-        role: 'thief', 
-        t: Date.now(),
-        isOffline: false,
-        disconnectedAt: null
-    };
+    roomData.players[playerId] = { name: playerName, role: 'thief', t: Date.now(), isOffline: false, disconnectedAt: null };
 
     if (selectedGameMode === 'single') {
         for (let i = 1; i <= roomData.botCount; i++) {
-            roomData.players[`bot_cop_${i}`] = { 
-                name: `שוטר ${i} (בוט)`, 
-                role: 'cop', 
-                t: Date.now() 
-            };
+            roomData.players[`bot_cop_${i}`] = { name: `שוטר ${i} (בוט)`, role: 'cop', t: Date.now() };
         }
     }
 
@@ -198,15 +167,7 @@ function createRoom() {
 function joinRoom() {
     const inputName = document.getElementById('player-name').value.trim();
     const roomId = document.getElementById('room-code-input').value.trim();
-    if (!inputName) return alert("הכנס שם");
-    
-    if (roomId === '99999' || roomId === '88888') {
-        playerName = inputName;
-        currentRoom = roomId;
-        enableWakeLock();
-        if (typeof initQARoom === 'function') initQARoom(roomId); 
-        return;
-    }
+    if (!inputName || !roomId) return alert("הכנס שם וקוד משחק");
     
     playerName = inputName;
     currentRoom = roomId;
@@ -271,9 +232,7 @@ function renderLobbyPlayers(players) {
     });
 }
 
-// ==========================================
 // 5. Drag & Drop Logic
-// ==========================================
 function handleTouchStart(e, id, el) {
     activeTouchElement = el;
     activeTouchElement.dataset.playerId = id;

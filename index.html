@@ -6,86 +6,91 @@
     <title>Cops Vs. Thieves: Territory Battle</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
-        /* 1. Base Styles & General Design Consistency */
+        /* 1. Base Styles & Global Consistency[cite: 3] */
         body, html { 
             margin: 0; padding: 0; height: 100%; width: 100%; 
-            overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            overflow: hidden; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; 
             background-color: #0f172a; color: white; user-select: none; -webkit-user-select: none; 
         }
-        #map { height: 100%; width: 100%; position: absolute; top: 0; z-index: 1; display: none; }
         
-        /* 2. Screens & Layout */
-        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; padding: 20px; box-sizing: border-box; }
+        /* 2. Screen Layouts[cite: 3] */
+        .screen { 
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; 
+            display: flex; flex-direction: column; align-items: center; justify-content: center; 
+            background-color: #0f172a; padding: 30px 20px; box-sizing: border-box;
+            gap: 20px; /* מרווח אחיד בין כל הרכיבים[cite: 3] */
+        }
         #lobby-screen { display: none; justify-content: flex-start; padding-top: 50px; }
         
-        /* 3. Rounded Design Consistency (Inputs & Buttons) */
-        input { 
-            width: 100%; max-width: 300px; padding: 15px; margin-bottom: 15px; 
-            border-radius: 50px; 
-            border: 1px solid #38bdf8; background: #1e293b; color: white; 
-            font-size: 18px; text-align: center; box-sizing: border-box; 
+        /* 3. Typography & Brand[cite: 3] */
+        .game-logo { width: 130px; height: 130px; border-radius: 25px; filter: drop-shadow(0 0 15px #38bdf8); margin-bottom: 5px; }
+        h1 { color: #38bdf8; font-size: 20px; text-align: center; margin: 0; line-height: 1.2; text-shadow: 0 0 10px rgba(56, 189, 248, 0.4); }
+        h1 b { display: inline-block; direction: ltr; unicode-bidi: bidi-override; }
+        h1 span { font-size: 26px; display: block; color: white; margin-top: 5px; }
+
+        /* 4. Rounded Inputs & Buttons (Pill-shaped)[cite: 3] */
+        input, select { 
+            width: 100%; max-width: 300px; padding: 15px; 
+            border-radius: 50px; border: 1px solid #38bdf8; 
+            background: #1e293b; color: white; font-size: 17px; 
+            text-align: center; box-sizing: border-box; outline: none;
         }
         
         .btn { 
-            width: 100%; max-width: 300px; padding: 18px; 
-            border-radius: 50px; 
+            width: 100%; max-width: 300px; padding: 16px; border-radius: 50px; 
             border: none; font-size: 18px; font-weight: bold; color: white; 
-            cursor: pointer; margin-bottom: 15px; transition: 0.2s; 
-            text-align: center; display: flex; align-items: center; justify-content: center; 
+            cursor: pointer; transition: 0.2s; text-align: center; 
+            display: flex; align-items: center; justify-content: center;
         }
         .btn-blue { background: #1e40af; border-bottom: 4px solid #1e3a8a; }
         .btn-red { background: #991b1b; border-bottom: 4px solid #7f1d1d; }
         .btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; max-width: 350px; width: 100%; margin: 15px 0 0 0; }
-        
-        /* 4. Brand Elements - Fixed Title & Logo */
-        .game-logo { width: 140px; height: 140px; margin-bottom: 10px; border-radius: 30px; filter: drop-shadow(0 0 15px #38bdf8); }
-        h1 { color: #38bdf8; font-size: 22px; margin-bottom: 25px; text-align: center; text-shadow: 0 0 10px rgba(56, 189, 248, 0.5); line-height: 1.2; }
-        h1 b { display: inline-block; direction: ltr; }
-        h1 span { font-size: 28px; display: block; color: white; }
 
-        /* 5. Advanced Rounded Toggle - Responsive Column Fix */
-        #mode-toggle-wrapper {
-            width: 100%;
-            display: flex;
-            flex-direction: column; /* סידור בטור במקום שורה */
-            align-items: center;
-            gap: 15px; /* ריווח בין הטוגל לאפשרויות הבוטים */
-        }
-
+        /* 5. Modern Toggle UI[cite: 3] */
+        #mode-toggle-wrapper { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 15px; }
         .mode-toggle-container {
             display: flex; background: #1e293b; border-radius: 50px; padding: 4px; 
             width: 100%; max-width: 300px; position: relative; 
             border: 1px solid #38bdf8; box-sizing: border-box; direction: rtl;
         }
-        .mode-option {
-            flex: 1; text-align: center; padding: 12px 0; font-size: 14px; 
-            font-weight: bold; color: #94a3b8; cursor: pointer; z-index: 1; transition: 0.3s;
-        }
+        .mode-option { flex: 1; text-align: center; padding: 12px 0; font-size: 14px; font-weight: bold; color: #94a3b8; cursor: pointer; z-index: 2; transition: 0.3s; }
         .mode-option.active { color: white; }
-        
-        /* סליידר עם שליטה במיקום מימין למניעת טעויות כיוון ב-RTL */
         .mode-slider {
             position: absolute; top: 4px; right: 4px; width: calc(50% - 4px); 
             height: calc(100% - 8px); background: #38bdf8; border-radius: 50px; 
-            transition: 0.3s ease-in-out; z-index: 0;
+            transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1); z-index: 1;
         }
-        /* כשהבוטים פעילים (צד שמאל ב-RTL), נזיז את ה-right ב-50% */
         .mode-toggle-container.single-active .mode-slider { right: calc(50% + 0px); }
 
-        /* 6. Functional Layers (Unchanged) */
-        #map { position: absolute; top: 0; z-index: 1; }
-        #drawing-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2500; display: none; }
-        #chat-container { position: absolute; top: 70px; width: 45%; max-width: 210px; z-index: 5000; display: none; }
-        #controls-container { display: none; position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%); z-index: 5500; }
-        #floating-stats { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: none; z-index: 4000; }
+        /* 6. Bot Options[cite: 3] */
+        #single-player-opts { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 12px; }
+        .opt-group { width: 100%; max-width: 300px; display: flex; flex-direction: column; gap: 5px; }
+        .opt-label { color: #38bdf8; font-size: 13px; font-weight: bold; text-align: center; }
+
+        /* 7. Game Infrastructure Styles (From index_29.html)[cite: 3] */
+        #map { height: 100%; width: 100%; position: absolute; top: 0; z-index: 1; display: none; }
+        #drawing-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2500; display: none; background: rgba(15, 23, 42, 0.2); touch-action: none; }
+        #drawing-canvas { width: 100%; height: 100%; cursor: crosshair; }
+        .room-code-box { background: #1e293b; border: 2px dashed #38bdf8; padding: 15px; border-radius: 12px; font-size: 24px; font-weight: bold; text-align: center; flex-grow: 1; }
+        .btn-whatsapp-icon { background: #25D366; border: none; border-radius: 50%; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-right: 15px; }
+        .team-list { background: #1e293b; border-radius: 12px; padding: 10px; flex: 1; display: flex; flex-direction: column; margin: 5px; }
+        #floating-stats { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: none; flex-direction: row; justify-content: center; gap: 15px; z-index: 4000; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); padding: 8px 20px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 12px; font-weight: bold; }
+        #radar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2400; display: none; pointer-events: none; background: rgba(239, 68, 68, 0.2); animation: radar-flash 0.6s infinite alternate; }
+        @keyframes radar-flash { 0% { box-shadow: inset 0 0 30px rgba(239, 68, 68, 0.5); opacity: 0.4; } 100% { box-shadow: inset 0 0 150px rgba(239, 68, 68, 1); opacity: 1; } }
+        #arrest-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 4600; display: none; flex-direction: column; align-items: center; justify-content: center; background: rgba(0,0,0,0.8); }
+        .jail-bars { position: absolute; top: -100%; left: 0; width: 100%; height: 100%; background: repeating-linear-gradient(90deg, #111, #111 20px, transparent 20px, transparent 60px); z-index: 2; transition: top 0.5s ease-in; }
+        #chat-container { position: absolute; top: 70px; width: 45%; max-width: 210px; z-index: 5000; display: none; flex-direction: column; pointer-events: auto; }
+        #chat-messages { width: 100%; height: 150px; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(4px); border-radius: 12px; overflow-y: auto; padding: 10px; font-size: 13px; border: 2px solid rgba(56, 189, 248, 0.3); margin-bottom: 8px; box-sizing: border-box; }
+        #controls-container { display: none; position: absolute; bottom: 35px; left: 50%; transform: translateX(-50%); z-index: 5500; pointer-events: none; width: 140px; height: 140px; }
     </style>
 </head>
 <body>
     <button id="lang-toggle" onclick="toggleLanguage()" style="position:absolute; top:15px; right:15px; z-index:4102; background:rgba(30, 41, 59, 0.8); color:white; border-radius:50%; width:40px; height:40px; border:1px solid #38bdf8;">🌐</button>
 
+    <!-- מסך פתיחה מתוקן[cite: 3] -->
     <div id="login-screen" class="screen">
         <img src="LOGO 512.webp" alt="Logo" class="game-logo">
-        <h1 id="lbl-main-title"><b>Cops Vs. Thieves:</b><br><span>Territory Battle</span></h1>
+        <h1 id="lbl-main-title"><b>Cops Vs. Thieves:</b><span>Territory Battle</span></h1>
         
         <input type="text" id="player-name" placeholder="שם השחקן" />
         <div id="mode-toggle-wrapper"></div>
@@ -95,30 +100,48 @@
         <button class="btn btn-red" id="btn-create-room" onclick="createRoom()">התחל משחק חדש</button>
     </div>
 
+    <!-- מסך לובי (נשמר מגרסה 29)[cite: 3] -->
     <div id="lobby-screen" class="screen">
         <h2 id="lbl-lobby-title">לובי המתנה</h2>
         <div style="display: flex; align-items: center; width: 100%; max-width: 350px; margin-bottom: 20px;">
-            <div class="room-code-box" style="background: #1e293b; border: 2px dashed #38bdf8; padding: 15px; border-radius: 12px; font-size: 24px; font-weight: bold; text-align: center; flex-grow: 1;">קוד: <span id="display-room-code">----</span></div>
-            <button class="btn-whatsapp-icon" onclick="shareWhatsApp()" style="background: #25D366; border: none; border-radius: 50%; width: 55px; height: 55px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-right: 15px;"><svg viewBox="0 0 24 24" width="30" height="30" fill="white"><path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.128.552 4.195 1.6 6.02L.053 24l6.113-1.603c1.764.954 3.754 1.458 5.865 1.458 6.646 0 12.031-5.385 12.031-12.031S18.677 0 12.031 0zm3.626 17.15c-.156.44-1.295.992-1.847 1.054-.537.06-1.127.186-3.413-.761-2.92-1.21-4.787-4.225-4.93-4.417-.143-.192-1.178-1.568-1.178-2.986 0-1.418.736-2.115 1.002-2.392.266-.277.674-.352.887-.352.213 0 .426.002.605.009.213.008.497-.083.775.589.284.685.952 2.321 1.036 2.493.084.172.143.376.035.592-.108.216-.164.352-.326.544-.164.192-.345.426-.497.589-.168.176-.347.37-.148.712.199.342.885 1.463 1.895 2.361 1.305 1.159 2.404 1.516 2.748 1.673.344.157.545.132.748-.101.203-.233.882-1.025 1.118-1.378.236-.353.473-.294.787-.176.314.118 1.986.937 2.327 1.107.341.17.568.256.653.398.085.142.085.83-.071 1.27z"/></svg></button>
+            <div class="room-code-box">קוד: <span id="display-room-code">----</span></div>
+            <button class="btn-whatsapp-icon" onclick="shareWhatsApp()"><svg viewBox="0 0 24 24" width="30" height="30" fill="white"><path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.128.552 4.195 1.6 6.02L.053 24l6.113-1.603c1.764.954 3.754 1.458 5.865 1.458 6.646 0 12.031-5.385 12.031-12.031S18.677 0 12.031 0zm3.626 17.15c-.156.44-1.295.992-1.847 1.054-.537.06-1.127.186-3.413-.761-2.92-1.21-4.787-4.225-4.93-4.417-.143-.192-1.178-1.568-1.178-2.986 0-1.418.736-2.115 1.002-2.392.266-.277.674-.352.887-.352.213 0 .426.002.605.009.213.008.497-.083.775.589.284.685.952 2.321 1.036 2.493.084.172.143.376.035.592-.108.216-.164.352-.326.544-.164.192-.345.426-.497.589-.168.176-.347.37-.148.712.199.342.885 1.463 1.895 2.361 1.305 1.159 2.404 1.516 2.748 1.673.344.157.545.132.748-.101.203-.233.882-1.025 1.118-1.378.236-.353.473-.294.787-.176.314.118 1.986.937 2.327 1.107.341.17.568.256.653.398.085.142.085.83-.071 1.27z"/></svg></button>
         </div>
         <div style="display: flex; width: 100%; max-width: 350px; flex-grow: 1;">
-            <div class="team-list" id="list-cops" style="background: #1e293b; border-radius: 12px; padding: 10px; flex: 1; display: flex; flex-direction: column; margin: 5px;"><div style="color:#3b82f6; font-weight:bold; text-align:center; margin-bottom: 10px;">שוטרים 👮‍♂️</div><div id="players-cops"></div></div>
-            <div class="team-list" id="list-thieves" style="background: #1e293b; border-radius: 12px; padding: 10px; flex: 1; display: flex; flex-direction: column; margin: 5px;"><div style="color:#ef4444; font-weight:bold; text-align:center; margin-bottom: 10px;">גנבים 🥷</div><div id="players-thieves"></div></div>
+            <div class="team-list" id="list-cops"><div style="color:#3b82f6; font-weight:bold; text-align:center; margin-bottom: 10px;">שוטרים 👮‍♂️</div><div id="players-cops"></div></div>
+            <div class="team-list" id="list-thieves"><div style="color:#ef4444; font-weight:bold; text-align:center; margin-bottom: 10px;">גנבים 🥷</div><div id="players-thieves"></div></div>
         </div>
         <button class="btn btn-green" id="btn-start-game" style="display:none;" onclick="startGame()">התחל משחק</button>
     </div>
 
+    <!-- שכבות משחק נוספות[cite: 3] -->
     <div id="map"></div>
     <div id="drawing-container"><canvas id="drawing-canvas"></canvas></div>
-    <div id="floating-stats"></div>
-    <div id="chat-container"></div>
+    <div id="floating-stats"><div class="stat-item"><span id="gps-status">GPS ❌</span></div><div class="stat-item">|</div><div class="stat-item"><span id="audio-status">אודיו ⏳</span></div><div class="stat-item">|</div><div class="stat-item"><span id="players-count">שחקנים: 0</span></div></div>
+    <div id="radar-overlay"></div>
+    <div id="arrest-overlay"><div class="jail-bars" id="jail-bars"></div><div id="arrest-text" style="position:relative; z-index:3; color:white; font-size:50px; font-weight:bold; opacity:0;">נתפסת!</div></div>
+    <div id="chat-container"><div id="chat-messages"></div></div>
     <div id="controls-container"></div>
+    <div id="victory-screen" class="screen"><div style="font-size:80px; margin-bottom: 20px;">🏆</div><h1 id="victory-title">ניצחון!</h1><button class="btn btn-blue" onclick="location.reload()" style="margin-top: 20px;">חזור ללובי</button></div>
 
+    <!-- סקריפטים מלאים[cite: 3] -->
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-database-compat.js"></script>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/@turf/turf@6/turf.min.js"></script>
+    <script src="security.js"></script>
+    <script src="audio.js"></script>
+    <script src="territory.js"></script>
     <script src="firebase-init.js"></script>
     <script src="lobby.js"></script>
+    <script src="qa.js"></script>
+    <script src="briefing.js"></script>
+    <script src="thief-mechanics.js"></script>
+    <script src="chat.js"></script>
+    <script src="treasures.js"></script>
+    <script src="victory.js"></script>
+    <script src="bot-ai.js"></script>
     <script src="game-core.js"></script>
     <script src="game-arena.js"></script>
     <script src="game-play.js"></script>
