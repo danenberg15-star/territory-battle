@@ -87,7 +87,7 @@ function checkCopProximity(lat, lng) {
     });
 }
 
-// 4.1: ניהול שובלים וסגירת פוליגונים
+// 4.1: ניהול שובלים וסגירת פוליגונים (כולל התרת פלונטרים)
 function handleThiefTrail(lat, lng) {
     if (thiefPath.length > 0) {
         const last = thiefPath[thiefPath.length - 1];
@@ -96,8 +96,18 @@ function handleThiefTrail(lat, lng) {
 
     if (thiefPath.length > 5) {
         for (let i = 0; i < thiefPath.length - 5; i++) {
-            if (map.distance([lat, lng], thiefPath[i]) < 10) {
-                tryCaptureArea([...thiefPath, [lat, lng]]);
+            // רגישות חיתוך הורדה ל-6 מטר
+            if (map.distance([lat, lng], thiefPath[i]) < 6) {
+                const areaCoords = thiefPath.slice(i);
+                
+                // אם השטח גדול מ-25 מ"ר זה כיבוש שטח תקין
+                if (calculatePathArea(areaCoords) > 25) {
+                    tryCaptureArea([...areaCoords, [lat, lng]]);
+                } else {
+                    // התרת פלונטר: הגנב חזר על עקבותיו, לכן נחתוך את המסלול רק עד נקודת החיתוך
+                    thiefPath = thiefPath.slice(0, i + 1);
+                    if (trailLayer) trailLayer.setLatLngs(thiefPath);
+                }
                 return;
             }
         }
@@ -105,6 +115,15 @@ function handleThiefTrail(lat, lng) {
 
     thiefPath.push([lat, lng]);
     if (trailLayer) trailLayer.setLatLngs(thiefPath);
+}
+
+// פונקציית עזר לחישוב שטח מהיר בתוך המסלול לצורך זיהוי פלונטרים
+function calculatePathArea(points) {
+    try {
+        const coords = points.map(p => [p[1], p[0]]);
+        coords.push(coords[0]);
+        return turf.area(turf.polygon([coords]));
+    } catch(e) { return 0; }
 }
 
 // 4.1 & 4.2: ניסיון סגירת שטח ובדיקת נוכחות שוטר
