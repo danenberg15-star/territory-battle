@@ -1,23 +1,30 @@
-// bot-ai.js - Multi-Target Bot Engine (Co-op Support)
+// bot-ai.js - Multi-Target Bot Engine with Age Profiles & Phased AI
 
 let botInterval = null;
 let botsActive = false;
 let botCooldowns = {};
+let botStates = {}; // זוכר את נקודות השיטוט והסטטוס של כל בוט
 
 function startSinglePlayerAI(roomId, difficulty, arenaData) {
     if (botsActive || !arenaData || !arenaData.points) return;
     botsActive = true;
     console.log(`Starting Co-op vs Bots (${difficulty})...`);
 
-    let speed = 0.00005; 
-    let reactionTime = 2000;
+    // הגדרות פרופילים לפי גיל מתורגמות ל-GPS (0.00001 = ~1 מטר)
+    let scanSpeed, runSpeed, reactionTime;
     
-    if (difficulty === 'rookie') { 
-        speed = 0.00003; 
-        reactionTime = 3000; 
-    } else if (difficulty === 'elite') { 
-        speed = 0.00008; 
-        reactionTime = 1000; 
+    if (difficulty === 'rookie') { // ילד בן 10
+        scanSpeed = 0.00001; 
+        runSpeed = 0.00003;  
+        reactionTime = 2000; 
+    } else if (difficulty === 'elite') { // בחור בן 20
+        scanSpeed = 0.00002; 
+        runSpeed = 0.000075; 
+        reactionTime = 400;  
+    } else { // 'skilled' - ילד בן 14 (ברירת מחדל)
+        scanSpeed = 0.000015; 
+        runSpeed = 0.00005;   
+        reactionTime = 1000;  
     }
 
     const lats = arenaData.points.map(p => p[0]);
@@ -36,20 +43,26 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
 
             const updates = {};
 
-            // לולאה על כל הבוטים במשחק
             Object.keys(players).forEach(botId => {
                 if (botId.startsWith('bot_cop_')) {
                     let bot = players[botId];
                     
+                    // אתחול בוט - זריקה לקצוות הזירה
                     if (!bot.lat || bot.lat === 0) {
                         const edge = Math.floor(Math.random() * 4);
                         if (edge === 0) { bot.lat = maxLat; bot.lng = minLng + Math.random() * (maxLng - minLng); }
                         else if (edge === 1) { bot.lat = minLat; bot.lng = minLng + Math.random() * (maxLng - minLng); }
                         else if (edge === 2) { bot.lat = minLat + Math.random() * (maxLat - minLat); bot.lng = maxLng; }
                         else { bot.lat = minLat + Math.random() * (maxLat - minLat); bot.lng = minLng; }
+                        
+                        botStates[botId] = { mode: 'wander', target: getRandomPointInArena(minLat, maxLat, minLng, maxLng) };
+                    }
+                    
+                    if (!botStates[botId]) {
+                        botStates[botId] = { mode: 'wander', target: getRandomPointInArena(minLat, maxLat, minLng, maxLng) };
                     }
 
-                    // סריקת שטח: חיפוש הגנב *הקרוב ביותר* לבוט הספציפי הזה
+                    // 1. איתור הגנב הקרוב ביותר
                     let closestThief = null;
                     let minDist = Infinity;
 
@@ -66,25 +79,49 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                         }
                     });
 
-                    // תנועה רק אם נמצא יעד חי ופעיל
-                    if (closestThief) {
-                        const latDiff = closestThief.lat - bot.lat;
-                        const lngDiff = closestThief.lng - bot.lng;
-                        const dist = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+                    // 2. לוגיקת תנועה (שיטוט לעומת התבייתות)
+                    // רדיוס 30 מטר = ~0.0003 מעלות
+                    // רדיוס 5 מטר  = ~0.00005 מעלות
+                    let targetLat, targetLng, currentSpeed;
 
-                        if (dist > 0.00001) {
-                            bot.lat += (latDiff / dist) * speed;
-                            bot.lng += (lngDiff / dist) * speed;
-                        }
-                        
-                        updates[`game/${roomId}/players/${botId}/lat`] = bot.lat;
-                        updates[`game/${roomId}/players/${botId}/lng`] = bot.lng;
-                        updates[`game/${roomId}/players/${botId}/t`] = Date.now();
+                    if (closestThief && minDist <= 0.0003) {
+                        // שלב 2: התבייתות (Chase Mode) - הבוט בתוך 30 מטר מגנב!
+                        targetLat = closestThief.lat;
+                        targetLng = closestThief.lng;
+                        currentSpeed = runSpeed;
+                        botStates[botId].mode = 'chase';
 
-                        if (dist < 0.00015) { 
+                        // שלב 3: טייזר (Taser Phase) - הבוט בתוך 5 מטר מהגנב!
+                        if (minDist <= 0.00005) {
                             triggerBotCapture(roomId, botId, bot, reactionTime);
                         }
+                    } else {
+                        // שלב 1: סריקה רנדומלית (Wander Mode)
+                        currentSpeed = scanSpeed;
+                        botStates[botId].mode = 'wander';
+                        targetLat = botStates[botId].target.lat;
+                        targetLng = botStates[botId].target.lng;
+
+                        // בדיקה אם הבוט הגיע ליעד השיטוט שלו (בטווח של 2 מטר)
+                        const distToTarget = Math.sqrt(Math.pow(targetLat - bot.lat, 2) + Math.pow(targetLng - bot.lng, 2));
+                        if (distToTarget < 0.00002) {
+                            botStates[botId].target = getRandomPointInArena(minLat, maxLat, minLng, maxLng);
+                        }
                     }
+
+                    // ביצוע התנועה אל עבר היעד הרלוונטי
+                    const moveLatDiff = targetLat - bot.lat;
+                    const moveLngDiff = targetLng - bot.lng;
+                    const moveDist = Math.sqrt(moveLatDiff * moveLatDiff + moveLngDiff * moveLngDiff);
+
+                    if (moveDist > 0) {
+                        bot.lat += (moveLatDiff / moveDist) * currentSpeed;
+                        bot.lng += (moveLngDiff / moveDist) * currentSpeed;
+                    }
+                    
+                    updates[`game/${roomId}/players/${botId}/lat`] = bot.lat;
+                    updates[`game/${roomId}/players/${botId}/lng`] = bot.lng;
+                    updates[`game/${roomId}/players/${botId}/t`] = Date.now();
                 }
             });
 
@@ -95,11 +132,19 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
     }, 1000); 
 }
 
+function getRandomPointInArena(minLat, maxLat, minLng, maxLng) {
+    return {
+        lat: minLat + Math.random() * (maxLat - minLat),
+        lng: minLng + Math.random() * (maxLng - minLng)
+    };
+}
+
 function triggerBotCapture(roomId, botId, botData, reactionTime) {
     if (botCooldowns[botId] && Date.now() - botCooldowns[botId] < 10000) return; 
     
     botCooldowns[botId] = Date.now();
     
+    // מפעיל את הטייזר רק אחרי זמן התגובה המוגדר לפרופיל!
     setTimeout(() => {
         window.db.ref(`game/${roomId}/captureSignal`).set({
             sender: botId,
