@@ -63,14 +63,11 @@ function checkGpsCatch(copLat, copLng, signalTime) {
 function listenForCaptureSignals() {
     window.db.ref(`game/${window.currentRoom}/captureSignal`).on('value', snap => {
         const sig = snap.val();
-        // בדיקת אות בתוקף (5 שניות אחרונות)
         if (!sig || Date.now() - sig.t > 5000) return;
         
         if (window.playerRole === 'thief') {
-            // הגנב בודק אם הוא קרוב למיקום ממנו נשלח האות (בוט או שוטר)
             const dist = map.distance([myLat, myLng], [sig.lat, sig.lng]);
-            if (dist <= 12) { // רדיוס פגיעה של 12 מטר
-                console.log("Caught by signal from:", sig.sender);
+            if (dist <= 12) { 
                 confirmCatch(window.playerId, sig.t, sig.sender);
             }
         }
@@ -90,30 +87,29 @@ function confirmCatch(victimId, signalTime, copId) {
         }, (error, committed) => {
             if (committed) {
                 if (victimId === window.playerId) {
-                    playArrestAnimation(() => {
-                        // בודקים אם יש עוד גנבים פעילים חוץ מאיתנו
-                        window.db.ref(`rooms/${window.currentRoom}/players`).once('value', pSnap => {
-                            const players = pSnap.val() || {};
-                            let otherActiveThieves = 0;
-                            
-                            Object.keys(players).forEach(id => {
-                                // סופרים גנבים אנושיים שאינם אנחנו ולא מנותקים
-                                if (id !== window.playerId && players[id].role === 'thief' && !players[id].isOffline && !id.startsWith('bot_')) {
-                                    otherActiveThieves++;
-                                }
-                            });
+                    // רטט פגיעה מיידי
+                    if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
+                    
+                    // מעבר ישיר ללוגיקת ניצחון ללא המתנה לאנימציית סורגים
+                    window.db.ref(`rooms/${window.currentRoom}/players`).once('value', pSnap => {
+                        const players = pSnap.val() || {};
+                        let otherActiveThieves = 0;
+                        
+                        Object.keys(players).forEach(id => {
+                            if (id !== window.playerId && players[id].role === 'thief' && !players[id].isOffline && !id.startsWith('bot_')) {
+                                otherActiveThieves++;
+                            }
+                        });
 
-                            // משנים את התפקיד שלנו למלשין
-                            window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'snitch' }).then(() => {
-                                if (otherActiveThieves === 0) {
-                                    // אנחנו הגנב האחרון (או היחיד)!
-                                    // במקום להרוס את המסך עם ריפרש, נכריז על ניצחון השוטרים וניתן לווידאו לנגן
-                                    window.db.ref(`game/${window.currentRoom}/winner`).set('cops');
-                                } else {
-                                    // יש עוד גנבים במשחק, אז רק אנחנו נרפרש וניכנס כמלשינים
-                                    location.reload();
-                                }
-                            });
+                        window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'snitch' }).then(() => {
+                            // הפעלת נטרול אזהרת הדפדפן
+                            if (typeof window.killExitWarning === 'function') window.killExitWarning();
+
+                            if (otherActiveThieves === 0) {
+                                window.db.ref(`game/${window.currentRoom}/winner`).set('cops');
+                            } else {
+                                location.reload();
+                            }
                         });
                     });
                 }
@@ -122,17 +118,48 @@ function confirmCatch(victimId, signalTime, copId) {
     });
 }
 
-function playArrestAnimation(callback) {
-    const overlay = document.getElementById('arrest-overlay');
-    const bars = document.getElementById('jail-bars');
-    const text = document.getElementById('arrest-text');
-    
-    if (overlay) overlay.style.display = 'flex';
-    if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
-    
-    setTimeout(() => { if (bars) bars.style.top = '0'; }, 100);
-    setTimeout(() => { if (text) text.style.opacity = '1'; }, 600);
-    setTimeout(() => { if (callback) callback(); }, 3500); 
+function triggerSnitch() {
+    if (typeof isGameFrozen !== 'undefined' && isGameFrozen) return;
+    const btn = document.getElementById('snitch-btn');
+    if (btn.disabled) return;
+    btn.disabled = true;
+    btn.style.opacity = '0.5';
+
+    window.db.ref(`game/${window.currentRoom}/players`).once('value', snap => {
+        const players = snap.val() || {};
+        let foundThief = false;
+        Object.keys(players).forEach(id => {
+            const p = players[id];
+            if (p.role === 'thief' && !p.isOffline) {
+                const dist = map.distance([myLat, myLng], [p.lat, p.lng]);
+                if (dist <= 15) {
+                    window.db.ref(`game/${window.currentRoom}/players/${id}/flashUntil`).set(Date.now() + 3000);
+                    foundThief = true;
+                }
+            }
+        });
+        if (foundThief && navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    });
+
+    setTimeout(() => { btn.disabled = false; btn.style.opacity = '1'; }, 10000);
+}
+
+function startCooldown(seconds) {
+    const circle = document.getElementById('cooldown-circle');
+    if (!circle) return;
+    let left = seconds;
+    const totalOffset = 358; 
+    const interval = setInterval(() => {
+        left--;
+        const offset = totalOffset - (left / seconds) * totalOffset;
+        circle.style.strokeDashoffset = offset;
+        if (left <= 0) {
+            clearInterval(interval);
+            const btn = document.getElementById('capture-btn');
+            if (btn) { btn.disabled = false; if (navigator.vibrate) navigator.vibrate(50); }
+            circle.style.strokeDashoffset = totalOffset; 
+        }
+    }, 1000);
 }
 
 // ==========================================
@@ -170,7 +197,11 @@ function checkOfflinePlayers() {
 
 function listenToVictory() {
     window.db.ref(`game/${window.currentRoom}/winner`).on('value', snap => {
-        if (snap.val() && typeof showVictoryScreen === 'function') showVictoryScreen(snap.val());
+        if (snap.val() && typeof showVictoryScreen === 'function') {
+            // הפעלת נטרול אזהרת הדפדפן לפני מעבר וידאו
+            if (typeof window.killExitWarning === 'function') window.killExitWarning();
+            showVictoryScreen(snap.val());
+        }
     });
 }
 
@@ -185,7 +216,6 @@ function listenToOtherPlayers() {
     window.db.ref(`rooms/${window.currentRoom}/players`).on('value', snapRooms => {
         const roomPlayers = snapRooms.val() || {};
         
-        // חוק שחקן יחיד: הסתרת צ'אט אם יש רק בן אדם אחד
         const humans = Object.keys(roomPlayers).filter(id => !id.startsWith('bot_'));
         const chatUI = document.getElementById('chat-container');
         const micUI = document.getElementById('chat-mic-btn');
@@ -251,24 +281,6 @@ function listenToOtherPlayers() {
             }
         });
     });
-}
-
-function startCooldown(seconds) {
-    const circle = document.getElementById('cooldown-circle');
-    if (!circle) return;
-    let left = seconds;
-    const totalOffset = 358; 
-    const interval = setInterval(() => {
-        left--;
-        const offset = totalOffset - (left / seconds) * totalOffset;
-        circle.style.strokeDashoffset = offset;
-        if (left <= 0) {
-            clearInterval(interval);
-            const btn = document.getElementById('capture-btn');
-            if (btn) { btn.disabled = false; if (navigator.vibrate) navigator.vibrate(50); }
-            circle.style.strokeDashoffset = totalOffset; 
-        }
-    }, 1000);
 }
 
 function startThiefMechanics() {
