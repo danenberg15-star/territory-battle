@@ -1,64 +1,56 @@
-// victory.js - Handles the Victory Screen and Confetti Animation
+// victory.js - Video Supported Victory Screen
 
-function showVictoryScreen(winningTeam) {
-    // Hide Game UI Elements
-    document.getElementById('game-header').style.display = 'none';
-    document.getElementById('map').style.display = 'none';
-    document.getElementById('controls-container').style.display = 'none';
-    document.getElementById('exit-btn').style.display = 'none';
+function showVictoryScreen(winnerRole) {
+    const screen = document.getElementById('victory-screen');
+    const video = document.getElementById('victory-video');
+    const uiOverlay = document.getElementById('victory-ui-overlay');
+    const title = document.getElementById('victory-title');
+    const defaultTrophy = document.getElementById('default-trophy');
 
-    // Show Victory Screen
-    const victoryScreen = document.getElementById('victory-screen');
-    victoryScreen.style.display = 'flex';
+    // מציג את מסך הניצחון מעל הכל
+    screen.style.display = 'flex';
 
-    // Set Content Based on Winner & Language
-    const iconEl = document.getElementById('victory-icon');
-    const titleEl = document.getElementById('victory-title');
-    const btnEl = document.getElementById('btn-back-lobby');
+    if (winnerRole === 'cops') {
+        // --- לוגיקת שוטרים: מנגנים סרטון וזורקים חזרה ללובי ---
+        video.style.display = 'block';
+        uiOverlay.style.display = 'none';
 
-    const isHebrew = window.currentLang === 'he';
-    btnEl.innerText = isHebrew ? "חזור ללובי" : "Back to Lobby";
+        // מנסים לנגן את הסרטון
+        video.play().then(() => {
+            // כשהסרטון מסתיים באופן טבעי
+            video.onended = () => {
+                location.reload(); // רענון הדף מחזיר אוטומטית ללובי
+            };
+        }).catch(err => {
+            console.warn("Video failed to auto-play, failing back to standard UI:", err);
+            // מנגנון הגנה: אם הדפדפן חסם את ניגון הסרטון בגלל הגדרות מדיה
+            video.style.display = 'none';
+            title.innerText = "השוטרים ניצחו!";
+            title.style.color = "#3b82f6";
+            defaultTrophy.style.display = 'none';
+            uiOverlay.style.display = 'block';
+            
+            // במקרה של כישלון וידאו, עדיין נעשה ריפרש אחרי 5 שניות
+            setTimeout(() => {
+                location.reload();
+            }, 5000);
+        });
 
-    if (winningTeam === 'cops') {
-        iconEl.innerText = '👮‍♂️';
-        titleEl.innerText = isHebrew ? "השוטרים ניצחו!" : "Cops Win!";
-        titleEl.style.color = '#3b82f6'; // Blue
-    } else if (winningTeam === 'thieves') {
-        iconEl.innerText = '🥷';
-        titleEl.innerText = isHebrew ? "הגנבים ניצחו!" : "Thieves Win!";
-        titleEl.style.color = '#ef4444'; // Red
-    }
+    } else {
+        // --- לוגיקת גנבים: UI רגיל + קונפטי + כפתור חזרה ---
+        video.style.display = 'none';
+        title.innerText = "הגנבים ניצחו!";
+        title.style.color = "#ef4444";
+        defaultTrophy.style.display = 'block';
+        uiOverlay.style.display = 'block';
 
-    // Fire Confetti Animation
-    fireConfetti();
-}
-
-function fireConfetti() {
-    const duration = 3 * 1000;
-    const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 30, spread: 360, ticks: 60, zIndex: 5000 };
-
-    function randomInRange(min, max) {
-        return Math.random() * (max - min) + min;
-    }
-
-    const interval = setInterval(function() {
-        const timeLeft = animationEnd - Date.now();
-
-        if (timeLeft <= 0) {
-            return clearInterval(interval);
+        // מפעיל את אפקט הקונפטי
+        if (typeof confetti === 'function') {
+            confetti({
+                particleCount: 150,
+                spread: 70,
+                origin: { y: 0.6 }
+            });
         }
-
-        const particleCount = 50 * (timeLeft / duration);
-        
-        // Fire from two random sources (left and right)
-        confetti(Object.assign({}, defaults, { 
-            particleCount, 
-            origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } 
-        }));
-        confetti(Object.assign({}, defaults, { 
-            particleCount, 
-            origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } 
-        }));
-    }, 250);
+    }
 }

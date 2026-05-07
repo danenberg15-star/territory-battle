@@ -6,6 +6,56 @@
     <title>Territory Battle</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="styles.css" />
+    <style>
+        /* Base Styles */
+        body, html { 
+            margin: 0; padding: 0; height: 100%; width: 100%; 
+            overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #0f172a; color: white; user-select: none; -webkit-user-select: none; 
+        }
+        #map { height: 100%; width: 100%; position: absolute; top: 0; z-index: 1; display: none; }
+        
+        /* Drawing Layer */
+        #drawing-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2500; display: none; background: rgba(15, 23, 42, 0.2); touch-action: none; }
+        #drawing-canvas { width: 100%; height: 100%; cursor: crosshair; }
+        
+        /* Screens */
+        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; padding: 20px; box-sizing: border-box; }
+        #lobby-screen { display: none; justify-content: flex-start; padding-top: 50px; }
+        
+        /* UI Elements */
+        h1 { color: #38bdf8; font-size: 28px; margin-bottom: 30px; text-align: center; text-shadow: 0 0 10px rgba(56, 189, 248, 0.5); }
+        input, select { width: 100%; max-width: 300px; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: 1px solid #38bdf8; background: #1e293b; color: white; font-size: 18px; text-align: center; box-sizing: border-box; user-select: auto; }
+        
+        .btn { width: 100%; max-width: 300px; padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; margin-bottom: 15px; transition: 0.2s; text-align: center; display: flex; align-items: center; justify-content: center; }
+        .btn-blue { background: #1e40af; }
+        .btn-red { background: #991b1b; }
+        .btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; max-width: 350px; width: 100%; margin: 15px 0 0 0; }
+        
+        /* Game Mode Selector */
+        .mode-selector { display: flex; gap: 15px; margin-bottom: 15px; font-size: 16px; background: #1e293b; padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; }
+        .mode-selector label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
+        
+        /* Stats & Controls */
+        #floating-stats { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: none; flex-direction: row; justify-content: center; gap: 15px; z-index: 4000; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); padding: 8px 20px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 12px; font-weight: bold; }
+        .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 4100; background: rgba(220, 38, 38, 0.8); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; font-weight: bold; display: none; align-items: center; justify-content: center; }
+        
+        /* Overlays */
+        #radar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2400; display: none; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; background: rgba(239, 68, 68, 0.2); animation: radar-flash 0.6s infinite alternate; }
+        @keyframes radar-flash { 0% { box-shadow: inset 0 0 30px rgba(239, 68, 68, 0.5); opacity: 0.4; } 100% { box-shadow: inset 0 0 150px rgba(239, 68, 68, 1); opacity: 1; } }
+        .radar-text { color: white; font-size: 26px; font-weight: 900; text-align: center; text-shadow: 0 0 15px #ef4444, 0 0 5px black; padding: 20px; background: rgba(0, 0, 0, 0.3); border-radius: 15px; max-width: 80%; }
+
+        #chat-container { position: absolute; top: 70px; width: 45%; max-width: 210px; z-index: 5000; display: none; flex-direction: column; pointer-events: auto; }
+        #chat-messages { width: 100%; height: 150px; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(4px); border-radius: 12px; overflow-y: auto; padding: 10px; font-size: 13px; border: 2px solid rgba(56, 189, 248, 0.3); margin-bottom: 8px; box-sizing: border-box; }
+        #chat-mic-btn { width: 52px; height: 52px; background: #1e293b; border: 3px solid #38bdf8; border-radius: 50%; cursor: pointer; display: none; align-items: center; justify-content: center; transition: 0.2s; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.8)); outline: none; pointer-events: auto; margin-right: 5px; }
+
+        #setup-ui { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 95%; max-width: 450px; display: none; flex-direction: column; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; }
+        
+        /* סגנונות חדשים למסך הניצחון המשלב וידאו */
+        #victory-screen { display: none; z-index: 6000; padding: 0; background: black; justify-content: center; align-items: center; }
+        #victory-video { position: absolute; width: 100%; height: 100%; object-fit: cover; display: none; }
+        #victory-ui-overlay { position: relative; z-index: 2; text-align: center; display: none; background: rgba(15, 23, 42, 0.85); padding: 30px; border-radius: 20px; border: 2px solid #38bdf8; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
+    </style>
 </head>
 <body>
     <div id="security-overlay"><div style="font-size: 2rem; font-weight: bold; transform: rotate(-30deg); opacity: 0.2; text-align: center; color: white; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">Territory Battle</div></div>
@@ -87,7 +137,16 @@
         <div id="snitch-btn-container" style="display:none;"><button id="snitch-btn" onclick="triggerSnitch()" style="width:100px; height:100px; background:linear-gradient(145deg, #b45309, #78350f); color:white; border:3px solid #fcd34d; border-radius:50%; font-weight:bold; font-size:18px; cursor:pointer;">מצאתי גנב!</button></div>
     </div>
 
-    <div id="victory-screen" class="screen"><div style="font-size:80px; margin-bottom: 20px;">🏆</div><h1 id="victory-title">ניצחון!</h1><button class="btn btn-blue" onclick="location.reload()" style="margin-top: 20px;">חזור ללובי</button></div>
+    <div id="victory-screen" class="screen">
+        <video id="victory-video" playsinline>
+            <source src="cop_win.webm" type="video/webm">
+        </video>
+        <div id="victory-ui-overlay">
+            <div id="default-trophy" style="font-size:80px; margin-bottom: 20px;">🏆</div>
+            <h1 id="victory-title" style="margin-bottom: 20px;">ניצחון!</h1>
+            <button class="btn btn-blue" onclick="location.reload()">חזור ללובי</button>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.9.0/firebase-app-compat.js"></script>
@@ -99,7 +158,6 @@
     <script src="territory.js"></script>
     <script src="firebase-init.js"></script>
     
-    <!-- הוספנו את הקובץ של המסך הראשון -->
     <script src="login.js"></script>
     <script src="lobby.js"></script>
     
@@ -108,7 +166,9 @@
     <script src="thief-mechanics.js"></script>
     <script src="chat.js"></script>
     <script src="treasures.js"></script>
-    <script src="victory.js"></script>
+    
+    <script src="victory.js?v=3.0"></script>
+    
     <script src="bot-ai.js"></script>
     <script src="game-core.js"></script>
     <script src="game-arena.js"></script>
