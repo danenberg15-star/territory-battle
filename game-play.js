@@ -91,8 +91,30 @@ function confirmCatch(victimId, signalTime, copId) {
             if (committed) {
                 if (victimId === window.playerId) {
                     playArrestAnimation(() => {
-                        window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'snitch' })
-                            .then(() => location.reload());
+                        // בודקים אם יש עוד גנבים פעילים חוץ מאיתנו
+                        window.db.ref(`rooms/${window.currentRoom}/players`).once('value', pSnap => {
+                            const players = pSnap.val() || {};
+                            let otherActiveThieves = 0;
+                            
+                            Object.keys(players).forEach(id => {
+                                // סופרים גנבים אנושיים שאינם אנחנו ולא מנותקים
+                                if (id !== window.playerId && players[id].role === 'thief' && !players[id].isOffline && !id.startsWith('bot_')) {
+                                    otherActiveThieves++;
+                                }
+                            });
+
+                            // משנים את התפקיד שלנו למלשין
+                            window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'snitch' }).then(() => {
+                                if (otherActiveThieves === 0) {
+                                    // אנחנו הגנב האחרון (או היחיד)!
+                                    // במקום להרוס את המסך עם ריפרש, נכריז על ניצחון השוטרים וניתן לווידאו לנגן
+                                    window.db.ref(`game/${window.currentRoom}/winner`).set('cops');
+                                } else {
+                                    // יש עוד גנבים במשחק, אז רק אנחנו נרפרש וניכנס כמלשינים
+                                    location.reload();
+                                }
+                            });
+                        });
                     });
                 }
             }
