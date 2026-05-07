@@ -1,23 +1,6 @@
 // game-arena.js - Arena Management, Drawing & Early GPS Load
 
 // ==========================================
-// 0. Early GPS Activation (Login Screen)
-// ==========================================
-document.addEventListener('DOMContentLoaded', () => {
-    const nameInput = document.getElementById('player-name');
-    if (nameInput) {
-        // ברגע שהשחקן מתחיל להקליד את שמו, ה-GPS מתחיל לעבוד ברקע
-        nameInput.addEventListener('input', () => {
-            if (typeof startRealGpsTracking === 'function' && !window.earlyGpsStarted) {
-                window.earlyGpsStarted = true;
-                console.log("Early GPS tracking started from login screen...");
-                startRealGpsTracking();
-            }
-        }, { once: true });
-    }
-});
-
-// ==========================================
 // 4. Arena Setup & Role-Based Visibility
 // ==========================================
 function checkArenaStatus() {
@@ -48,7 +31,6 @@ function checkArenaStatus() {
                 initTreasuresMaster();
             }
 
-            // הפעלת מנוע הבוטים לשחקן יחיד
             window.db.ref(`rooms/${window.currentRoom}`).once('value', rSnap => {
                 const rData = rSnap.val();
                 if (rData && rData.gameMode === 'single' && window.isHost) {
@@ -68,40 +50,55 @@ function checkArenaStatus() {
                 }
             });
             
-            // בקרת UI לפי תפקיד
             const controls = document.getElementById('controls-container');
             const captureContainer = document.getElementById('capture-btn-container');
             const snitchContainer = document.getElementById('snitch-btn-container');
             const micBtn = document.getElementById('chat-mic-btn');
+            const chatUI = document.getElementById('chat-container');
 
             if (controls) controls.style.display = 'block';
-            if (micBtn) micBtn.style.display = 'flex'; // הווקי-טוקי תמיד מופיע
 
             if (window.playerRole === 'cop') {
-                if (captureContainer) captureContainer.style.display = 'block'; // רק שוטר רואה טייזר
+                if (captureContainer) captureContainer.style.display = 'block'; 
                 if (snitchContainer) snitchContainer.style.display = 'none';
             } else if (window.playerRole === 'snitch') {
                 if (captureContainer) captureContainer.style.display = 'none';
                 if (snitchContainer) snitchContainer.style.display = 'block';
             } else {
-                if (captureContainer) captureContainer.style.display = 'none'; // גנב לא רואה טייזר
+                if (captureContainer) captureContainer.style.display = 'none'; 
                 if (snitchContainer) snitchContainer.style.display = 'none';
                 if (isBriefingComplete) startThiefMechanics();
             }
 
-            if (typeof toggleChatVisibility === "function") {
-                toggleChatVisibility(true);
-            }
+            // חוק "רק בתחילה": בודקים פעם אחת כמה בני אדם יש בקבוצה שלי ברגע הכניסה למפה
+            window.db.ref(`rooms/${window.currentRoom}/players`).once('value', pSnap => {
+                const roomPlayers = pSnap.val() || {};
+                let myTeamHumans = 0;
+                const amICop = (window.playerRole === 'cop');
+                
+                Object.keys(roomPlayers).forEach(id => {
+                    if (!id.startsWith('bot_')) {
+                        const isCop = (roomPlayers[id].role === 'cop');
+                        if (isCop === amICop) myTeamHumans++;
+                    }
+                });
+
+                if (myTeamHumans > 1) {
+                    if (micBtn) micBtn.style.display = 'flex';
+                    if (chatUI) chatUI.style.display = 'flex';
+                } else {
+                    if (micBtn) micBtn.style.display = 'none';
+                    if (chatUI) chatUI.style.display = 'none';
+                }
+            });
         }
     });
 }
 
 function setupHostDrawingMode() {
-    // הסרת מסך ה-briefing הכהה שנתקע
     const overlay = document.getElementById('briefing-overlay');
     if (overlay) overlay.style.display = 'none';
-
-    if (myLat && myLng) map.setView([myLat, myLng], 17); // זום קרוב לציור
+    if (myLat && myLng) map.setView([myLat, myLng], 17);
     document.getElementById('setup-ui').style.display = 'flex';
     document.getElementById('map-controls').style.display = 'flex';
     document.getElementById('zoom-controls').style.display = 'flex';
@@ -113,23 +110,16 @@ function confirmDrawing() {
         const results = finalizeDrawing(); 
         if (results) {
             window.db.ref(`game/${window.currentRoom}/arena`).set(results).then(() => {
-                // העלמה מיידית של ממשק הציור
                 document.getElementById('setup-ui').style.display = 'none';
                 document.getElementById('drawing-container').style.display = 'none';
-
-                // בדיקה אם זה משחק מרובה משתתפים או שחקן יחיד
                 window.db.ref(`rooms/${window.currentRoom}`).once('value', snap => {
                     const roomData = snap.val();
                     if (roomData && roomData.gameMode === 'single') {
-                        // בשחקן יחיד מדלגים על טיימר התדריך ומתחילים ישר
                         window.db.ref(`game/${window.currentRoom}/briefing/complete`).set(true);
+                    } else if (typeof window.startBriefingTimer === 'function') {
+                        window.startBriefingTimer();
                     } else {
-                        // ברב משתתפים, מפעילים את טיימר התדריך של ה-30 שניות כרגיל
-                        if (typeof window.startBriefingTimer === 'function') {
-                            window.startBriefingTimer();
-                        } else {
-                            window.db.ref(`game/${window.currentRoom}/briefing/complete`).set(true);
-                        }
+                        window.db.ref(`game/${window.currentRoom}/briefing/complete`).set(true);
                     }
                 });
             });
@@ -140,16 +130,11 @@ function confirmDrawing() {
 function drawArenaOnMap() {
     if (!arenaData || !map) return;
     if (arenaPolygonLayer) map.removeLayer(arenaPolygonLayer);
-    arenaPolygonLayer = L.polygon(arenaData.points, {
-        color: '#1d4ed8', weight: 4, fillOpacity: 0.1, dashArray: '5, 10'
-    }).addTo(map);
+    arenaPolygonLayer = L.polygon(arenaData.points, { color: '#1d4ed8', weight: 4, fillOpacity: 0.1, dashArray: '5, 10' }).addTo(map);
 }
 
 function setupPoliceStation() {
     const data = arenaData.policeStation;
     if (policeStationCircle) map.removeLayer(policeStationCircle);
-    policeStationCircle = L.circle([data.lat, data.lng], {
-        radius: data.radius,
-        color: '#1e40af', fillColor: '#3b82f6', fillOpacity: 0.3
-    }).addTo(map);
+    policeStationCircle = L.circle([data.lat, data.lng], { radius: data.radius, color: '#1e40af', fillColor: '#3b82f6', fillOpacity: 0.3 }).addTo(map);
 }
