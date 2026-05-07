@@ -60,7 +60,7 @@ window.onload = () => {
                 <input type="radio" name="gameMode" value="multi" checked onchange="toggleSinglePlayerOpts()"> רב משתתפים
             </label>
             <label style="color: white; font-weight: bold;">
-                <input type="radio" name="gameMode" value="single" onchange="toggleSinglePlayerOpts()"> שחקן יחיד (בוטים)
+                <input type="radio" name="gameMode" value="single" onchange="toggleSinglePlayerOpts()"> קבוצה נגד בוטים
             </label>
         </div>
         <div id="single-player-opts" style="display: none; width: 100%; max-width: 300px; margin-bottom: 15px;">
@@ -164,7 +164,6 @@ function createRoom() {
     }
 
     window.db.ref(`rooms/${roomId}`).set(roomData).then(() => {
-        // קריאה לפונקציה שקיימת בקובץ lobby.js
         joinRoomLogic(roomId);
     });
 }
@@ -184,10 +183,21 @@ function joinRoom() {
     
     playerName = inputName;
     currentRoom = roomId;
+    localStorage.setItem('tb_name', playerName);
     enableWakeLock();
-    window.db.ref(`rooms/${roomId}/status`).once('value', snap => {
+    
+    window.db.ref(`rooms/${roomId}`).once('value', snap => {
         if (!snap.exists()) return alert("חדר לא נמצא");
-        // קריאה לפונקציה שקיימת בקובץ lobby.js
-        joinRoomLogic(roomId);
+        
+        // מוסיף באופן אקטיבי את השחקן המצטרף למסד הנתונים כגנב
+        window.db.ref(`rooms/${roomId}/players/${playerId}`).update({
+            name: playerName,
+            role: 'thief',
+            t: Date.now(),
+            isOffline: false,
+            disconnectedAt: null
+        }).then(() => {
+            joinRoomLogic(roomId);
+        });
     });
 }

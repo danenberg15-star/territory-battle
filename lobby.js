@@ -13,7 +13,9 @@ function joinRoomLogic(roomId) {
         if (!roomData) return;
         
         isHost = (roomData.host === playerId);
-        if (isHost) document.getElementById('btn-start-game').style.display = 'block';
+        if (isHost && roomData.status !== 'playing') {
+            document.getElementById('btn-start-game').style.display = 'block';
+        }
         
         if (roomData.status === 'playing') {
             window.db.ref(`rooms/${roomId}`).off(); 
@@ -25,11 +27,11 @@ function joinRoomLogic(roomId) {
             if(typeof enterGameScene === 'function') enterGameScene();
             return;
         }
-        renderLobbyPlayers(roomData.players || {});
+        renderLobbyPlayers(roomData.players || {}, roomData.gameMode);
     });
 }
 
-function renderLobbyPlayers(players) {
+function renderLobbyPlayers(players, gameMode) {
     const copsDiv = document.getElementById('players-cops');
     const thievesDiv = document.getElementById('players-thieves');
     copsDiv.innerHTML = ""; 
@@ -41,7 +43,8 @@ function renderLobbyPlayers(players) {
         div.className = 'player-item';
         div.innerText = p.name + (id === playerId ? " (אתה)" : "");
         
-        if (isHost && !id.startsWith('bot_')) {
+        // במשחק קבוצה נגד בוטים, מונעים מהמנהל לגרור שחקנים לשוטרים
+        if (isHost && !id.startsWith('bot_') && gameMode !== 'single') {
             div.classList.add('draggable');
             div.addEventListener('touchstart', (e) => handleTouchStart(e, id, div), { passive: false });
             div.addEventListener('touchmove', handleTouchMove, { passive: false });
@@ -116,7 +119,6 @@ function startGame() {
         if (!roomData) return;
 
         const gamePlayers = {};
-        // העברת כל השחקנים (כולל בוטים) למבנה המשחק הפעיל
         Object.keys(roomData.players).forEach(id => {
             gamePlayers[id] = {
                 role: roomData.players[id].role,
