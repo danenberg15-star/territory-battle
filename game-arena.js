@@ -1,6 +1,23 @@
 // game-arena.js - Arena Management, Drawing & Early GPS Load
 
 // ==========================================
+// 0. Early GPS Activation (Login Screen)
+// ==========================================
+document.addEventListener('DOMContentLoaded', () => {
+    const nameInput = document.getElementById('player-name');
+    if (nameInput) {
+        // ברגע שהשחקן מתחיל להקליד את שמו, ה-GPS מתחיל לעבוד ברקע
+        nameInput.addEventListener('input', () => {
+            if (typeof startRealGpsTracking === 'function' && !window.earlyGpsStarted) {
+                window.earlyGpsStarted = true;
+                console.log("Early GPS tracking started from login screen...");
+                startRealGpsTracking();
+            }
+        }, { once: true });
+    }
+});
+
+// ==========================================
 // 4. Arena Setup & Role-Based Visibility
 // ==========================================
 function checkArenaStatus() {
