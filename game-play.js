@@ -1,7 +1,7 @@
 // game-play.js - Gameplay Logic, Bot Interactions & Single Player Rules
 
 // ==========================================
-// 6. Taser Trigger & Feedback
+// 6. Taser Trigger & Feedback (HYBRID)
 // ==========================================
 function triggerCapture() {
     if (!isBriefingComplete || (typeof isGameFrozen !== 'undefined' && isGameFrozen)) return;
@@ -11,9 +11,10 @@ function triggerCapture() {
     btn.disabled = true;
     btn.classList.add('active-capture'); 
     
+    // הגדלנו את הרדיוס הוויזואלי ל-15 מטר כדי שיתאים לטווח האקוסטי
     if (taserVisualRing) map.removeLayer(taserVisualRing);
     taserVisualRing = L.circle([myLat, myLng], {
-        radius: 10,
+        radius: 15,
         color: '#7dd3fc',
         weight: 5,
         fillColor: '#0ea5e9',
@@ -23,6 +24,11 @@ function triggerCapture() {
 
     if (navigator.vibrate) navigator.vibrate([150, 50, 150]);
     
+    // === מנגנון היברידי: הפעלת רמקול לשדר תדר 20kHz ===
+    if (typeof broadcastCapture === 'function') {
+        broadcastCapture();
+    }
+
     const timestamp = Date.now();
     window.db.ref(`game/${window.currentRoom}/captureSignal`).set({
         sender: window.playerId,
@@ -54,7 +60,12 @@ function checkGpsCatch(copLat, copLng, signalTime) {
             const p = players[id];
             if (p.role === 'thief') {
                 const dist = map.distance([copLat, copLng], [p.lat, p.lng]);
-                if (dist <= 10) confirmCatch(id, signalTime, window.playerId);
+                const isBotThief = id.startsWith('bot_');
+                
+                // === מנגנון היברידי: תפיסה אוטומטית ב-GPS עובדת רק נגד בוטים או שחקנים מנותקים ===
+                if (dist <= 15 && (isBotThief || p.isOffline)) {
+                    confirmCatch(id, signalTime, window.playerId);
+                }
             }
         });
     });
@@ -67,8 +78,23 @@ function listenForCaptureSignals() {
         
         if (window.playerRole === 'thief') {
             const dist = map.distance([myLat, myLng], [sig.lat, sig.lng]);
-            if (dist <= 12) { 
-                confirmCatch(window.playerId, sig.t, sig.sender);
+            if (dist <= 15) { 
+                
+                // === מנגנון היברידי: בודקים מי ירה עלינו ===
+                if (sig.sender && sig.sender.startsWith('bot_')) {
+                    // ירייה מבוט: בוטים לא מפיקים קול, מעצר מבוסס רדיוס GPS
+                    console.log("Caught by bot (GPS mapping).");
+                    confirmCatch(window.playerId, sig.t, sig.sender);
+                } else {
+                    // ירייה משוטר אנושי: דורש הוכחה אקוסטית בתדר גבוה!
+                    console.log("Human cop in range. Initiating Acoustic Verification...");
+                    if (typeof startListeningForCops === 'function') {
+                        startListeningForCops(() => {
+                            // הפונקציה קוראת לזה רק אם התגלה תדר ה-20kHz
+                            confirmCatch(window.playerId, sig.t, sig.sender);
+                        });
+                    }
+                }
             }
         }
     });
@@ -87,10 +113,8 @@ function confirmCatch(victimId, signalTime, copId) {
         }, (error, committed) => {
             if (committed) {
                 if (victimId === window.playerId) {
-                    // רטט פגיעה מיידי
                     if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
                     
-                    // מעבר ישיר ללוגיקת ניצחון ללא המתנה לאנימציית סורגים
                     window.db.ref(`rooms/${window.currentRoom}/players`).once('value', pSnap => {
                         const players = pSnap.val() || {};
                         let otherActiveThieves = 0;
@@ -102,7 +126,6 @@ function confirmCatch(victimId, signalTime, copId) {
                         });
 
                         window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'snitch' }).then(() => {
-                            // הפעלת נטרול אזהרת הדפדפן
                             if (typeof window.killExitWarning === 'function') window.killExitWarning();
 
                             if (otherActiveThieves === 0) {
@@ -198,7 +221,6 @@ function checkOfflinePlayers() {
 function listenToVictory() {
     window.db.ref(`game/${window.currentRoom}/winner`).on('value', snap => {
         if (snap.val() && typeof showVictoryScreen === 'function') {
-            // הפעלת נטרול אזהרת הדפדפן לפני מעבר וידאו
             if (typeof window.killExitWarning === 'function') window.killExitWarning();
             showVictoryScreen(snap.val());
         }
