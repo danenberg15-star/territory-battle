@@ -14,15 +14,15 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
     let scanSpeed, runSpeed, reactionTime;
     
     if (difficulty === 'rookie') { // ילד בן 10
-        scanSpeed = 0.00001; 
+        scanSpeed = 0.00002; // הוכפל פי 2
         runSpeed = 0.00003;  
         reactionTime = 2000; 
     } else if (difficulty === 'elite') { // בחור בן 20
-        scanSpeed = 0.00002; 
+        scanSpeed = 0.00004; // הוכפל פי 2
         runSpeed = 0.000075; 
         reactionTime = 400;  
     } else { // 'skilled' - ילד בן 14 (ברירת מחדל)
-        scanSpeed = 0.000015; 
+        scanSpeed = 0.00003; // הוכפל פי 2
         runSpeed = 0.00005;   
         reactionTime = 1000;  
     }
@@ -47,19 +47,17 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                 if (botId.startsWith('bot_cop_')) {
                     let bot = players[botId];
                     
-                    // אתחול בוט - זריקה לקצוות הזירה
+                    // אתחול בוט - זריקה לנקודה חוקית *בתוך* הזירה המדויקת
                     if (!bot.lat || bot.lat === 0) {
-                        const edge = Math.floor(Math.random() * 4);
-                        if (edge === 0) { bot.lat = maxLat; bot.lng = minLng + Math.random() * (maxLng - minLng); }
-                        else if (edge === 1) { bot.lat = minLat; bot.lng = minLng + Math.random() * (maxLng - minLng); }
-                        else if (edge === 2) { bot.lat = minLat + Math.random() * (maxLat - minLat); bot.lng = maxLng; }
-                        else { bot.lat = minLat + Math.random() * (maxLat - minLat); bot.lng = minLng; }
+                        const startPoint = getValidPointInPolygon(arenaData.points, minLat, maxLat, minLng, maxLng);
+                        bot.lat = startPoint.lat;
+                        bot.lng = startPoint.lng;
                         
-                        botStates[botId] = { mode: 'wander', target: getRandomPointInArena(minLat, maxLat, minLng, maxLng) };
+                        botStates[botId] = { mode: 'wander', target: getValidPointInPolygon(arenaData.points, minLat, maxLat, minLng, maxLng) };
                     }
                     
                     if (!botStates[botId]) {
-                        botStates[botId] = { mode: 'wander', target: getRandomPointInArena(minLat, maxLat, minLng, maxLng) };
+                        botStates[botId] = { mode: 'wander', target: getValidPointInPolygon(arenaData.points, minLat, maxLat, minLng, maxLng) };
                     }
 
                     // 1. איתור הגנב הקרוב ביותר
@@ -105,7 +103,7 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                         // בדיקה אם הבוט הגיע ליעד השיטוט שלו (בטווח של 2 מטר)
                         const distToTarget = Math.sqrt(Math.pow(targetLat - bot.lat, 2) + Math.pow(targetLng - bot.lng, 2));
                         if (distToTarget < 0.00002) {
-                            botStates[botId].target = getRandomPointInArena(minLat, maxLat, minLng, maxLng);
+                            botStates[botId].target = getValidPointInPolygon(arenaData.points, minLat, maxLat, minLng, maxLng);
                         }
                     }
 
@@ -132,10 +130,32 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
     }, 1000); 
 }
 
-function getRandomPointInArena(minLat, maxLat, minLng, maxLng) {
+// פונקציה חדשה שמוודאת שהנקודה נופלת בתוך הפוליגון (זירת המשחק) המדויק
+function getValidPointInPolygon(arenaPoints, minLat, maxLat, minLng, maxLng) {
+    try {
+        const polyCoords = arenaPoints.map(p => [p[1], p[0]]);
+        polyCoords.push(polyCoords[0]); // סגירת מעגל
+        const polygon = turf.polygon([polyCoords]);
+
+        let attempts = 0;
+        while (attempts < 100) {
+            const lat = minLat + Math.random() * (maxLat - minLat);
+            const lng = minLng + Math.random() * (maxLng - minLng);
+            const pt = turf.point([lng, lat]);
+            
+            if (turf.booleanPointInPolygon(pt, polygon)) {
+                return { lat: lat, lng: lng };
+            }
+            attempts++;
+        }
+    } catch (e) {
+        console.error("Polygon mapping error:", e);
+    }
+    
+    // חלופת חירום במקרה של זירה משונה מאוד (מחזיר את מרכז המפה)
     return {
-        lat: minLat + Math.random() * (maxLat - minLat),
-        lng: minLng + Math.random() * (maxLng - minLng)
+        lat: (minLat + maxLat) / 2,
+        lng: (minLng + maxLng) / 2
     };
 }
 
