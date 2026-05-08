@@ -137,13 +137,12 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
     
     let newLayers = [];
     let totalCapturedSqMeters = 0;
-    let currentAreaCount = 0;
+    
+    // ספירת השטחים העדכנית
+    let currentAreaCount = areasData ? Object.keys(areasData).length : 0;
 
     if (areasData) {
-        const areasArray = Object.values(areasData);
-        currentAreaCount = areasArray.length;
-
-        areasArray.forEach(area => {
+        Object.values(areasData).forEach(area => {
             if (area.points && area.points.length >= 3) {
                 const poly = L.polygon(area.points, { 
                     color: '#ef4444', 
@@ -157,7 +156,7 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
 
                 try {
                     const coords = area.points.map(p => [p[1], p[0]]);
-                    coords.push(coords[0]); // חובה לסגור ל-Turf
+                    coords.push(coords[0]); 
                     const turfPoly = turf.polygon([coords]);
                     totalCapturedSqMeters += turf.area(turfPoly);
                 } catch(e) {
@@ -167,9 +166,10 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
         });
     }
 
+    let safePercentage = 0;
     if (window.arenaData && window.arenaData.totalArea) {
         const percentage = (totalCapturedSqMeters / window.arenaData.totalArea) * 100;
-        const safePercentage = Math.min(100, Math.max(0, percentage)).toFixed(1); 
+        safePercentage = Math.min(100, Math.max(0, percentage)).toFixed(1); 
         
         let progressEl = document.getElementById('capture-progress-text');
         if (!progressEl) {
@@ -192,17 +192,17 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
             progressEl.innerText = `${safePercentage}%`;
         }
 
-        // התיקון להודעה הקופצת: שימוש במשתנה גלובלי כדי שלא יתאפס
-        if (typeof window.lastCapturedAreaCount === 'undefined') {
-            window.lastCapturedAreaCount = currentAreaCount;
-        } else if (currentAreaCount > window.lastCapturedAreaCount) {
-            displayCaptureToast(safePercentage);
-            window.lastCapturedAreaCount = currentAreaCount;
-        }
-
         if (safePercentage >= 80 && window.isHost && window.currentRoom) {
             window.db.ref(`game/${window.currentRoom}/winner`).set('thieves');
         }
+    }
+
+    // התיקון: בדיקה אמינה מול זיכרון הדפדפן והפעלת הטוסט
+    if (typeof window.lastCapturedAreaCount === 'undefined') {
+        window.lastCapturedAreaCount = currentAreaCount; 
+    } else if (currentAreaCount > window.lastCapturedAreaCount) {
+        window.displayCaptureToast(safePercentage);
+        window.lastCapturedAreaCount = currentAreaCount;
     }
 
     return newLayers;
@@ -211,43 +211,45 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
 // ==========================================
 // 4. Toast Notification UI
 // ==========================================
-function displayCaptureToast(percentage) {
-    let toast = document.getElementById('capture-toast');
-    if (!toast) {
-        toast = document.createElement('div');
-        toast.id = 'capture-toast';
-        toast.style.position = 'fixed';
-        toast.style.top = '25%';
-        toast.style.left = '50%';
-        toast.style.transform = 'translate(-50%, -50%)';
-        toast.style.backgroundColor = 'rgba(220, 38, 38, 0.95)';
-        toast.style.color = 'white';
-        toast.style.padding = '20px 40px';
-        toast.style.borderRadius = '15px';
-        toast.style.fontSize = '24px';
-        toast.style.fontWeight = '900';
-        toast.style.zIndex = '9999';
-        toast.style.boxShadow = '0 0 30px rgba(220, 38, 38, 0.8)';
-        toast.style.textAlign = 'center';
-        toast.style.pointerEvents = 'none';
-        toast.style.animation = 'pop-in 0.3s ease-out forwards';
+window.displayCaptureToast = function(percentage) {
+    // השמדת טוסט קודם אם נתקע במסך כדי להכריח אנימציה חדשה
+    let oldToast = document.getElementById('capture-toast');
+    if (oldToast) oldToast.remove();
 
-        if (!document.getElementById('toast-styles')) {
-            const style = document.createElement('style');
-            style.id = 'toast-styles';
-            style.innerHTML = `@keyframes pop-in { 0% { opacity: 0; transform: translate(-50%, -60%) scale(0.8); } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); } }`;
-            document.head.appendChild(style);
-        }
+    let toast = document.createElement('div');
+    toast.id = 'capture-toast';
+    toast.style.position = 'fixed';
+    toast.style.top = '25%';
+    toast.style.left = '50%';
+    toast.style.transform = 'translate(-50%, -50%)';
+    toast.style.backgroundColor = 'rgba(220, 38, 38, 0.95)';
+    toast.style.color = 'white';
+    toast.style.padding = '20px 40px';
+    toast.style.borderRadius = '15px';
+    toast.style.fontSize = '24px';
+    toast.style.fontWeight = '900';
+    toast.style.zIndex = '99999'; // מפלצתי כדי לדרוס את Leaflet
+    toast.style.boxShadow = '0 0 30px rgba(220, 38, 38, 0.8)';
+    toast.style.textAlign = 'center';
+    toast.style.pointerEvents = 'none';
+    toast.style.animation = 'pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
 
-        document.body.appendChild(toast);
+    if (!document.getElementById('toast-styles')) {
+        const style = document.createElement('style');
+        style.id = 'toast-styles';
+        style.innerHTML = `@keyframes pop-in { 0% { opacity: 0; transform: translate(-50%, -60%) scale(0.5); } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); } }`;
+        document.head.appendChild(style);
     }
 
+    document.body.appendChild(toast);
     toast.innerText = window.currentLang === 'he' ? `הגנבים כבשו ${percentage}% מהשטח!` : `Thieves captured ${percentage}%!`;
-    toast.style.display = 'block';
 
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 
+    // השמדה מוחלטת של ה-HTML אחרי 4 שניות
     setTimeout(() => {
-        if (toast) toast.style.display = 'none';
+        if (toast && toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
     }, 4000);
-}
+};
