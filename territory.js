@@ -3,6 +3,7 @@
 let drawingPath = [];
 let isDrawing = false;
 let canvas, ctx;
+let lastCapturedAreaCount = -1; // משתנה למעקב מתי נוסף שטח חדש
 
 // ==========================================
 // 1. Canvas Drawing Initialization
@@ -34,7 +35,6 @@ function startDrawing(e, mapInstance) {
     drawingPath = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    // הסתרת הכפתור ברגע שמתחילים לצייר מחדש
     const btn = document.getElementById('btn-confirm-drawing');
     if (btn) btn.style.display = 'none';
     
@@ -64,7 +64,6 @@ function stopDrawing() {
     isDrawing = false;
     ctx.closePath();
     
-    // חשיפת כפתור האישור רק אם צויר שטח מינימלי חוקי
     if (drawingPath.length >= 10) {
         const btn = document.getElementById('btn-confirm-drawing');
         if (btn) btn.style.display = 'block';
@@ -77,7 +76,6 @@ function clearDrawing() {
     }
     drawingPath = [];
     
-    // הסתרת כפתור האישור כשמנקים את המסך
     const btn = document.getElementById('btn-confirm-drawing');
     if (btn) btn.style.display = 'none';
 }
@@ -140,9 +138,13 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
     
     let newLayers = [];
     let totalCapturedSqMeters = 0;
+    let currentAreaCount = 0;
 
     if (areasData) {
-        Object.values(areasData).forEach(area => {
+        const areasArray = Object.values(areasData);
+        currentAreaCount = areasArray.length;
+
+        areasArray.forEach(area => {
             if (area.points && area.points.length >= 3) {
                 const poly = L.polygon(area.points, { 
                     color: '#ef4444', 
@@ -170,16 +172,36 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
         const percentage = (totalCapturedSqMeters / window.arenaData.totalArea) * 100;
         const safePercentage = Math.min(100, Math.max(0, percentage)).toFixed(1); 
         
-        const progressEl = document.getElementById('capture-progress-text');
+        // 1. הזרקת התצוגה הקבועה לשורת הסטטוסים העליונה (אם היא חסרה)
+        let progressEl = document.getElementById('capture-progress-text');
+        if (!progressEl) {
+            const statsContainer = document.getElementById('floating-stats');
+            if (statsContainer) {
+                const sep = document.createElement('div');
+                sep.className = 'stat-item';
+                sep.innerText = '|';
+                statsContainer.appendChild(sep);
+
+                const stat = document.createElement('div');
+                stat.className = 'stat-item';
+                stat.innerHTML = `שטח: <span id="capture-progress-text" style="color:#ef4444; font-weight:bold;">0%</span>`;
+                statsContainer.appendChild(stat);
+                progressEl = document.getElementById('capture-progress-text');
+            }
+        }
+        
+        // עדכון הטקסט בשורת הסטטוסים
         if (progressEl) {
             progressEl.innerText = `${safePercentage}%`;
         }
-        
-        const progressBar = document.getElementById('capture-progress-bar');
-        if (progressBar) {
-            progressBar.style.width = `${safePercentage}%`;
-        }
 
+        // 2. הצגת הודעה קופצת (Toast) לכל השחקנים רק אם נוסף שטח חדש
+        if (lastCapturedAreaCount !== -1 && currentAreaCount > lastCapturedAreaCount) {
+            displayCaptureToast(safePercentage);
+        }
+        lastCapturedAreaCount = currentAreaCount;
+
+        // בדיקת ניצחון: גנבים מנצחים ב-80%
         if (safePercentage >= 80 && window.isHost && window.currentRoom) {
             window.db.ref(`game/${window.currentRoom}/winner`).set('thieves');
         }
@@ -187,3 +209,47 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
 
     return newLayers;
 };
+
+// ==========================================
+// 4. Toast Notification UI
+// ==========================================
+function displayCaptureToast(percentage) {
+    let toast = document.getElementById('capture-toast');
+    if (!toast) {
+        toast = document.createElement('div');
+        toast.id = 'capture-toast';
+        toast.style.position = 'fixed';
+        toast.style.top = '25%';
+        toast.style.left = '50%';
+        toast.style.transform = 'translate(-50%, -50%)';
+        toast.style.backgroundColor = 'rgba(220, 38, 38, 0.95)'; // אדום חזק
+        toast.style.color = 'white';
+        toast.style.padding = '20px 40px';
+        toast.style.borderRadius = '15px';
+        toast.style.fontSize = '24px';
+        toast.style.fontWeight = '900';
+        toast.style.zIndex = '9999';
+        toast.style.boxShadow = '0 0 30px rgba(220, 38, 38, 0.8)';
+        toast.style.textAlign = 'center';
+        toast.style.pointerEvents = 'none';
+        toast.style.animation = 'pop-in 0.3s ease-out forwards';
+
+        if (!document.getElementById('toast-styles')) {
+            const style = document.createElement('style');
+            style.id = 'toast-styles';
+            style.innerHTML = `@keyframes pop-in { 0% { opacity: 0; transform: translate(-50%, -60%) scale(0.8); } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); } }`;
+            document.head.appendChild(style);
+        }
+
+        document.body.appendChild(toast);
+    }
+
+    toast.innerText = window.currentLang === 'he' ? `הגנבים כבשו ${percentage}% מהשטח!` : `Thieves captured ${percentage}%!`;
+    toast.style.display = 'block';
+
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+    setTimeout(() => {
+        if (toast) toast.style.display = 'none';
+    }, 4000);
+}
