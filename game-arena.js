@@ -1,4 +1,4 @@
-// game-arena.js - Arena Management, Drawing & Early GPS Load
+// game-arena.js - Arena Management & Briefing Sync
 
 // ==========================================
 // 0. Early GPS Activation (Login Screen)
@@ -32,14 +32,16 @@ function checkArenaStatus() {
                 if (status) status.innerText = window.currentLang === 'he' ? "ממתין למנהל שיצייר זירה..." : "Waiting for host...";
             }
         } else {
-            arenaData = data;
+            window.arenaData = data;
             document.getElementById('setup-ui').style.display = 'none';
             document.getElementById('drawing-container').style.display = 'none';
             document.getElementById('map-controls').style.display = 'none';
             document.getElementById('zoom-controls').style.display = 'none';
 
-            map.dragging.enable();
-            map.touchZoom.enable();
+            if (window.map) {
+                window.map.dragging.enable();
+                window.map.touchZoom.enable();
+            }
 
             drawArenaOnMap();
             setupPoliceStation();
@@ -55,23 +57,23 @@ function checkArenaStatus() {
                     const rData = rSnap.val();
                     if (rData && rData.gameMode === 'single' && window.isHost) {
                         if (typeof startSinglePlayerAI === 'function') {
-                            startSinglePlayerAI(window.currentRoom, rData.difficulty || 'skilled', arenaData);
+                            startSinglePlayerAI(window.currentRoom, rData.difficulty || 'skilled', window.arenaData);
                         }
                     }
                 });
             }
 
-            // התיקון הקריטי מגרסה 2.16 (שהיה חסר בקובץ): האזנה רציפה שמבטיחה ציור שובל
+            // סנכרון גלובלי: מוודא שברגע שהמשחק מתחיל, כל הקבצים יודעים והשובל מופעל
             if (!window.briefingListenerAttached) {
                 window.briefingListenerAttached = true;
                 window.db.ref(`game/${window.currentRoom}/briefing/complete`).on('value', bSnap => {
                     if (bSnap.val() === true) {
-                        isBriefingComplete = true; 
+                        window.isBriefingComplete = true; 
                         document.getElementById('briefing-overlay').style.display = 'none';
                         
-                        // הבטחת ציור השובל לגנב ברגע שהמשחק מתחיל!
+                        // הבטחת ציור השובל לגנב ברגע שהמשחק מתחיל
                         if (window.playerRole === 'thief') {
-                            if (!trailLayer && typeof startThiefMechanics === 'function') {
+                            if (!window.trailLayer && typeof startThiefMechanics === 'function') {
                                 startThiefMechanics();
                             }
                         }
@@ -132,11 +134,11 @@ function checkArenaStatus() {
 function setupHostDrawingMode() {
     const overlay = document.getElementById('briefing-overlay');
     if (overlay) overlay.style.display = 'none';
-    if (myLat && myLng) map.setView([myLat, myLng], 17);
+    if (window.myLat && window.myLng && window.map) window.map.setView([window.myLat, window.myLng], 17);
     document.getElementById('setup-ui').style.display = 'flex';
     document.getElementById('map-controls').style.display = 'flex';
     document.getElementById('zoom-controls').style.display = 'flex';
-    if (typeof initDrawingCanvas === "function") initDrawingCanvas(map); 
+    if (typeof initDrawingCanvas === "function") initDrawingCanvas(window.map); 
 }
 
 function confirmDrawing() {
@@ -163,13 +165,13 @@ function confirmDrawing() {
 }
 
 function drawArenaOnMap() {
-    if (!arenaData || !map) return;
-    if (arenaPolygonLayer) map.removeLayer(arenaPolygonLayer);
-    arenaPolygonLayer = L.polygon(arenaData.points, { color: '#1d4ed8', weight: 4, fillOpacity: 0.1, dashArray: '5, 10' }).addTo(map);
+    if (!window.arenaData || !window.map) return;
+    if (window.arenaPolygonLayer) window.map.removeLayer(window.arenaPolygonLayer);
+    window.arenaPolygonLayer = L.polygon(window.arenaData.points, { color: '#1d4ed8', weight: 4, fillOpacity: 0.1, dashArray: '5, 10' }).addTo(window.map);
 }
 
 function setupPoliceStation() {
-    const data = arenaData.policeStation;
-    if (policeStationCircle) map.removeLayer(policeStationCircle);
-    policeStationCircle = L.circle([data.lat, data.lng], { radius: data.radius, color: '#1e40af', fillColor: '#3b82f6', fillOpacity: 0.3 }).addTo(map);
+    const data = window.arenaData.policeStation;
+    if (window.policeStationCircle) window.map.removeLayer(window.policeStationCircle);
+    window.policeStationCircle = L.circle([data.lat, data.lng], { radius: data.radius, color: '#1e40af', fillColor: '#3b82f6', fillOpacity: 0.3 }).addTo(window.map);
 }

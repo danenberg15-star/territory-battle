@@ -1,11 +1,22 @@
-// thief-mechanics.js - Phase 1.8.8: "Steal the Street" & Game Freeze Integration
+// thief-mechanics.js - Anti-Tangle Trail & Area Capture (Fully Synced)
 
 let outOfBoundsTimer = null;
 let outOfBoundsSeconds = 10;
 let lastProximityAlert = 0;
 
+// דורס את הפונקציה הישנה ומוודא שהשובל מאותחל על המפה הגלובלית
+window.startThiefMechanics = function() {
+    if (window.trailLayer && window.map) {
+        window.map.removeLayer(window.trailLayer);
+    }
+    if (window.map) {
+        window.trailLayer = L.polyline([], { color: '#dc2626', weight: 6, dashArray: '5, 10', opacity: 0.8 }).addTo(window.map);
+    }
+    window.thiefPath = [];
+};
+
 function updateThiefLogic(lat, lng) {
-    if (window.playerRole !== 'thief' || !isBriefingComplete || !arenaData) return;
+    if (window.playerRole !== 'thief' || !window.isBriefingComplete || !window.arenaData) return;
 
     checkArenaBoundaries(lat, lng);
     checkCopProximity(lat, lng);
@@ -17,7 +28,7 @@ function updateThiefLogic(lat, lng) {
 
 function checkArenaBoundaries(lat, lng) {
     const point = turf.point([lng, lat]);
-    const polygon = turf.polygon([arenaData.points.map(p => [p[1], p[0]])]);
+    const polygon = turf.polygon([window.arenaData.points.map(p => [p[1], p[0]])]);
     const isInside = turf.booleanPointInPolygon(point, polygon);
 
     if (!isInside) {
@@ -47,7 +58,7 @@ function startOutOfBoundsTimer() {
         if (outOfBoundsSeconds <= 0) {
             stopOutOfBoundsTimer();
             alert(window.currentLang === 'he' ? "נפסלת עקב יציאה מהזירה!" : "Disqualified for leaving the arena!");
-            exitGame(); 
+            if(typeof exitGame === 'function') exitGame(); 
         }
     }, 1000);
 }
@@ -71,7 +82,7 @@ function checkCopProximity(lat, lng) {
         Object.keys(players).forEach(id => {
             const p = players[id];
             if (p.role === 'cop' && id !== window.playerId) {
-                const distance = map.distance([lat, lng], [p.lat, p.lng]);
+                const distance = window.map.distance([lat, lng], [p.lat, p.lng]);
                 if (distance <= 20) {
                     if (navigator.vibrate) navigator.vibrate(200); 
                     lastProximityAlert = now;
@@ -84,17 +95,17 @@ function checkCopProximity(lat, lng) {
 // 4.1: ניהול שובלים וסגירת פוליגונים (כולל התרת פלונטרים מגרסה 2.2)
 function handleThiefTrail(lat, lng) {
     // בדיקה מינימלית - אם לא זזת 3 מטרים, אל תוסיף נקודה
-    if (thiefPath.length > 0) {
-        const last = thiefPath[thiefPath.length - 1];
-        if (map.distance([lat, lng], last) < 3) return; 
+    if (window.thiefPath.length > 0) {
+        const last = window.thiefPath[window.thiefPath.length - 1];
+        if (window.map.distance([lat, lng], last) < 3) return; 
     }
 
-    // בדיקת הצטלבות (פלונטר)
-    if (thiefPath.length > 5) {
-        for (let i = 0; i < thiefPath.length - 5; i++) {
+    // בדיקת הצטלבות (פלונטר) והחזרת יכולת החיתוך
+    if (window.thiefPath.length > 5) {
+        for (let i = 0; i < window.thiefPath.length - 5; i++) {
             // אם התקרבת לנקודה קיימת בשובל שלך (עד 6 מטר)
-            if (map.distance([lat, lng], thiefPath[i]) < 6) {
-                const areaCoords = thiefPath.slice(i);
+            if (window.map.distance([lat, lng], window.thiefPath[i]) < 6) {
+                const areaCoords = window.thiefPath.slice(i);
                 
                 // חישוב השטח שנוצר בחיתוך
                 const areaSqM = calculatePathArea(areaCoords);
@@ -105,16 +116,16 @@ function handleThiefTrail(lat, lng) {
                 } else {
                     // חזרה אחורה: הגנב פשוט חזר על עקבותיו, לכן נחתוך ("ננקה") את השובל עד לנקודת החזרה
                     console.log("Knot untied - cleaning trail");
-                    thiefPath = thiefPath.slice(0, i + 1);
-                    if (trailLayer) trailLayer.setLatLngs(thiefPath);
+                    window.thiefPath = window.thiefPath.slice(0, i + 1);
+                    if (window.trailLayer) window.trailLayer.setLatLngs(window.thiefPath);
                 }
                 return;
             }
         }
     }
 
-    thiefPath.push([lat, lng]);
-    if (trailLayer) trailLayer.setLatLngs(thiefPath);
+    window.thiefPath.push([lat, lng]);
+    if (window.trailLayer) window.trailLayer.setLatLngs(window.thiefPath);
 }
 
 function calculatePathArea(points) {
@@ -142,8 +153,8 @@ function tryCaptureArea(points) {
 
         if (copInside) {
             alert(window.currentLang === 'he' ? "לא ניתן לגנוב - שוטר נמצא בשטח!" : "Cannot steal - Cop is inside!");
-            thiefPath = [];
-            if (trailLayer) trailLayer.setLatLngs([]);
+            window.thiefPath = [];
+            if (window.trailLayer) window.trailLayer.setLatLngs([]);
             return;
         }
 
@@ -160,7 +171,7 @@ function tryCaptureArea(points) {
             checkTreasureInCapturedArea(points);
         }
 
-        thiefPath = [];
-        if (trailLayer) trailLayer.setLatLngs([]);
+        window.thiefPath = [];
+        if (window.trailLayer) window.trailLayer.setLatLngs([]);
     });
 }
