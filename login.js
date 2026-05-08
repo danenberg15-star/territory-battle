@@ -27,9 +27,9 @@ const i18n = {
     'he': {
         mainTitle: "Territory Battle",
         lobbyTitle: "לובי המתנה",
-        btnJoin: "הצטרף לחדר",
-        btnCreate: "צור חדר חדש",
-        roomCodeLbl: "קוד חדר:",
+        btnJoin: "הצטרף למשחק",
+        btnCreate: "התחל משחק חדש",
+        roomCodeLbl: "קוד משחק:",
         copsLbl: "שוטרים 👮‍♂️",
         thievesLbl: "גנבים 🥷",
         btnStart: "התחל משחק<br><span style='font-size:12px; font-weight:normal;'>(לחוויה מיטבית וודא שאינך במצב חיסכון סוללה)</span>"
