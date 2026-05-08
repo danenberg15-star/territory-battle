@@ -3,7 +3,6 @@
 let drawingPath = [];
 let isDrawing = false;
 let canvas, ctx;
-let lastCapturedAreaCount = -1; // משתנה למעקב מתי נוסף שטח חדש
 
 // ==========================================
 // 1. Canvas Drawing Initialization
@@ -172,7 +171,6 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
         const percentage = (totalCapturedSqMeters / window.arenaData.totalArea) * 100;
         const safePercentage = Math.min(100, Math.max(0, percentage)).toFixed(1); 
         
-        // 1. הזרקת התצוגה הקבועה לשורת הסטטוסים העליונה (אם היא חסרה)
         let progressEl = document.getElementById('capture-progress-text');
         if (!progressEl) {
             const statsContainer = document.getElementById('floating-stats');
@@ -190,18 +188,18 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
             }
         }
         
-        // עדכון הטקסט בשורת הסטטוסים
         if (progressEl) {
             progressEl.innerText = `${safePercentage}%`;
         }
 
-        // 2. הצגת הודעה קופצת (Toast) לכל השחקנים רק אם נוסף שטח חדש
-        if (lastCapturedAreaCount !== -1 && currentAreaCount > lastCapturedAreaCount) {
+        // התיקון להודעה הקופצת: שימוש במשתנה גלובלי כדי שלא יתאפס
+        if (typeof window.lastCapturedAreaCount === 'undefined') {
+            window.lastCapturedAreaCount = currentAreaCount;
+        } else if (currentAreaCount > window.lastCapturedAreaCount) {
             displayCaptureToast(safePercentage);
+            window.lastCapturedAreaCount = currentAreaCount;
         }
-        lastCapturedAreaCount = currentAreaCount;
 
-        // בדיקת ניצחון: גנבים מנצחים ב-80%
         if (safePercentage >= 80 && window.isHost && window.currentRoom) {
             window.db.ref(`game/${window.currentRoom}/winner`).set('thieves');
         }
@@ -222,7 +220,7 @@ function displayCaptureToast(percentage) {
         toast.style.top = '25%';
         toast.style.left = '50%';
         toast.style.transform = 'translate(-50%, -50%)';
-        toast.style.backgroundColor = 'rgba(220, 38, 38, 0.95)'; // אדום חזק
+        toast.style.backgroundColor = 'rgba(220, 38, 38, 0.95)';
         toast.style.color = 'white';
         toast.style.padding = '20px 40px';
         toast.style.borderRadius = '15px';

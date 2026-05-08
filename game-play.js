@@ -11,7 +11,6 @@ function triggerCapture() {
     btn.disabled = true;
     btn.classList.add('active-capture'); 
     
-    // הגדלנו את הרדיוס הוויזואלי ל-15 מטר כדי שיתאים לטווח האקוסטי
     if (window.taserVisualRing) window.map.removeLayer(window.taserVisualRing);
     window.taserVisualRing = L.circle([window.myLat, window.myLng], {
         radius: 15,
@@ -24,7 +23,6 @@ function triggerCapture() {
 
     if (navigator.vibrate) navigator.vibrate([150, 50, 150]);
     
-    // === מנגנון היברידי: הפעלת רמקול לשדר תדר 20kHz ===
     if (typeof broadcastCapture === 'function') {
         broadcastCapture();
     }
@@ -62,7 +60,6 @@ function checkGpsCatch(copLat, copLng, signalTime) {
                 const dist = window.map.distance([copLat, copLng], [p.lat, p.lng]);
                 const isBotThief = id.startsWith('bot_');
                 
-                // === מנגנון היברידי: תפיסה אוטומטית ב-GPS עובדת רק נגד בוטים או שחקנים מנותקים ===
                 if (dist <= 15 && (isBotThief || p.isOffline)) {
                     confirmCatch(id, signalTime, window.playerId);
                 }
@@ -79,18 +76,13 @@ function listenForCaptureSignals() {
         if (window.playerRole === 'thief') {
             const dist = window.map.distance([window.myLat, window.myLng], [sig.lat, sig.lng]);
             if (dist <= 15) { 
-                
-                // === מנגנון היברידי: בודקים מי ירה עלינו ===
                 if (sig.sender && sig.sender.startsWith('bot_')) {
-                    // ירייה מבוט: בוטים לא מפיקים קול, מעצר מבוסס רדיוס GPS
                     console.log("Caught by bot (GPS mapping).");
                     confirmCatch(window.playerId, sig.t, sig.sender);
                 } else {
-                    // ירייה משוטר אנושי: דורש הוכחה אקוסטית בתדר גבוה!
                     console.log("Human cop in range. Initiating Acoustic Verification...");
                     if (typeof startListeningForCops === 'function') {
                         startListeningForCops(() => {
-                            // הפונקציה קוראת לזה רק אם התגלה תדר ה-20kHz
                             confirmCatch(window.playerId, sig.t, sig.sender);
                         });
                     }
@@ -254,6 +246,7 @@ function listenToOtherPlayers() {
             let activeCount = 0;
             let thievesCount = 0;
             let isThiefNearby = false; 
+            let isCopNearby = false;
 
             Object.keys(gamePlayers).forEach(id => {
                 const gp = gamePlayers[id];
@@ -268,8 +261,14 @@ function listenToOtherPlayers() {
                     if (role === 'thief') thievesCount++;
                 }
 
-                if (window.playerRole === 'cop' && role === 'thief' && !isOffline && window.myLat && window.myLng) {
+                // ראדאר לשוטרים: מזהה אם גנב קרוב
+                if ((window.playerRole === 'cop' || window.playerRole === 'snitch') && role === 'thief' && !isOffline && window.myLat && window.myLng) {
                     if (window.map.distance([window.myLat, window.myLng], [gp.lat, gp.lng]) <= 30) isThiefNearby = true;
+                }
+                
+                // ראדאר לגנבים: מזהה אם שוטר קרוב
+                if (window.playerRole === 'thief' && role === 'cop' && !isOffline && window.myLat && window.myLng) {
+                    if (window.map.distance([window.myLat, window.myLng], [gp.lat, gp.lng]) <= 30) isCopNearby = true;
                 }
                 
                 if (id === window.playerId) {
@@ -297,9 +296,14 @@ function listenToOtherPlayers() {
             if (countEl) countEl.innerText = `שחקנים: ${activeCount}`;
             if (thievesCount > 0) window.hasSeenThief = true;
             
-            if (window.playerRole === 'cop' || window.playerRole === 'snitch') {
-                const radar = document.getElementById('radar-overlay');
-                if (radar) radar.style.display = isThiefNearby ? 'block' : 'none';
+            // הדלקת הראדאר בהתאם לתפקיד השחקן
+            const radar = document.getElementById('radar-overlay');
+            if (radar) {
+                if (window.playerRole === 'cop' || window.playerRole === 'snitch') {
+                    radar.style.display = isThiefNearby ? 'flex' : 'none';
+                } else if (window.playerRole === 'thief') {
+                    radar.style.display = isCopNearby ? 'flex' : 'none';
+                }
             }
         });
     });
