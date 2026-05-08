@@ -4,7 +4,7 @@
 // 6. Taser Trigger & Feedback (HYBRID)
 // ==========================================
 function triggerCapture() {
-    if (!isBriefingComplete || (typeof isGameFrozen !== 'undefined' && isGameFrozen)) return;
+    if (!window.isBriefingComplete || (typeof window.isGameFrozen !== 'undefined' && window.isGameFrozen)) return;
     const btn = document.getElementById('capture-btn');
     if (!btn || btn.disabled) return;
 
@@ -12,15 +12,15 @@ function triggerCapture() {
     btn.classList.add('active-capture'); 
     
     // הגדלנו את הרדיוס הוויזואלי ל-15 מטר כדי שיתאים לטווח האקוסטי
-    if (taserVisualRing) map.removeLayer(taserVisualRing);
-    taserVisualRing = L.circle([myLat, myLng], {
+    if (window.taserVisualRing) window.map.removeLayer(window.taserVisualRing);
+    window.taserVisualRing = L.circle([window.myLat, window.myLng], {
         radius: 15,
         color: '#7dd3fc',
         weight: 5,
         fillColor: '#0ea5e9',
         fillOpacity: 0.4,
         className: 'electric-arc-pulse' 
-    }).addTo(map);
+    }).addTo(window.map);
 
     if (navigator.vibrate) navigator.vibrate([150, 50, 150]);
     
@@ -33,17 +33,17 @@ function triggerCapture() {
     window.db.ref(`game/${window.currentRoom}/captureSignal`).set({
         sender: window.playerId,
         t: timestamp,
-        lat: myLat,
-        lng: myLng
+        lat: window.myLat,
+        lng: window.myLng
     });
 
     let gpsChecks = 0;
     const gpsInterval = setInterval(() => {
-        checkGpsCatch(myLat, myLng, timestamp);
+        checkGpsCatch(window.myLat, window.myLng, timestamp);
         gpsChecks++;
         if (gpsChecks >= 10) {
             clearInterval(gpsInterval);
-            if (taserVisualRing) { map.removeLayer(taserVisualRing); taserVisualRing = null; }
+            if (window.taserVisualRing) { window.map.removeLayer(window.taserVisualRing); window.taserVisualRing = null; }
         }
     }, 1000);
 
@@ -59,7 +59,7 @@ function checkGpsCatch(copLat, copLng, signalTime) {
         Object.keys(players).forEach(id => {
             const p = players[id];
             if (p.role === 'thief') {
-                const dist = map.distance([copLat, copLng], [p.lat, p.lng]);
+                const dist = window.map.distance([copLat, copLng], [p.lat, p.lng]);
                 const isBotThief = id.startsWith('bot_');
                 
                 // === מנגנון היברידי: תפיסה אוטומטית ב-GPS עובדת רק נגד בוטים או שחקנים מנותקים ===
@@ -77,7 +77,7 @@ function listenForCaptureSignals() {
         if (!sig || Date.now() - sig.t > 5000) return;
         
         if (window.playerRole === 'thief') {
-            const dist = map.distance([myLat, myLng], [sig.lat, sig.lng]);
+            const dist = window.map.distance([window.myLat, window.myLng], [sig.lat, sig.lng]);
             if (dist <= 15) { 
                 
                 // === מנגנון היברידי: בודקים מי ירה עלינו ===
@@ -142,7 +142,7 @@ function confirmCatch(victimId, signalTime, copId) {
 }
 
 function triggerSnitch() {
-    if (typeof isGameFrozen !== 'undefined' && isGameFrozen) return;
+    if (typeof window.isGameFrozen !== 'undefined' && window.isGameFrozen) return;
     const btn = document.getElementById('snitch-btn');
     if (btn.disabled) return;
     btn.disabled = true;
@@ -154,7 +154,7 @@ function triggerSnitch() {
         Object.keys(players).forEach(id => {
             const p = players[id];
             if (p.role === 'thief' && !p.isOffline) {
-                const dist = map.distance([myLat, myLng], [p.lat, p.lng]);
+                const dist = window.map.distance([window.myLat, window.myLng], [p.lat, p.lng]);
                 if (dist <= 15) {
                     window.db.ref(`game/${window.currentRoom}/players/${id}/flashUntil`).set(Date.now() + 3000);
                     foundThief = true;
@@ -210,7 +210,7 @@ function checkOfflinePlayers() {
             }
         });
 
-        if (activeThieves === 0 && hasSeenThief) {
+        if (activeThieves === 0 && window.hasSeenThief) {
             window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'cops');
         } else if (activeCops === 0 && activeThieves > 0) {
             window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => current || 'thieves');
@@ -230,7 +230,7 @@ function listenToVictory() {
 function listenToCapturedAreas() {
     window.db.ref(`game/${window.currentRoom}/capturedAreas`).on('value', snap => {
         const areas = snap.val();
-        if (typeof renderAreas === "function") areaLayers = renderAreas(map, areas, areaLayers);
+        if (typeof renderAreas === "function") window.areaLayers = renderAreas(window.map, areas, window.areaLayers);
     });
 }
 
@@ -248,8 +248,8 @@ function listenToOtherPlayers() {
 
         window.db.ref(`game/${window.currentRoom}/players`).on('value', snapGame => {
             const gamePlayers = snapGame.val() || {};
-            for (let id in playerMarkers) map.removeLayer(playerMarkers[id]);
-            playerMarkers = {};
+            for (let id in window.playerMarkers) window.map.removeLayer(window.playerMarkers[id]);
+            window.playerMarkers = {};
             
             let activeCount = 0;
             let thievesCount = 0;
@@ -268,8 +268,8 @@ function listenToOtherPlayers() {
                     if (role === 'thief') thievesCount++;
                 }
 
-                if (window.playerRole === 'cop' && role === 'thief' && !isOffline && myLat && myLng) {
-                    if (map.distance([myLat, myLng], [gp.lat, gp.lng]) <= 30) isThiefNearby = true;
+                if (window.playerRole === 'cop' && role === 'thief' && !isOffline && window.myLat && window.myLng) {
+                    if (window.map.distance([window.myLat, window.myLng], [gp.lat, gp.lng]) <= 30) isThiefNearby = true;
                 }
                 
                 if (id === window.playerId) {
@@ -279,23 +279,23 @@ function listenToOtherPlayers() {
                         iconSize: [32, 32],
                         iconAnchor: [16, 16]
                     });
-                    playerMarkers[id] = L.marker([gp.lat, gp.lng], { icon: starIcon }).addTo(map);
+                    window.playerMarkers[id] = L.marker([gp.lat, gp.lng], { icon: starIcon }).addTo(window.map);
                 } else {
                     let markerColor = (role === 'cop') ? '#2563eb' : (role === 'snitch' ? '#f59e0b' : '#dc2626');
                     if (isOffline) markerColor = '#6b7280'; 
                     
                     if ((window.playerRole === 'cop' || window.playerRole === 'snitch') && role === 'thief' && !isFlashing) return;
 
-                    playerMarkers[id] = L.circleMarker([gp.lat, gp.lng], {
+                    window.playerMarkers[id] = L.circleMarker([gp.lat, gp.lng], {
                         radius: 15, fillColor: markerColor, fillOpacity: isOffline ? 0.5 : 1,
                         color: isFlashing ? '#ffff00' : '#fff', weight: isFlashing ? 6 : 3 
-                    }).addTo(map);
+                    }).addTo(window.map);
                 }
             });
 
             const countEl = document.getElementById('players-count');
             if (countEl) countEl.innerText = `שחקנים: ${activeCount}`;
-            if (thievesCount > 0) hasSeenThief = true;
+            if (thievesCount > 0) window.hasSeenThief = true;
             
             if (window.playerRole === 'cop' || window.playerRole === 'snitch') {
                 const radar = document.getElementById('radar-overlay');
@@ -303,9 +303,4 @@ function listenToOtherPlayers() {
             }
         });
     });
-}
-
-function startThiefMechanics() {
-    if (trailLayer) map.removeLayer(trailLayer);
-    trailLayer = L.polyline([], { color: '#dc2626', weight: 6, dashArray: '5, 10', opacity: 0.8 }).addTo(map);
 }
