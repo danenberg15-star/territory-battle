@@ -4,16 +4,11 @@
 // 0. Early GPS Activation (Login Screen)
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-    const nameInput = document.getElementById('player-name');
-    if (nameInput) {
-        // ברגע שהשחקן מתחיל להקליד את שמו, ה-GPS מתחיל לעבוד ברקע
-        nameInput.addEventListener('input', () => {
-            if (typeof startRealGpsTracking === 'function' && !window.earlyGpsStarted) {
-                window.earlyGpsStarted = true;
-                console.log("Early GPS tracking started from login screen...");
-                startRealGpsTracking();
-            }
-        }, { once: true });
+    // הפעלת GPS באופן מיידי ברקע עם טעינת הדף (ללא המתנה להקלדת שם)
+    if (typeof startRealGpsTracking === 'function' && !window.earlyGpsStarted) {
+        window.earlyGpsStarted = true;
+        console.log("Early GPS tracking started automatically on load...");
+        startRealGpsTracking();
     }
 });
 
