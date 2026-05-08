@@ -222,9 +222,15 @@ function listenToVictory() {
 function listenToCapturedAreas() {
     window.db.ref(`game/${window.currentRoom}/capturedAreas`).on('value', snap => {
         const areas = snap.val();
-        if (typeof renderAreas === "function") window.areaLayers = renderAreas(window.map, areas, window.areaLayers);
+        if (typeof window.renderAreas === "function") {
+            window.areaLayers = window.renderAreas(window.map, areas, window.areaLayers);
+        } else if (typeof renderAreas === "function") {
+            window.areaLayers = renderAreas(window.map, areas, window.areaLayers);
+        }
     });
 }
+
+let lastRadarVibrate = 0;
 
 function listenToOtherPlayers() {
     window.db.ref(`rooms/${window.currentRoom}/players`).on('value', snapRooms => {
@@ -261,14 +267,18 @@ function listenToOtherPlayers() {
                     if (role === 'thief') thievesCount++;
                 }
 
-                // ראדאר לשוטרים: מזהה אם גנב קרוב
                 if ((window.playerRole === 'cop' || window.playerRole === 'snitch') && role === 'thief' && !isOffline && window.myLat && window.myLng) {
-                    if (window.map.distance([window.myLat, window.myLng], [gp.lat, gp.lng]) <= 30) isThiefNearby = true;
+                    if (window.map.distance([window.myLat, window.myLng], [gp.lat, gp.lng]) <= 60) isThiefNearby = true;
                 }
                 
-                // ראדאר לגנבים: מזהה אם שוטר קרוב
                 if (window.playerRole === 'thief' && role === 'cop' && !isOffline && window.myLat && window.myLng) {
-                    if (window.map.distance([window.myLat, window.myLng], [gp.lat, gp.lng]) <= 30) isCopNearby = true;
+                    if (window.map.distance([window.myLat, window.myLng], [gp.lat, gp.lng]) <= 60) {
+                        isCopNearby = true;
+                        if (Date.now() - lastRadarVibrate > 3000 && navigator.vibrate) {
+                            navigator.vibrate([150, 50, 150]);
+                            lastRadarVibrate = Date.now();
+                        }
+                    }
                 }
                 
                 if (id === window.playerId) {
@@ -296,7 +306,6 @@ function listenToOtherPlayers() {
             if (countEl) countEl.innerText = `שחקנים: ${activeCount}`;
             if (thievesCount > 0) window.hasSeenThief = true;
             
-            // הדלקת הראדאר בהתאם לתפקיד השחקן
             const radar = document.getElementById('radar-overlay');
             if (radar) {
                 if (window.playerRole === 'cop' || window.playerRole === 'snitch') {
