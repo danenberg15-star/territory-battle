@@ -92,29 +92,22 @@ function checkCopProximity(lat, lng) {
     });
 }
 
-// 4.1: ניהול שובלים וסגירת פוליגונים (כולל התרת פלונטרים מגרסה 2.2)
 function handleThiefTrail(lat, lng) {
-    // בדיקה מינימלית - אם לא זזת 3 מטרים, אל תוסיף נקודה
     if (window.thiefPath.length > 0) {
         const last = window.thiefPath[window.thiefPath.length - 1];
         if (window.map.distance([lat, lng], last) < 3) return; 
     }
 
-    // בדיקת הצטלבות (פלונטר) והחזרת יכולת החיתוך
     if (window.thiefPath.length > 5) {
         for (let i = 0; i < window.thiefPath.length - 5; i++) {
-            // אם התקרבת לנקודה קיימת בשובל שלך (עד 6 מטר)
             if (window.map.distance([lat, lng], window.thiefPath[i]) < 6) {
                 const areaCoords = window.thiefPath.slice(i);
                 
-                // חישוב השטח שנוצר בחיתוך
                 const areaSqM = calculatePathArea(areaCoords);
 
                 if (areaSqM > 25) {
-                    // כיבוש שטח אמיתי
                     tryCaptureArea([...areaCoords, [lat, lng]]);
                 } else {
-                    // חזרה אחורה: הגנב פשוט חזר על עקבותיו, לכן נחתוך ("ננקה") את השובל עד לנקודת החזרה
                     console.log("Knot untied - cleaning trail");
                     window.thiefPath = window.thiefPath.slice(0, i + 1);
                     if (window.trailLayer) window.trailLayer.setLatLngs(window.thiefPath);

@@ -75,6 +75,8 @@ function checkArenaStatus() {
                         if (window.playerRole === 'thief') {
                             if (!window.trailLayer && typeof startThiefMechanics === 'function') {
                                 startThiefMechanics();
+                            } else if (!window.trailLayer && typeof window.startThiefMechanics === 'function') {
+                                window.startThiefMechanics();
                             }
                         }
                     } else {

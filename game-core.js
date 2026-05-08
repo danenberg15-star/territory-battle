@@ -49,7 +49,6 @@ function enterGameScene() {
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    // ניקוי מפה קיימת למניעת כפילויות
     if (window.map) {
         window.map.remove();
         window.map = null;
@@ -75,7 +74,6 @@ function enterGameScene() {
     if (typeof listenForCaptureSignals === 'function') listenForCaptureSignals(); 
     if (typeof listenToTreasures === 'function') listenToTreasures();
 
-    // בדיקת AFK מבוזרת
     setInterval(() => {
         if (typeof checkOfflinePlayers === 'function') checkOfflinePlayers();
     }, 10000); 
@@ -147,11 +145,11 @@ function updateRealPosition() {
     const isDrawingMode = drawingEl && drawingEl.style.display === 'block';
     
     if (!isDrawingMode) {
-        window.map.panTo([window.myLat, window.myLng], { animate: true, duration: 1.0 });
+        // התיקון כאן: קיצור זמן האנימציה מ-1.0 שניות ל-0.25 כדי שהמצלמה תעקוב אחריך מיד וללא דיליי מורגש
+        window.map.panTo([window.myLat, window.myLng], { animate: true, duration: 0.25 });
     }
 
     if (window.currentRoom && window.playerId) {
-        // עדכון מיקום ב-Firebase
         window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({ 
             lat: window.myLat, 
             lng: window.myLng, 
@@ -159,14 +157,12 @@ function updateRealPosition() {
             role: window.playerRole 
         });
 
-        // בדיקת שהייה בתחנת משטרה
         if ((window.playerRole === 'cop' || window.playerRole === 'snitch') && window.arenaData) {
             const dist = window.map.distance([window.myLat, window.myLng], [window.arenaData.policeStation.lat, window.arenaData.policeStation.lng]);
             const inStation = dist <= window.arenaData.policeStation.radius;
             window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/inStation`).set(inStation);
         }
 
-        // הפעלת לוגיקת גנב (שובל) - משתמש ב-window.isBriefingComplete לסנכרון
         if (window.playerRole === 'thief' && window.isBriefingComplete) {
             if (typeof updateThiefLogic === "function") updateThiefLogic(window.myLat, window.myLng);
         }
