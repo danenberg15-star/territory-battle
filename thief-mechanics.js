@@ -1,4 +1,4 @@
-// thief-mechanics.js - Anti-Tangle Trail & Area Capture (Fully Synced)
+// thief-mechanics.js - Anti-Tangle Trail & Area Capture (Fully Synced & Fixed)
 
 let outOfBoundsTimer = null;
 let outOfBoundsSeconds = 10;
@@ -18,25 +18,39 @@ window.startThiefMechanics = function() {
 function updateThiefLogic(lat, lng) {
     if (window.playerRole !== 'thief' || !window.isBriefingComplete || !window.arenaData) return;
 
+    // הגנת ברזל: הדלקה בכוח של השובל במקרה שפספסנו את ההוראה מהתדריך
+    if (!window.trailLayer && typeof window.startThiefMechanics === 'function') {
+        window.startThiefMechanics();
+    }
+
     checkArenaBoundaries(lat, lng);
     checkCopProximity(lat, lng);
     
-    if (typeof isGameFrozen !== 'undefined' && isGameFrozen) return;
+    if (typeof window.isGameFrozen !== 'undefined' && window.isGameFrozen) return;
 
     handleThiefTrail(lat, lng);
 }
 
 function checkArenaBoundaries(lat, lng) {
-    const point = turf.point([lng, lat]);
-    const polygon = turf.polygon([window.arenaData.points.map(p => [p[1], p[0]])]);
-    const isInside = turf.booleanPointInPolygon(point, polygon);
+    try {
+        const point = turf.point([lng, lat]);
+        const polyCoords = window.arenaData.points.map(p => [p[1], p[0]]);
+        
+        // התיקון הקריטי: Turf.js קורס אם הפוליגון לא "סגור" (הנקודה הראשונה חייבת להיות זהה לאחרונה)
+        polyCoords.push(polyCoords[0]); 
+        
+        const polygon = turf.polygon([polyCoords]);
+        const isInside = turf.booleanPointInPolygon(point, polygon);
 
-    if (!isInside) {
-        if (!outOfBoundsTimer) {
-            startOutOfBoundsTimer();
+        if (!isInside) {
+            if (!outOfBoundsTimer) {
+                startOutOfBoundsTimer();
+            }
+        } else {
+            if (outOfBoundsTimer) stopOutOfBoundsTimer();
         }
-    } else {
-        if (outOfBoundsTimer) stopOutOfBoundsTimer();
+    } catch (e) {
+        console.error("Turf.js Polygon Error in Arena Check:", e);
     }
 }
 
