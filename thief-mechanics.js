@@ -4,20 +4,17 @@ let outOfBoundsTimer = null;
 let outOfBoundsSeconds = 10;
 let lastProximityAlert = 0;
 
-// פונקציה ראשית לניהול לוגיקת הגנב בכל עדכון מיקום
 function updateThiefLogic(lat, lng) {
     if (window.playerRole !== 'thief' || !isBriefingComplete || !arenaData) return;
 
     checkArenaBoundaries(lat, lng);
     checkCopProximity(lat, lng);
     
-    // אם יש תחקיר משטרתי (Game Freeze), הגנבים לא יכולים לגנוב שטחים!
     if (typeof isGameFrozen !== 'undefined' && isGameFrozen) return;
 
     handleThiefTrail(lat, lng);
 }
 
-// 4.2: בדיקת גבולות הזירה וטיימר פסילה
 function checkArenaBoundaries(lat, lng) {
     const point = turf.point([lng, lat]);
     const polygon = turf.polygon([arenaData.points.map(p => [p[1], p[0]])]);
@@ -25,7 +22,6 @@ function checkArenaBoundaries(lat, lng) {
 
     if (!isInside) {
         if (!outOfBoundsTimer) {
-            console.warn("Out of bounds!");
             startOutOfBoundsTimer();
         }
     } else {
@@ -66,7 +62,6 @@ function stopOutOfBoundsTimer() {
     if(timerText) timerText.style.color = "#facc15";
 }
 
-// 4.2: התראת קרבה לשוטר (20 מטר)
 function checkCopProximity(lat, lng) {
     const now = Date.now();
     if (now - lastProximityAlert < 5000) return; 
@@ -79,7 +74,6 @@ function checkCopProximity(lat, lng) {
                 const distance = map.distance([lat, lng], [p.lat, p.lng]);
                 if (distance <= 20) {
                     if (navigator.vibrate) navigator.vibrate(200); 
-                    console.log("Cop nearby!");
                     lastProximityAlert = now;
                 }
             }
@@ -87,24 +81,30 @@ function checkCopProximity(lat, lng) {
     });
 }
 
-// 4.1: ניהול שובלים וסגירת פוליגונים (כולל התרת פלונטרים)
+// 4.1: ניהול שובלים וסגירת פוליגונים (כולל התרת פלונטרים מגרסה 2.2)
 function handleThiefTrail(lat, lng) {
+    // בדיקה מינימלית - אם לא זזת 3 מטרים, אל תוסיף נקודה
     if (thiefPath.length > 0) {
         const last = thiefPath[thiefPath.length - 1];
         if (map.distance([lat, lng], last) < 3) return; 
     }
 
+    // בדיקת הצטלבות (פלונטר)
     if (thiefPath.length > 5) {
         for (let i = 0; i < thiefPath.length - 5; i++) {
-            // רגישות חיתוך הורדה ל-6 מטר
+            // אם התקרבת לנקודה קיימת בשובל שלך (עד 6 מטר)
             if (map.distance([lat, lng], thiefPath[i]) < 6) {
                 const areaCoords = thiefPath.slice(i);
                 
-                // אם השטח גדול מ-25 מ"ר זה כיבוש שטח תקין
-                if (calculatePathArea(areaCoords) > 25) {
+                // חישוב השטח שנוצר בחיתוך
+                const areaSqM = calculatePathArea(areaCoords);
+
+                if (areaSqM > 25) {
+                    // כיבוש שטח אמיתי
                     tryCaptureArea([...areaCoords, [lat, lng]]);
                 } else {
-                    // התרת פלונטר: הגנב חזר על עקבותיו, לכן נחתוך את המסלול רק עד נקודת החיתוך
+                    // חזרה אחורה: הגנב פשוט חזר על עקבותיו, לכן נחתוך ("ננקה") את השובל עד לנקודת החזרה
+                    console.log("Knot untied - cleaning trail");
                     thiefPath = thiefPath.slice(0, i + 1);
                     if (trailLayer) trailLayer.setLatLngs(thiefPath);
                 }
@@ -117,7 +117,6 @@ function handleThiefTrail(lat, lng) {
     if (trailLayer) trailLayer.setLatLngs(thiefPath);
 }
 
-// פונקציית עזר לחישוב שטח מהיר בתוך המסלול לצורך זיהוי פלונטרים
 function calculatePathArea(points) {
     try {
         const coords = points.map(p => [p[1], p[0]]);
@@ -126,7 +125,6 @@ function calculatePathArea(points) {
     } catch(e) { return 0; }
 }
 
-// 4.1 & 4.2: ניסיון סגירת שטח ובדיקת נוכחות שוטר
 function tryCaptureArea(points) {
     const polygonCoords = points.map(p => [p[1], p[0]]);
     polygonCoords.push(polygonCoords[0]); 
@@ -156,10 +154,8 @@ function tryCaptureArea(points) {
             t: Date.now()
         });
 
-        // 4.1: הבהוב אדום לשוטרים
         window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/flashUntil`).set(Date.now() + 3000);
 
-        // 6.3: בדיקה האם הגנב כלא אוצר בתוך השטח שזה עתה יצר!
         if (typeof checkTreasureInCapturedArea === 'function') {
             checkTreasureInCapturedArea(points);
         }

@@ -27,7 +27,6 @@ let arenaPolygonLayer = null;
 function enterGameScene() {
     console.log("Tactical Scene Initializing...");
     
-    // ניקוי מסכים קודמים
     document.getElementById('lobby-screen').style.display = 'none';
     document.getElementById('login-screen').style.display = 'none';
     
@@ -40,7 +39,6 @@ function enterGameScene() {
     if (typeof audioCtx !== 'undefined' && !audioCtx) initAudio();
     if (typeof audioCtx !== 'undefined' && audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
 
-    // אתחול מפה - הגדרות אופטימליות למובייל
     map = L.map('map', { 
         zoomControl: false, 
         attributionControl: false,
@@ -56,23 +54,20 @@ function enterGameScene() {
         maxZoom: 20 
     }).addTo(map);
 
-    // סנכרון זמן התחלה ובדיקת סטטוס ארנה
     window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
         gameStartTime = snap.val() || Date.now();
         if (typeof checkArenaStatus === 'function') checkArenaStatus();
     });
 
-    // הפעלת מאזינים גלובליים
+    // הפעלת ה-GPS ה"עקשן" מגרסה 2.2
     startRealGpsTracking();
     
     if (typeof listenToOtherPlayers === 'function') listenToOtherPlayers();
     if (typeof listenToCapturedAreas === 'function') listenToCapturedAreas();
     if (typeof listenToVictory === 'function') listenToVictory(); 
     if (typeof listenForCaptureSignals === 'function') listenForCaptureSignals(); 
-    
     if (typeof listenToTreasures === 'function') listenToTreasures();
 
-    // ניהול שחקנים לא מקוונים על ידי המארח
     if (window.isHost) {
         setInterval(checkOfflinePlayers, 10000); 
     }
@@ -99,10 +94,15 @@ function zoomMap(delta) {
 }
 
 // ==========================================
-// 5. GPS Tracking & Auto-Pan
+// 5. GPS Tracking & Auto-Pan (v2.2 Stubborn Mode)
 // ==========================================
 function startRealGpsTracking() {
     if (!navigator.geolocation) return;
+
+    // ניקוי מזהה קודם כדי למנוע כפילויות שחוסמות את החומרה
+    if (gpsWatchId !== null) {
+        navigator.geolocation.clearWatch(gpsWatchId);
+    }
     
     gpsWatchId = navigator.geolocation.watchPosition((pos) => {
         myLat = pos.coords.latitude;
@@ -116,23 +116,22 @@ function startRealGpsTracking() {
             gpsEl.style.color = "#10b981"; 
         }
 
-        // מיקום ראשוני של המפה על השחקן
         if (map && !window.firstLoadDone) {
             map.setView([myLat, myLng], 18);
             window.firstLoadDone = true;
         }
         updateRealPosition();
     }, (err) => {
-        console.warn("GPS Error:", err);
+        console.warn("GPS Hardware Error:", err);
         const gpsEl = document.getElementById('gps-status');
         if (gpsEl) {
             gpsEl.innerText = "GPS ❌";
             gpsEl.style.color = "#ef4444";
         }
     }, { 
-        enableHighAccuracy: true,
-        maximumAge: 1000,
-        timeout: 5000
+        enableHighAccuracy: true, // דרישה לדיוק מירבי
+        maximumAge: 0,            // איסור שימוש במיקום ישן מהזיכרון
+        timeout: 10000 
     });
 }
 
@@ -142,36 +141,33 @@ function updateRealPosition() {
     const drawingEl = document.getElementById('drawing-container');
     const isDrawingMode = drawingEl && drawingEl.style.display === 'block';
     
-    // מעקב מפה אוטומי - רק כשלא במצב ציור
     if (!isDrawingMode) {
         map.panTo([myLat, myLng], { animate: true, duration: 1.0 });
     }
 
-    // בדיקת שהייה בתחנת משטרה לשוטרים ומלשינים
     if ((window.playerRole === 'cop' || window.playerRole === 'snitch') && arenaData) {
         const dist = map.distance([myLat, myLng], [arenaData.policeStation.lat, arenaData.policeStation.lng]);
         const inStation = dist <= arenaData.policeStation.radius;
         window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/inStation`).set(inStation);
     }
 
-    // הפעלת לוגיקת גנב אם רלוונטי
     if (window.playerRole === 'thief' && isBriefingComplete) {
         if (typeof updateThiefLogic === "function") updateThiefLogic(myLat, myLng);
     }
     
-    // בדיקת אוצרות בקרבת מקום
     if (typeof checkTreasureProximity === 'function') {
         checkTreasureProximity(myLat, myLng);
     }
 
-    // עדכון מיקום ב-Firebase
-    window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({ 
-        lat: myLat, 
-        lng: myLng, 
-        t: Date.now(),
-        role: window.playerRole 
-    });
+    // עדכון Firebase - מוודא שהשחקן "חי" במפה של כולם
+    if (window.currentRoom && window.playerId) {
+        window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({ 
+            lat: myLat, 
+            lng: myLng, 
+            t: Date.now(),
+            role: window.playerRole 
+        });
+    }
 
-    // ניהול תדריך ע"י המארח
     if (window.isHost && typeof manageBriefingLogic === "function") manageBriefingLogic();
 }
