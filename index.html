@@ -36,67 +36,51 @@
         #drawing-canvas { width: 100%; height: 100%; cursor: crosshair; }
         
         /* Screens */
-        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; padding: 20px; box-sizing: border-box; }
+        .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; padding: 20px; box-sizing: border-box; overflow-y: auto; }
         #lobby-screen { display: none; justify-content: flex-start; padding-top: 50px; }
         
         /* UI Elements */
-        h1 { color: #38bdf8; font-size: 28px; margin-bottom: 30px; text-align: center; text-shadow: 0 0 10px rgba(56, 189, 248, 0.5); }
-        input, select { width: 100%; max-width: 300px; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: 1px solid #38bdf8; background: #1e293b; color: white; font-size: 18px; text-align: center; box-sizing: border-box; user-select: auto; }
-        
-        .btn { width: 100%; max-width: 300px; padding: 18px; border-radius: 12px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; margin-bottom: 15px; transition: 0.2s; text-align: center; display: flex; align-items: center; justify-content: center; }
+        h1 { color: #38bdf8; font-size: 28px; margin-bottom: 20px; text-align: center; }
+        input, select { width: 100%; max-width: 300px; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #38bdf8; background: #1e293b; color: white; font-size: 16px; text-align: center; box-sizing: border-box; user-select: auto; }
+        .btn { width: 100%; max-width: 300px; padding: 15px; border-radius: 8px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; margin-bottom: 10px; transition: 0.2s; text-align: center; display: flex; align-items: center; justify-content: center; }
         .btn-blue { background: #1e40af; }
         .btn-red { background: #991b1b; }
         .btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; max-width: 350px; width: 100%; margin: 15px 0 0 0; }
         
-        /* Game Mode Selector */
-        .mode-selector { display: flex; gap: 15px; margin-bottom: 15px; font-size: 16px; background: #1e293b; padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; }
-        .mode-selector label { display: flex; align-items: center; gap: 5px; cursor: pointer; }
-        
-        /* Stats & Controls */
+        /* Game Overlays */
         #floating-stats { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: none; flex-direction: row; justify-content: center; gap: 15px; z-index: 4000; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); padding: 8px 20px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 12px; font-weight: bold; }
         .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 4100; background: rgba(220, 38, 38, 0.8); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; font-weight: bold; display: none; align-items: center; justify-content: center; }
         
-        /* Overlays */
+        /* Radar and Borders */
         #radar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2400; display: none; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; background: rgba(239, 68, 68, 0.2); animation: radar-flash 0.6s infinite alternate; }
         @keyframes radar-flash { 0% { box-shadow: inset 0 0 30px rgba(239, 68, 68, 0.5); opacity: 0.4; } 100% { box-shadow: inset 0 0 150px rgba(239, 68, 68, 1); opacity: 1; } }
-        .radar-text { color: white; font-size: 26px; font-weight: 900; text-align: center; text-shadow: 0 0 15px #ef4444, 0 0 5px black; padding: 20px; background: rgba(0, 0, 0, 0.3); border-radius: 15px; max-width: 80%; }
-
+        
+        /* Chat UI */
         #chat-container { position: absolute; top: 70px; width: 45%; max-width: 210px; z-index: 5000; display: none; flex-direction: column; pointer-events: auto; }
         #chat-messages { width: 100%; height: 150px; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(4px); border-radius: 12px; overflow-y: auto; padding: 10px; font-size: 13px; border: 2px solid rgba(56, 189, 248, 0.3); margin-bottom: 8px; box-sizing: border-box; }
         #chat-mic-btn { width: 52px; height: 52px; background: #1e293b; border: 3px solid #38bdf8; border-radius: 50%; cursor: pointer; display: none; align-items: center; justify-content: center; transition: 0.2s; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.8)); outline: none; pointer-events: auto; margin-right: 5px; }
 
+        /* Setup/Drawing UI */
         #setup-ui { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 95%; max-width: 450px; display: none; flex-direction: column; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; }
         
-        /* סגנונות חדשים למסך הניצחון המשלב וידאו */
+        /* Victory Screen */
         #victory-screen { display: none; z-index: 6000; padding: 0; background: black; justify-content: center; align-items: center; }
         #victory-video { position: absolute; width: 100%; height: 100%; object-fit: cover; display: none; }
         #victory-ui-overlay { position: relative; z-index: 2; text-align: center; display: none; background: rgba(15, 23, 42, 0.85); padding: 30px; border-radius: 20px; border: 2px solid #38bdf8; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
+
+        /* Lobby Helper styles */
+        .team-list { flex: 1; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 12px; min-height: 200px; }
+        .room-code-box { background: #1e293b; padding: 10px 20px; border-radius: 12px; border: 2px dashed #38bdf8; color: #38bdf8; font-size: 20px; font-weight: bold; flex-grow: 1; text-align: center; }
+        .btn-whatsapp-icon { background: #25D366; border: none; border-radius: 12px; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-left: 10px; }
     </style>
 </head>
 <body>
     <div id="security-overlay"><div style="font-size: 2rem; font-weight: bold; transform: rotate(-30deg); opacity: 0.2; text-align: center; color: white; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">Territory Battle</div></div>
     <button id="lang-toggle" onclick="toggleLanguage()" style="position:absolute; top:15px; right:15px; z-index:4102; background:rgba(30, 41, 59, 0.8); color:white; border-radius:50%; width:40px; height:40px; border:1px solid #38bdf8;">🌐</button>
 
-    <div id="login-screen" class="screen">
-        <h1 id="lbl-main-title">Territory Battle</h1>
-        <input type="text" id="player-name" placeholder="הכנס שם שחקן" />
-        <input type="number" id="room-code-input" placeholder="קוד משחק" />
-        <button class="btn btn-blue" onclick="joinRoom()">הצטרף למשחק</button>
-        <button class="btn btn-red" onclick="createRoom()">צור משחק חדש</button>
-    </div>
+    <div id="login-screen" class="screen"></div>
 
-    <div id="lobby-screen" class="screen">
-        <h2 id="lbl-lobby-title">לובי המתנה</h2>
-        <div style="display: flex; align-items: center; width: 100%; max-width: 350px; margin-bottom: 20px;">
-            <div class="room-code-box">קוד: <span id="display-room-code">----</span></div>
-            <button class="btn-whatsapp-icon" onclick="shareWhatsApp()"><svg viewBox="0 0 24 24" width="30" height="30" fill="white"><path d="M12.031 0C5.385 0 0 5.385 0 12.031c0 2.128.552 4.195 1.6 6.02L.053 24l6.113-1.603c1.764.954 3.754 1.458 5.865 1.458 6.646 0 12.031-5.385 12.031-12.031S18.677 0 12.031 0zm3.626 17.15c-.156.44-1.295.992-1.847 1.054-.537.06-1.127.186-3.413-.761-2.92-1.21-4.787-4.225-4.93-4.417-.143-.192-1.178-1.568-1.178-2.986 0-1.418.736-2.115 1.002-2.392.266-.277.674-.352.887-.352.213 0 .426.002.605.009.213.008.497-.083.775.589.284.685.952 2.321 1.036 2.493.084.172.143.376.035.592-.108.216-.164.352-.326.544-.164.192-.345.426-.497.589-.168.176-.347.37-.148.712.199.342.885 1.463 1.895 2.361 1.305 1.159 2.404 1.516 2.748 1.673.344.157.545.132.748-.101.203-.233.882-1.025 1.118-1.378.236-.353.473-.294.787-.176.314.118 1.986.937 2.327 1.107.341.17.568.256.653.398.085.142.085.83-.071 1.27z"/></svg></button>
-        </div>
-        <div style="display: flex; width: 100%; max-width: 350px; flex-grow: 1;">
-            <div class="team-list" id="list-cops"><div style="color:#3b82f6; font-weight:bold; text-align:center; margin-bottom: 10px;">שוטרים 👮‍♂️</div><div id="players-cops"></div></div>
-            <div class="team-list" id="list-thieves"><div style="color:#ef4444; font-weight:bold; text-align:center; margin-bottom: 10px;">גנבים 🥷</div><div id="players-thieves"></div></div>
-        </div>
-        <button class="btn btn-green" id="btn-start-game" style="display:none;" onclick="startGame()">התחל משחק</button>
-    </div>
+    <div id="lobby-screen" class="screen"></div>
 
     <div id="map"></div>
     <div id="drawing-container"><canvas id="drawing-canvas"></canvas></div>
