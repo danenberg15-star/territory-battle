@@ -34,6 +34,10 @@ function startDrawing(e, mapInstance) {
     drawingPath = [];
     ctx.clearRect(0, 0, canvas.width, canvas.height);
     
+    // הסתרת הכפתור ברגע שמתחילים לצייר מחדש
+    const btn = document.getElementById('btn-confirm-drawing');
+    if (btn) btn.style.display = 'none';
+    
     const touch = e.touches[0];
     const pt = mapInstance.containerPointToLatLng([touch.clientX, touch.clientY]);
     drawingPath.push([pt.lat, pt.lng]);
@@ -59,6 +63,12 @@ function draw(e, mapInstance) {
 function stopDrawing() {
     isDrawing = false;
     ctx.closePath();
+    
+    // חשיפת כפתור האישור רק אם צויר שטח מינימלי חוקי
+    if (drawingPath.length >= 10) {
+        const btn = document.getElementById('btn-confirm-drawing');
+        if (btn) btn.style.display = 'block';
+    }
 }
 
 function clearDrawing() {
@@ -66,6 +76,10 @@ function clearDrawing() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
     }
     drawingPath = [];
+    
+    // הסתרת כפתור האישור כשמנקים את המסך
+    const btn = document.getElementById('btn-confirm-drawing');
+    if (btn) btn.style.display = 'none';
 }
 
 // ==========================================
@@ -119,9 +133,7 @@ function isPointInArena(lat, lng, arenaPoints) {
 // ==========================================
 // 3. Render Captured Areas & Update Progress
 // ==========================================
-// סונכרן ל-window כדי שיופעל מתוך game-play.js בצורה חלקה
 window.renderAreas = function(mapInstance, areasData, currentLayers) {
-    // 1. ניקוי שטחים קודמים מהמפה (לפני ציור מחדש כדי למנוע כפילויות)
     if (currentLayers && currentLayers.length > 0) {
         currentLayers.forEach(layer => mapInstance.removeLayer(layer));
     }
@@ -129,11 +141,9 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
     let newLayers = [];
     let totalCapturedSqMeters = 0;
 
-    // 2. מעבר על כל השטחים שנכבשו וציור שלהם באדום
     if (areasData) {
         Object.values(areasData).forEach(area => {
             if (area.points && area.points.length >= 3) {
-                // ציור הפוליגון במפה (אדום חצי שקוף)
                 const poly = L.polygon(area.points, { 
                     color: '#ef4444', 
                     fillColor: '#ef4444', 
@@ -144,7 +154,6 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
                 
                 newLayers.push(poly);
 
-                // חישוב גודל השטח הכבוש
                 try {
                     const coords = area.points.map(p => [p[1], p[0]]);
                     coords.push(coords[0]); // חובה לסגור ל-Turf
@@ -157,24 +166,20 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
         });
     }
 
-    // 3. עדכון UI של אחוזי הכיבוש
     if (window.arenaData && window.arenaData.totalArea) {
         const percentage = (totalCapturedSqMeters / window.arenaData.totalArea) * 100;
-        const safePercentage = Math.min(100, Math.max(0, percentage)).toFixed(1); // מוגבל בין 0 ל-100
+        const safePercentage = Math.min(100, Math.max(0, percentage)).toFixed(1); 
         
-        // עדכון טקסט
         const progressEl = document.getElementById('capture-progress-text');
         if (progressEl) {
             progressEl.innerText = `${safePercentage}%`;
         }
         
-        // עדכון פס התקדמות ויזואלי ב-UI (אם קיים)
         const progressBar = document.getElementById('capture-progress-bar');
         if (progressBar) {
             progressBar.style.width = `${safePercentage}%`;
         }
 
-        // חוק ניצחון לגנבים: כיבוש 80% מהשטח מביא לניצחון מיידי
         if (safePercentage >= 80 && window.isHost && window.currentRoom) {
             window.db.ref(`game/${window.currentRoom}/winner`).set('thieves');
         }
