@@ -3,8 +3,11 @@
 let outOfBoundsTimer = null;
 let outOfBoundsSeconds = 10;
 let lastProximityAlert = 0;
+let localCapturedAreas = null;
 
-// דורס את הפונקציה הישנה ומוודא שהשובל מאותחל על המפה הגלובלית
+// ==========================================
+// 1. Initialization
+// ==========================================
 window.startThiefMechanics = function() {
     if (window.trailLayer && window.map) {
         window.map.removeLayer(window.trailLayer);
@@ -13,12 +16,22 @@ window.startThiefMechanics = function() {
         window.trailLayer = L.polyline([], { color: '#dc2626', weight: 6, dashArray: '5, 10', opacity: 0.8 }).addTo(window.map);
     }
     window.thiefPath = [];
+    
+    // האזנה אקטיבית לשטחים כבושים כדי לדעת מתי אנחנו דורכים עליהם (להשלמת פאות)
+    if (window.currentRoom) {
+        window.db.ref(`game/${window.currentRoom}/capturedAreas`).off('value'); 
+        window.db.ref(`game/${window.currentRoom}/capturedAreas`).on('value', snap => {
+            localCapturedAreas = snap.val() || {};
+        });
+    }
 };
 
+// ==========================================
+// 2. Core Logic Loop
+// ==========================================
 function updateThiefLogic(lat, lng) {
     if (window.playerRole !== 'thief' || !window.isBriefingComplete || !window.arenaData) return;
 
-    // הגנת ברזל: הדלקה בכוח של השובל במקרה שפספסנו את ההוראה מהתדריך
     if (!window.trailLayer && typeof window.startThiefMechanics === 'function') {
         window.startThiefMechanics();
     }
@@ -31,12 +44,13 @@ function updateThiefLogic(lat, lng) {
     handleThiefTrail(lat, lng);
 }
 
+// ==========================================
+// 3. Rules & Boundaries
+// ==========================================
 function checkArenaBoundaries(lat, lng) {
     try {
         const point = turf.point([lng, lat]);
         const polyCoords = window.arenaData.points.map(p => [p[1], p[0]]);
-        
-        // התיקון הקריטי: Turf.js קורס אם הפוליגון לא "סגור" (הנקודה הראשונה חייבת להיות זהה לאחרונה)
         polyCoords.push(polyCoords[0]); 
         
         const polygon = turf.polygon([polyCoords]);
@@ -106,32 +120,74 @@ function checkCopProximity(lat, lng) {
     });
 }
 
+// ==========================================
+// 4. Trail & Polygon Detection (The "P" & Territory Rules)
+// ==========================================
+function isPointInAnyCapturedArea(checkLat, checkLng) {
+    if (!localCapturedAreas) return false;
+    const pt = turf.point([checkLng, checkLat]);
+    
+    for (let key in localCapturedAreas) {
+        const pts = localCapturedAreas[key].points;
+        if (!pts || pts.length < 3) continue;
+        
+        const coords = pts.map(p => [p[1], p[0]]);
+        coords.push(coords[0]);
+        try {
+            const poly = turf.polygon([coords]);
+            if (turf.booleanPointInPolygon(pt, poly)) return true;
+        } catch(e) { }
+    }
+    return false;
+}
+
 function handleThiefTrail(lat, lng) {
     if (window.thiefPath.length > 0) {
         const last = window.thiefPath[window.thiefPath.length - 1];
         if (window.map.distance([lat, lng], last) < 3) return; 
     }
 
+    let captured = false;
+
     if (window.thiefPath.length > 5) {
+        // 1. חוק האות P - חיתוך עצמי
         for (let i = 0; i < window.thiefPath.length - 5; i++) {
             if (window.map.distance([lat, lng], window.thiefPath[i]) < 6) {
                 const areaCoords = window.thiefPath.slice(i);
-                
                 const areaSqM = calculatePathArea(areaCoords);
 
                 if (areaSqM > 25) {
-                    tryCaptureArea([...areaCoords, [lat, lng]]);
-                    return; // לאחר כיבוש אנחנו יוצאים מהפונקציה, השובל יתאפס
+                    tryCaptureArea([...areaCoords, [lat, lng]], i);
+                    captured = true;
+                    break;
                 }
-                // אם השטח קטן מ-25 מ"ר (פשוט חזרנו אחורה או עשינו לולאה קטנה),
-                // אנחנו מתעלמים מהלולאה וממשיכים הלאה כדי לא למחוק לגנב את השובל!
             }
         }
     }
 
-    // הוספת הנקודה לשובל תמיד (אלא אם כן כבשנו שטח והשובל אופס)
-    window.thiefPath.push([lat, lng]);
-    if (window.trailLayer) window.trailLayer.setLatLngs(window.thiefPath);
+    // 2. חוק השלמת הפאות - שימוש בטריטוריות קיימות כדי לסגור שטחים
+    if (!captured && localCapturedAreas && window.thiefPath.length > 5) {
+        if (isPointInAnyCapturedArea(lat, lng)) {
+            // דורכים כרגע על טריטוריה, נבדוק אם גם יצאנו מהטריטוריה מתישהו בעבר השביל
+            for (let i = 0; i < window.thiefPath.length - 5; i++) {
+                if (isPointInAnyCapturedArea(window.thiefPath[i][0], window.thiefPath[i][1])) {
+                    const areaCoords = window.thiefPath.slice(i);
+                    const areaSqM = calculatePathArea(areaCoords);
+                    
+                    if (areaSqM > 25) {
+                        tryCaptureArea([...areaCoords, [lat, lng]], i);
+                        captured = true;
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (!captured) {
+        window.thiefPath.push([lat, lng]);
+        if (window.trailLayer) window.trailLayer.setLatLngs(window.thiefPath);
+    }
 }
 
 function calculatePathArea(points) {
@@ -142,7 +198,7 @@ function calculatePathArea(points) {
     } catch(e) { return 0; }
 }
 
-function tryCaptureArea(points) {
+function tryCaptureArea(points, splitIndex) {
     const polygonCoords = points.map(p => [p[1], p[0]]);
     polygonCoords.push(polygonCoords[0]); 
     const polygon = turf.polygon([polygonCoords]);
@@ -150,7 +206,7 @@ function tryCaptureArea(points) {
     window.db.ref(`game/${window.currentRoom}/players`).once('value', snap => {
         const players = snap.val() || {};
         const copInside = Object.values(players).some(p => {
-            if (p.role === 'cop') {
+            if (p.role === 'cop' && !p.isOffline) {
                 const pt = turf.point([p.lng, p.lat]);
                 return turf.booleanPointInPolygon(pt, polygon);
             }
@@ -159,8 +215,13 @@ function tryCaptureArea(points) {
 
         if (copInside) {
             alert(window.currentLang === 'he' ? "לא ניתן לגנוב - שוטר נמצא בשטח!" : "Cannot steal - Cop is inside!");
-            window.thiefPath = [];
-            if (window.trailLayer) window.trailLayer.setLatLngs([]);
+            // עונש על כליאת שוטר - השארת הרגל בלבד
+            if (splitIndex !== undefined) {
+                window.thiefPath = window.thiefPath.slice(0, splitIndex + 1);
+            } else {
+                window.thiefPath = []; 
+            }
+            if (window.trailLayer) window.trailLayer.setLatLngs(window.thiefPath);
             return;
         }
 
@@ -177,7 +238,13 @@ function tryCaptureArea(points) {
             checkTreasureInCapturedArea(points);
         }
 
-        window.thiefPath = [];
-        if (window.trailLayer) window.trailLayer.setLatLngs([]);
+        // הצלחה! משאירים את ה"רגל" בחיים (או את נקודת העוגן) כדי שנוכל להמשיך ממנה
+        if (splitIndex !== undefined) {
+            window.thiefPath = window.thiefPath.slice(0, splitIndex + 1);
+        } else {
+            window.thiefPath = []; 
+        }
+        
+        if (window.trailLayer) window.trailLayer.setLatLngs(window.thiefPath);
     });
 }
