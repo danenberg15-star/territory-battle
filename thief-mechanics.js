@@ -121,16 +121,15 @@ function handleThiefTrail(lat, lng) {
 
                 if (areaSqM > 25) {
                     tryCaptureArea([...areaCoords, [lat, lng]]);
-                } else {
-                    console.log("Knot untied - cleaning trail");
-                    window.thiefPath = window.thiefPath.slice(0, i + 1);
-                    if (window.trailLayer) window.trailLayer.setLatLngs(window.thiefPath);
+                    return; // לאחר כיבוש אנחנו יוצאים מהפונקציה, השובל יתאפס
                 }
-                return;
+                // אם השטח קטן מ-25 מ"ר (פשוט חזרנו אחורה או עשינו לולאה קטנה),
+                // אנחנו מתעלמים מהלולאה וממשיכים הלאה כדי לא למחוק לגנב את השובל!
             }
         }
     }
 
+    // הוספת הנקודה לשובל תמיד (אלא אם כן כבשנו שטח והשובל אופס)
     window.thiefPath.push([lat, lng]);
     if (window.trailLayer) window.trailLayer.setLatLngs(window.thiefPath);
 }
