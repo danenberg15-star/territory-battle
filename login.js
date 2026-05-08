@@ -13,10 +13,10 @@ function injectLoginUI() {
             padding: 20px; text-align: center;
         }
         .logo-main { width: 150px; height: 150px; margin-bottom: 20px; object-fit: contain; filter: drop-shadow(0 0 10px rgba(56, 189, 248, 0.4)); }
-        .login-input { width: 100%; max-width: 320px; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: 1px solid #38bdf8; background: #1e293b; color: white; font-size: 18px; text-align: center; }
+        .login-input { width: 100%; max-width: 320px; padding: 15px; margin-bottom: 15px; border-radius: 12px; border: 1px solid #38bdf8; background: #1e293b; color: white; font-size: 18px; text-align: center; box-sizing: border-box; }
         
         /* Toggle Switch */
-        .mode-container { display: flex; align-items: center; gap: 15px; margin-bottom: 25px; background: rgba(30, 41, 59, 0.5); padding: 10px 20px; border-radius: 50px; border: 1px solid rgba(56, 189, 248, 0.2); }
+        .mode-container { display: flex; align-items: center; justify-content: center; gap: 15px; margin-bottom: 25px; background: rgba(30, 41, 59, 0.5); padding: 10px 20px; border-radius: 50px; border: 1px solid rgba(56, 189, 248, 0.2); }
         .switch { position: relative; display: inline-block; width: 60px; height: 34px; }
         .switch input { opacity: 0; width: 0; height: 0; }
         .slider-round { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #334155; transition: .4s; border-radius: 34px; }
@@ -29,7 +29,7 @@ function injectLoginUI() {
         /* Range Slider */
         .bot-range-wrap { width: 100%; max-width: 300px; display: none; flex-direction: column; align-items: center; margin-bottom: 20px; }
         .range-slider { -webkit-appearance: none; width: 100%; height: 8px; border-radius: 5px; background: #334155; outline: none; margin: 20px 0; }
-        .range-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 30px; height: 30px; border-radius: 50%; background: #38bdf8; cursor: pointer; border: 2px solid white; }
+        .range-slider::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 30px; height: 30px; border-radius: 50%; background: #38bdf8; cursor: pointer; border: 2px solid white; box-shadow: 0 0 10px rgba(56, 189, 248, 0.5); }
         .bot-count-display { font-size: 24px; font-weight: bold; color: #38bdf8; }
     `;
     document.head.appendChild(style);
@@ -63,7 +63,7 @@ function injectLoginUI() {
                 </select>
             </div>
 
-            <div id="multi-inputs" style="width:100%; max-width:320px;">
+            <div id="multi-inputs" style="width:100%; max-width:320px; display: flex; flex-direction: column; align-items: center;">
                 <input type="number" id="room-code-input" class="login-input" placeholder="קוד משחק">
                 <button class="btn btn-blue" onclick="joinRoom()">הצטרף למשחק</button>
             </div>
@@ -79,7 +79,7 @@ function injectLoginUI() {
 function updateModeUI() {
     const isSingle = document.getElementById('mode-toggle').checked;
     document.getElementById('bot-settings').style.display = isSingle ? 'flex' : 'none';
-    document.getElementById('multi-inputs').style.display = isSingle ? 'none' : 'block';
+    document.getElementById('multi-inputs').style.display = isSingle ? 'none' : 'flex';
     
     document.getElementById('lbl-multi').classList.toggle('active', !isSingle);
     document.getElementById('lbl-single').classList.toggle('active', isSingle);
@@ -120,7 +120,10 @@ function createRoom() {
         isHost = true;
         currentRoom = roomId;
         window.location.hash = roomId;
-        enterLobby();
+        // התיקון הקריטי: קריאה ללוגיקה של הלובי מהקובץ lobby.js
+        if (typeof joinRoomLogic === 'function') {
+            joinRoomLogic(roomId);
+        }
     });
 }
 
@@ -141,15 +144,13 @@ function joinRoom() {
             name: playerName,
             role: 'thief',
             t: Date.now()
-        }).then(() => enterLobby());
+        }).then(() => {
+            // התיקון הקריטי: קריאה ללוגיקה של הלובי
+            if (typeof joinRoomLogic === 'function') {
+                joinRoomLogic(roomId);
+            }
+        });
     });
-}
-
-function enterLobby() {
-    document.getElementById('login-screen').style.display = 'none';
-    document.getElementById('lobby-screen').style.display = 'flex';
-    document.getElementById('display-room-code').innerText = currentRoom;
-    // כאן תבוא הלוגיקה של הלובי מקובץ lobby.js
 }
 
 // הפעלת הזרקת ה-UI כשהדף נטען
