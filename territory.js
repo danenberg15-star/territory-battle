@@ -138,7 +138,6 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
     let newLayers = [];
     let totalCapturedSqMeters = 0;
     
-    // ספירת השטחים העדכנית
     let currentAreaCount = areasData ? Object.keys(areasData).length : 0;
 
     if (areasData) {
@@ -197,11 +196,16 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
         }
     }
 
-    // התיקון: בדיקה אמינה מול זיכרון הדפדפן והפעלת הטוסט
+    // התיקון: חסימת הטוסט מלהופיע על ערכים הנמוכים מ-1% או שווים לערך הקודם
     if (typeof window.lastCapturedAreaCount === 'undefined') {
         window.lastCapturedAreaCount = currentAreaCount; 
+        window.lastDisplayedPercentage = 0;
     } else if (currentAreaCount > window.lastCapturedAreaCount) {
-        window.displayCaptureToast(safePercentage);
+        const currentFloat = parseFloat(safePercentage);
+        if (currentFloat >= 1.0 && currentFloat > window.lastDisplayedPercentage) {
+            window.displayCaptureToast(safePercentage);
+            window.lastDisplayedPercentage = currentFloat;
+        }
         window.lastCapturedAreaCount = currentAreaCount;
     }
 
@@ -212,7 +216,6 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
 // 4. Toast Notification UI
 // ==========================================
 window.displayCaptureToast = function(percentage) {
-    // השמדת טוסט קודם אם נתקע במסך כדי להכריח אנימציה חדשה
     let oldToast = document.getElementById('capture-toast');
     if (oldToast) oldToast.remove();
 
@@ -228,7 +231,7 @@ window.displayCaptureToast = function(percentage) {
     toast.style.borderRadius = '15px';
     toast.style.fontSize = '24px';
     toast.style.fontWeight = '900';
-    toast.style.zIndex = '99999'; // מפלצתי כדי לדרוס את Leaflet
+    toast.style.zIndex = '99999';
     toast.style.boxShadow = '0 0 30px rgba(220, 38, 38, 0.8)';
     toast.style.textAlign = 'center';
     toast.style.pointerEvents = 'none';
@@ -246,7 +249,6 @@ window.displayCaptureToast = function(percentage) {
 
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 
-    // השמדה מוחלטת של ה-HTML אחרי 4 שניות
     setTimeout(() => {
         if (toast && toast.parentNode) {
             toast.parentNode.removeChild(toast);
