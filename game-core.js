@@ -21,6 +21,9 @@ window.arenaData = null;
 window.policeStationCircle = null;
 window.arenaPolygonLayer = null;
 
+// משתנה חדש: שומר את זמן העדכון האחרון לשרת
+let lastFirebaseUpdate = 0;
+
 // ==========================================
 // 1.5. Browser Wake-Up & GPS Unfreeze Mechanism (v2.2 logic)
 // ==========================================
@@ -145,17 +148,22 @@ function updateRealPosition() {
     const isDrawingMode = drawingEl && drawingEl.style.display === 'block';
     
     if (!isDrawingMode) {
-        // התיקון כאן: קיצור זמן האנימציה מ-1.0 שניות ל-0.25 כדי שהמצלמה תעקוב אחריך מיד וללא דיליי מורגש
         window.map.panTo([window.myLat, window.myLng], { animate: true, duration: 0.25 });
     }
 
     if (window.currentRoom && window.playerId) {
-        window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({ 
-            lat: window.myLat, 
-            lng: window.myLng, 
-            t: Date.now(),
-            role: window.playerRole 
-        });
+        
+        const now = Date.now();
+        // הגבלת כתיבה לשרת: פעם בחצי שנייה לכל היותר.
+        if (now - lastFirebaseUpdate >= 500) {
+            window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({ 
+                lat: window.myLat, 
+                lng: window.myLng, 
+                t: now,
+                role: window.playerRole 
+            });
+            lastFirebaseUpdate = now;
+        }
 
         if ((window.playerRole === 'cop' || window.playerRole === 'snitch') && window.arenaData) {
             const dist = window.map.distance([window.myLat, window.myLng], [window.arenaData.policeStation.lat, window.arenaData.policeStation.lng]);
