@@ -57,10 +57,14 @@ function enterGameScene() {
         window.map = null;
     }
 
+    // התיקון: שימוש במיקום האמיתי שנאסף ברקע. תל אביב נשארת רק כגיבוי קיצוני למקרה שאין GPS בכלל.
+    const startLat = window.myLat || 32.0853; 
+    const startLng = window.myLng || 34.7818;
+
     window.map = L.map('map', { 
         zoomControl: false, attributionControl: false, dragging: true, touchZoom: true, 
         doubleClickZoom: false, scrollWheelZoom: false, boxZoom: false, keyboard: false
-    }).setView([32.0853, 34.7818], 18);
+    }).setView([startLat, startLng], 18);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(window.map);
 
