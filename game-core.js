@@ -112,6 +112,9 @@ function enterGameScene() {
     if (typeof listenForCaptureSignals === 'function') listenForCaptureSignals(); 
     if (typeof listenToTreasures === 'function') listenToTreasures();
 
+    // האזנה להודעת יציאה מטריטוריה — לכל השחקנים
+    if (typeof window.listenToOutOfBoundsAlert === 'function') window.listenToOutOfBoundsAlert();
+
     setInterval(() => {
         if (typeof checkOfflinePlayers === 'function') checkOfflinePlayers();
     }, 10000); 
@@ -204,6 +207,11 @@ function updateRealPosition() {
             const dist = window.map.distance([window.myLat, window.myLng], [window.arenaData.policeStation.lat, window.arenaData.policeStation.lng]);
             const inStation = dist <= window.arenaData.policeStation.radius;
             window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/inStation`).set(inStation);
+
+            // בדיקת גבולות טריטוריה לשוטרים — טיימר 20 שניות
+            if (window.isBriefingComplete && typeof window.checkArenaBoundariesForCop === 'function') {
+                window.checkArenaBoundariesForCop(window.myLat, window.myLng);
+            }
         }
 
         if (window.playerRole === 'thief' && window.isBriefingComplete) {

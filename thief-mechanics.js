@@ -1,7 +1,7 @@
 // thief-mechanics.js - Anti-Tangle Trail & Area Capture (Fully Synced & Fixed)
 
 let outOfBoundsTimer = null;
-let outOfBoundsSeconds = 10;
+let outOfBoundsSeconds = 20;
 let lastProximityAlert = 0;
 let localCapturedAreas = null;
 
@@ -82,29 +82,133 @@ function checkArenaBoundaries(lat, lng) {
     }
 }
 
-function startOutOfBoundsTimer() {
-    outOfBoundsSeconds = 10;
-    const overlay = document.getElementById('briefing-overlay');
-    if (overlay) overlay.style.display = 'flex';
+// בדיקת גבולות עבור שוטרים — נקראת מ-game-play.js
+window.checkArenaBoundariesForCop = function(lat, lng) {
+    if (!window.isBriefingComplete || !window.arenaData) return;
+    try {
+        const point = turf.point([lng, lat]);
+        const polyCoords = window.arenaData.points.map(p => [p[1], p[0]]);
+        polyCoords.push(polyCoords[0]);
 
-    const timerText = document.getElementById('briefing-timer-text');
-    if (timerText) timerText.style.color = "#ef4444";
+        const polygon = turf.polygon([polyCoords]);
+        const isInside = turf.booleanPointInPolygon(point, polygon);
+
+        if (!isInside) {
+            if (!outOfBoundsTimer) startOutOfBoundsTimer();
+        } else {
+            if (outOfBoundsTimer) stopOutOfBoundsTimer();
+        }
+    } catch (e) {
+        console.error("Turf.js Polygon Error in Cop Arena Check:", e);
+    }
+};
+
+// ==========================================
+// Territory Overlay (ייעודי — לא briefing-overlay)
+// ==========================================
+function getTerritoryOverlay() {
+    let overlay = document.getElementById('territory-exit-overlay');
+    if (overlay) return overlay;
+
+    // יצירת overlay ייעודי
+    overlay = document.createElement('div');
+    overlay.id = 'territory-exit-overlay';
+    overlay.style.cssText = `
+        position: fixed;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.55);
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 99990;
+        pointer-events: none;
+    `;
+
+    const box = document.createElement('div');
+    box.style.cssText = `
+        background: rgba(15, 15, 20, 0.97);
+        border: 3px solid #ef4444;
+        border-radius: 22px;
+        padding: 32px 44px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 14px;
+        box-shadow: 0 0 60px rgba(239, 68, 68, 0.6), 0 0 20px rgba(239, 68, 68, 0.3);
+        animation: territory-pulse-border 1s ease-in-out infinite alternate;
+    `;
+
+    // CSS animations
+    if (!document.getElementById('territory-exit-styles')) {
+        const style = document.createElement('style');
+        style.id = 'territory-exit-styles';
+        style.innerHTML = `
+            @keyframes territory-pulse-border {
+                0%  { box-shadow: 0 0 40px rgba(239,68,68,0.5), 0 0 15px rgba(239,68,68,0.2); border-color: #ef4444; }
+                100%{ box-shadow: 0 0 80px rgba(239,68,68,0.9), 0 0 30px rgba(239,68,68,0.5); border-color: #fca5a5; }
+            }
+            @keyframes territory-timer-pulse {
+                0%  { transform: scale(1);   color: #ef4444; }
+                50% { transform: scale(1.12); color: #fca5a5; }
+                100%{ transform: scale(1);   color: #ef4444; }
+            }
+        `;
+        document.head.appendChild(style);
+    }
+
+    const label = document.createElement('div');
+    label.id = 'territory-exit-label';
+    label.style.cssText = `
+        color: #ffffff;
+        font-size: clamp(20px, 5vw, 28px);
+        font-weight: 900;
+        letter-spacing: 1px;
+        text-align: center;
+        text-shadow: 0 0 12px rgba(239,68,68,0.8);
+    `;
+    label.innerText = window.currentLang === 'he' ? '⚠️ חזור לטריטוריה' : '⚠️ Return to Territory';
+
+    const timer = document.createElement('div');
+    timer.id = 'territory-exit-timer';
+    timer.style.cssText = `
+        color: #ef4444;
+        font-size: clamp(48px, 12vw, 80px);
+        font-weight: 900;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+        animation: territory-timer-pulse 1s ease-in-out infinite;
+        text-shadow: 0 0 20px rgba(239,68,68,0.8);
+    `;
+    timer.innerText = '20';
+
+    box.appendChild(label);
+    box.appendChild(timer);
+    overlay.appendChild(box);
+    document.body.appendChild(overlay);
+    return overlay;
+}
+
+function startOutOfBoundsTimer() {
+    outOfBoundsSeconds = 20;
+
+    const overlay = getTerritoryOverlay();
+    overlay.style.display = 'flex';
+
+    const timerEl = document.getElementById('territory-exit-timer');
+    if (timerEl) timerEl.innerText = outOfBoundsSeconds;
+
+    if (navigator.vibrate) navigator.vibrate([300, 100, 300]);
 
     outOfBoundsTimer = setInterval(() => {
         outOfBoundsSeconds--;
-        const statusText = document.getElementById('briefing-status');
-        if (statusText) statusText.innerText = window.currentLang === 'he' ? "חזור לזירה מיד!" : "Return to Arena!";
 
-        const timerEl = document.getElementById('briefing-timer-text');
-        if (timerEl) timerEl.innerText = `00:${outOfBoundsSeconds < 10 ? '0' : ''}${outOfBoundsSeconds}`;
+        const tEl = document.getElementById('territory-exit-timer');
+        if (tEl) tEl.innerText = outOfBoundsSeconds;
 
         if (outOfBoundsSeconds <= 0) {
             stopOutOfBoundsTimer();
-            // תיקון: החלפת alert() בטוסט שלא חוסם את ה-GPS
-            showOutOfBoundsToast();
-            setTimeout(() => {
-                if (typeof exitGame === 'function') exitGame();
-            }, 2000);
+            handleTerritoryExit();
         }
     }, 1000);
 }
@@ -112,14 +216,57 @@ function startOutOfBoundsTimer() {
 function stopOutOfBoundsTimer() {
     clearInterval(outOfBoundsTimer);
     outOfBoundsTimer = null;
-    const overlay = document.getElementById('briefing-overlay');
-    if (overlay) overlay.style.display = 'none';
 
-    const timerText = document.getElementById('briefing-timer-text');
-    if (timerText) timerText.style.color = "#facc15";
+    const overlay = document.getElementById('territory-exit-overlay');
+    if (overlay) overlay.style.display = 'none';
 }
 
-// תיקון: toast במקום alert — לא חוסם GPS או Firebase
+// ==========================================
+// פעולה בסיום הטיימר — יציאה מהמשחק + הודעה לכולם
+// ==========================================
+function handleTerritoryExit() {
+    showOutOfBoundsToast();
+
+    // שליחת הודעה לכל השחקנים דרך Firebase
+    if (window.currentRoom && window.playerId) {
+        const playerName = window.playerName || 'שחקן';
+        const role = window.playerRole || 'thief';
+
+        const exitMsg = {
+            senderId: 'system',
+            senderName: 'מערכת',
+            role: role,
+            text: window.currentLang === 'he'
+                ? `${playerName} יצא מהמשחק כי היה מחוץ לטריטוריה`
+                : `${playerName} left the game for being outside the territory`,
+            t: Date.now()
+        };
+
+        // כתיבה לשני ערוצי הצ'אט (שוטרים + גנבים) כדי שכולם יראו
+        const updates = {};
+        updates[`game/${window.currentRoom}/chat_cop/oob_${window.playerId}_${Date.now()}`] = exitMsg;
+        updates[`game/${window.currentRoom}/chat_thief/oob_${window.playerId}_${Date.now() + 1}`] = exitMsg;
+
+        // שידור toast ייעודי לכל המכשירים
+        updates[`game/${window.currentRoom}/outOfBoundsAlert`] = {
+            playerName: playerName,
+            role: role,
+            t: Date.now()
+        };
+
+        window.db.ref().update(updates).finally(() => {
+            setTimeout(() => {
+                if (typeof exitGame === 'function') exitGame();
+            }, 2000);
+        });
+    } else {
+        setTimeout(() => {
+            if (typeof exitGame === 'function') exitGame();
+        }, 2000);
+    }
+}
+
+// Toast לשחקן עצמו
 function showOutOfBoundsToast() {
     let old = document.getElementById('oob-toast');
     if (old) old.remove();
@@ -143,10 +290,51 @@ function showOutOfBoundsToast() {
         box-shadow: 0 0 40px rgba(220,38,38,0.8);
     `;
     toast.innerText = window.currentLang === 'he'
-        ? "נפסלת עקב יציאה מהזירה!"
-        : "Disqualified for leaving the arena!";
+        ? "נפסלת עקב יציאה מהטריטוריה!"
+        : "Disqualified for leaving the territory!";
     document.body.appendChild(toast);
 }
+
+// Toast לשאר השחקנים (מאזין ל-Firebase)
+window.listenToOutOfBoundsAlert = function() {
+    if (!window.currentRoom) return;
+    window.db.ref(`game/${window.currentRoom}/outOfBoundsAlert`).on('value', snap => {
+        const data = snap.val();
+        if (!data) return;
+        if (Date.now() - data.t > 8000) return;
+        if (data.playerName === (window.playerName || '')) return; // לא מציגים לעצמי
+
+        let old = document.getElementById('oob-broadcast-toast');
+        if (old) old.remove();
+
+        const toast = document.createElement('div');
+        toast.id = 'oob-broadcast-toast';
+        toast.style.cssText = `
+            position: fixed;
+            top: 18%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(120, 20, 20, 0.97);
+            color: white;
+            padding: 18px 36px;
+            border-radius: 16px;
+            font-size: 18px;
+            font-weight: 900;
+            z-index: 99998;
+            text-align: center;
+            pointer-events: none;
+            box-shadow: 0 0 30px rgba(220,38,38,0.7);
+        `;
+        toast.innerText = window.currentLang === 'he'
+            ? `⚠️ ${data.playerName} יצא מהמשחק — היה מחוץ לטריטוריה`
+            : `⚠️ ${data.playerName} left — was outside the territory`;
+        document.body.appendChild(toast);
+
+        setTimeout(() => {
+            if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+        }, 5000);
+    });
+};
 
 // תיקון: toast במקום alert — לא חוסם GPS או Firebase
 function showCopInsideToast() {
