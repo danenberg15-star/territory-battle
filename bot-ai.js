@@ -3,43 +3,35 @@
 let botInterval = null;
 let botsActive = false;
 let botCooldowns = {};
-let botStates = {}; // זוכר את נקודות השיטוט והסטטוס של כל בוט
+let botStates = {};
 
 // ============================================================
 // פרופילי קושי לפי גיל - ערכים באחוזים מאלכסון הזירה
-// כך הבוטים מאוזנים בכל גודל זירה
 // ============================================================
 const BOT_PROFILES = {
     rookie: {
-        // טירון - ילד בן 10
-        scanSpeedPct:   0.010,  // 1.0% מאלכסון הזירה לצעד
-        runSpeedPct:    0.015,  // 1.5% מאלכסון הזירה לצעד
-        radarRangePct:  0.20,   // רדיוס זיהוי = 20% מאלכסון הזירה
-        reactionTime:   3000,   // 3 שניות לפני תחילת מרדף (לא תלוי גודל)
-        catchRange:     0.00015 // תפיסה אוטומטית ב-~15 מטר (פיזי, לא יחסי)
+        scanSpeedPct:   0.010,
+        runSpeedPct:    0.015,
+        radarRangePct:  0.20,
+        reactionTime:   3000,
+        catchRange:     0.00015
     },
     skilled: {
-        // מיומן - ילד בן 14 (ברירת מחדל)
-        scanSpeedPct:   0.015,  // 1.5% מאלכסון הזירה לצעד
-        runSpeedPct:    0.030,  // 3.0% מאלכסון הזירה לצעד
-        radarRangePct:  0.35,   // רדיוס זיהוי = 35% מאלכסון הזירה
-        reactionTime:   1500,   // 1.5 שניות לפני תחילת מרדף
-        catchRange:     0.00015 // תפיסה אוטומטית ב-~15 מטר
+        scanSpeedPct:   0.015,
+        runSpeedPct:    0.030,
+        radarRangePct:  0.35,
+        reactionTime:   1500,
+        catchRange:     0.00015
     },
     elite: {
-        // עילית - נער בן 18
-        scanSpeedPct:   0.025,  // 2.5% מאלכסון הזירה לצעד
-        runSpeedPct:    0.050,  // 5.0% מאלכסון הזירה לצעד
-        radarRangePct:  0.55,   // רדיוס זיהוי = 55% מאלכסון הזירה
-        reactionTime:   400,    // 0.4 שניות - כמעט מיידי
-        catchRange:     0.00015 // תפיסה אוטומטית ב-~15 מטר
+        scanSpeedPct:   0.025,
+        runSpeedPct:    0.050,
+        radarRangePct:  0.55,
+        reactionTime:   400,
+        catchRange:     0.00015
     }
 };
 
-// ============================================================
-// חישוב אלכסון הזירה ב-GPS units
-// זהו המרחק הגדול ביותר בין שתי נקודות בתוך הזירה (bbox)
-// ============================================================
 function calcArenaDiagonal(minLat, maxLat, minLng, maxLng) {
     const latDiff = maxLat - minLat;
     const lngDiff = maxLng - minLng;
@@ -60,10 +52,8 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
     const minLng = Math.min(...lngs);
     const maxLng = Math.max(...lngs);
 
-    // חישוב אלכסון הזירה פעם אחת בלבד
     const diagonal = calcArenaDiagonal(minLat, maxLat, minLng, maxLng);
 
-    // תרגום אחוזים לערכי GPS אמיתיים לפי גודל הזירה
     const scanSpeed    = profile.scanSpeedPct  * diagonal;
     const runSpeed     = profile.runSpeedPct   * diagonal;
     const radarRange   = profile.radarRangePct * diagonal;
@@ -72,6 +62,10 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
 
     console.log(`Arena diagonal: ${(diagonal * 111000).toFixed(0)}m | radar: ${(radarRange * 111000).toFixed(0)}m | run: ${(runSpeed * 111000).toFixed(1)}m/step`);
 
+    // שמירת נקודות הפתיחה של הבוטים שכבר הוצבו
+    // כדי שהבוט הבא יהיה רחוק גם מהם
+    const spawnedBotPositions = [];
+
     botInterval = setInterval(() => {
         if (window.isGameFrozen === true) return;
 
@@ -79,12 +73,10 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
             const players = snap.val();
             if (!players) return;
 
-            // איסוף כל הגנבים הפעילים עם מיקום
             const activeThieves = Object.values(players).filter(
                 p => p.role === 'thief' && !p.isOffline && p.lat
             );
 
-            // אם אף גנב עדיין לא קיבל מיקום GPS, הבוטים ימתינו
             if (activeThieves.length === 0) return;
 
             const updates = {};
@@ -94,14 +86,16 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
             botIds.forEach((botId, index) => {
                 let bot = players[botId];
 
-                // אתחול בוט - פריסה הרחק מהגנבים
+                // אתחול בוט - פריסה הרחק מגנבים ומבוטים אחרים
                 if (!bot.lat || bot.lat === 0) {
-                    const spawnPt = getFarthestSpawnPoint(
-                        activeThieves, index, numBots,
+                    const spawnPt = getBestSpawnPoint(
+                        activeThieves, spawnedBotPositions,
                         arenaData.points, minLat, maxLat, minLng, maxLng
                     );
                     bot.lat = spawnPt.lat;
                     bot.lng = spawnPt.lng;
+                    spawnedBotPositions.push({ lat: spawnPt.lat, lng: spawnPt.lng });
+
                     botStates[botId] = {
                         mode: 'wander',
                         target: getValidPointInPolygon(arenaData.points, minLat, maxLat, minLng, maxLng),
@@ -117,27 +111,30 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     };
                 }
 
-                // איתור הגנב הקרוב ביותר
-                let closestThief = null;
-                let minDist = Infinity;
+                // ============================================================
+                // רדאר: סריקת מרחק בלבד - הבוט לא יודע היכן הגנב
+                // עד שהגנב נכנס פיזית לתוך טווח הרדאר שלו
+                // ============================================================
+                let detectedThief = null;
+                let detectedDist = Infinity;
 
                 activeThieves.forEach(thief => {
                     const latDiff = thief.lat - bot.lat;
                     const lngDiff = thief.lng - bot.lng;
                     const dist = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
-                    if (dist < minDist) {
-                        minDist = dist;
-                        closestThief = thief;
+
+                    // הבוט מזהה גנב רק אם הוא בתוך טווח הרדאר שלו ממש
+                    if (dist <= radarRange && dist < detectedDist) {
+                        detectedDist = dist;
+                        detectedThief = thief;
                     }
                 });
 
                 // לוגיקת תנועה
                 let targetLat, targetLng, currentSpeed;
 
-                const inRadar = closestThief && minDist <= radarRange;
-
-                if (inRadar) {
-                    // גנב בטווח הרדאר - עיכוב ואז מרדף
+                if (detectedThief) {
+                    // גנב זוהה בטווח הרדאר - עיכוב תגובה ואז מרדף
                     if (botStates[botId].mode !== 'chase') {
                         if (!botStates[botId].detectedAt) {
                             botStates[botId].detectedAt = Date.now();
@@ -150,22 +147,23 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     }
 
                     if (botStates[botId].mode === 'chase') {
-                        targetLat = closestThief.lat;
-                        targetLng = closestThief.lng;
+                        // מרדף אחרי הגנב שזוהה
+                        targetLat = detectedThief.lat;
+                        targetLng = detectedThief.lng;
                         currentSpeed = runSpeed;
 
-                        // תפיסה אוטומטית בטווח קרוב (15 מטר פיזי)
-                        if (minDist <= catchRange) {
+                        // תפיסה אוטומטית בטווח קרוב
+                        if (detectedDist <= catchRange) {
                             triggerBotCapture(roomId, botId, bot, 0);
                         }
                     } else {
-                        // עדיין בעיכוב תגובה - ממשיך לשוטט
+                        // עדיין בעיכוב תגובה - ממשיך לשוטט רנדומלית
                         currentSpeed = scanSpeed;
                         targetLat = botStates[botId].target.lat;
                         targetLng = botStates[botId].target.lng;
                     }
                 } else {
-                    // גנב מחוץ לרדאר - שיטוט רנדומלי
+                    // אין גנב בטווח - שיטוט רנדומלי לחלוטין, הבוט עיוור
                     botStates[botId].mode = 'wander';
                     botStates[botId].detectedAt = null;
                     currentSpeed = scanSpeed;
@@ -175,7 +173,6 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     const distToTarget = Math.sqrt(
                         Math.pow(targetLat - bot.lat, 2) + Math.pow(targetLng - bot.lng, 2)
                     );
-                    // החלפת יעד שיטוט כשמגיע אליו (5% מאלכסון = "קרוב מספיק")
                     if (distToTarget < diagonal * 0.005) {
                         botStates[botId].target = getValidPointInPolygon(
                             arenaData.points, minLat, maxLat, minLng, maxLng
@@ -183,7 +180,7 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     }
                 }
 
-                // ביצוע התנועה אל היעד
+                // ביצוע התנועה
                 const moveLatDiff = targetLat - bot.lat;
                 const moveLngDiff = targetLng - bot.lng;
                 const moveDist = Math.sqrt(moveLatDiff * moveLatDiff + moveLngDiff * moveLngDiff);
@@ -206,18 +203,18 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
 }
 
 // ============================================================
-// פריסת בוט הרחק מכל הגנבים הפעילים
-// מנסה למצוא נקודה בתוך הזירה שהיא הרחוקה ביותר מהגנבים
+// בחירת נקודת פתיחה אופטימלית:
+// הרחוקה ביותר מכל הגנבים + מכל הבוטים שכבר הוצבו
 // ============================================================
-function getFarthestSpawnPoint(activeThieves, botIndex, numBots, arenaPoints, minLat, maxLat, minLng, maxLng) {
+function getBestSpawnPoint(activeThieves, existingBotPositions, arenaPoints, minLat, maxLat, minLng, maxLng) {
     try {
         const polyCoords = arenaPoints.map(p => [p[1], p[0]]);
         polyCoords.push(polyCoords[0]);
         const polygon = turf.polygon([polyCoords]);
 
         let bestPoint = null;
-        let bestDist = -1;
-        const SAMPLES = 40;
+        let bestScore = -1;
+        const SAMPLES = 60;
 
         for (let i = 0; i < SAMPLES; i++) {
             const lat = minLat + Math.random() * (maxLat - minLat);
@@ -226,19 +223,28 @@ function getFarthestSpawnPoint(activeThieves, botIndex, numBots, arenaPoints, mi
 
             if (!turf.booleanPointInPolygon(pt, polygon)) continue;
 
-            // חשב מרחק מינימלי מכל הגנבים
+            // מרחק מינימלי מכל הגנבים
             let minDistFromThieves = Infinity;
             activeThieves.forEach(thief => {
                 const d = Math.sqrt(Math.pow(lat - thief.lat, 2) + Math.pow(lng - thief.lng, 2));
                 if (d < minDistFromThieves) minDistFromThieves = d;
             });
 
-            // בונוס פיזור בין הבוטים עצמם
-            const angleOffset = (botIndex / numBots) * 0.0001;
-            const score = minDistFromThieves + angleOffset;
+            // מרחק מינימלי מבוטים אחרים שכבר הוצבו
+            let minDistFromBots = Infinity;
+            existingBotPositions.forEach(bPos => {
+                const d = Math.sqrt(Math.pow(lat - bPos.lat, 2) + Math.pow(lng - bPos.lng, 2));
+                if (d < minDistFromBots) minDistFromBots = d;
+            });
 
-            if (score > bestDist) {
-                bestDist = score;
+            // ציון משולב: שקלול שווה בין ריחוק מגנבים לריחוק מבוטים
+            // אם אין בוטים עדיין - כל הציון הולך לריחוק מגנבים
+            const botWeight = existingBotPositions.length > 0 ? 0.5 : 0;
+            const score = (minDistFromThieves * (1 - botWeight)) +
+                          (minDistFromBots    * botWeight);
+
+            if (score > bestScore) {
+                bestScore = score;
                 bestPoint = { lat, lng };
             }
         }
