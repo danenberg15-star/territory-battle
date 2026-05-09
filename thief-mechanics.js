@@ -26,10 +26,13 @@ window.startThiefMechanics = function() {
 
     // האזנה לשטחים כבושים (להשלמת פאות)
     if (window.currentRoom) {
-        window.db.ref(`game/${window.currentRoom}/capturedAreas`).off('value');
-        window.db.ref(`game/${window.currentRoom}/capturedAreas`).on('value', snap => {
-            localCapturedAreas = snap.val() || {};
-        });
+        // הוסר ה-off('value') שדרס את מאזין הציור! הוספת בקרת כפילויות במקום.
+        if (!window.localCapturedAreasListenerAttached) {
+            window.db.ref(`game/${window.currentRoom}/capturedAreas`).on('value', snap => {
+                localCapturedAreas = snap.val() || {};
+            });
+            window.localCapturedAreasListenerAttached = true;
+        }
     }
 
     // תיקון: הפעלת האזנה ל-Toast כדי שכל השחקנים יראו הודעת כיבוש
