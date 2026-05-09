@@ -90,6 +90,19 @@ function listenForCaptureSignals() {
             }
         }
     });
+
+    // מאזין להתראות על שחקנים שנתפסו כדי להציג את ההודעה לכולם
+    window.db.ref(`game/${window.currentRoom}/catchAlert`).on('value', snap => {
+        const alertData = snap.val();
+        if (!alertData || Date.now() - alertData.t > 8000) return;
+        
+        window.db.ref(`rooms/${window.currentRoom}/gameMode`).once('value', modeSnap => {
+            const mode = modeSnap.val();
+            if (typeof window.displayCatchToast === 'function') {
+                window.displayCatchToast(alertData.victimName, mode);
+            }
+        });
+    });
 }
 
 function confirmCatch(victimId, signalTime, copId) {
@@ -110,6 +123,7 @@ function confirmCatch(victimId, signalTime, copId) {
                     window.db.ref(`rooms/${window.currentRoom}/players`).once('value', pSnap => {
                         const players = pSnap.val() || {};
                         let otherActiveThieves = 0;
+                        const myName = players[window.playerId]?.name || 'שחקן';
                         
                         Object.keys(players).forEach(id => {
                             if (id !== window.playerId && players[id].role === 'thief' && !players[id].isOffline && !id.startsWith('bot_')) {
@@ -117,14 +131,20 @@ function confirmCatch(victimId, signalTime, copId) {
                             }
                         });
 
-                        window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'snitch' }).then(() => {
-                            if (typeof window.killExitWarning === 'function') window.killExitWarning();
+                        // כתיבת ההתראה לשרת לפני היציאה מהמשחק
+                        window.db.ref(`game/${window.currentRoom}/catchAlert`).set({
+                            victimName: myName,
+                            t: Date.now()
+                        }).then(() => {
+                            window.db.ref(`rooms/${window.currentRoom}/players/${window.playerId}`).update({ role: 'snitch' }).then(() => {
+                                if (typeof window.killExitWarning === 'function') window.killExitWarning();
 
-                            if (otherActiveThieves === 0) {
-                                window.db.ref(`game/${window.currentRoom}/winner`).set('cops');
-                            } else {
-                                location.reload();
-                            }
+                                if (otherActiveThieves === 0) {
+                                    window.db.ref(`game/${window.currentRoom}/winner`).set('cops');
+                                } else {
+                                    location.reload();
+                                }
+                            });
                         });
                     });
                 }
@@ -317,3 +337,52 @@ function listenToOtherPlayers() {
         });
     });
 }
+
+// פונקציית תצוגת ההודעה מעוצבת באופן גלובלי
+window.displayCatchToast = function(victimName, gameMode) {
+    let oldToast = document.getElementById('catch-toast');
+    if (oldToast) oldToast.remove();
+
+    let toast = document.createElement('div');
+    toast.id = 'catch-toast';
+    toast.style.position = 'fixed';
+    toast.style.top = '15%'; 
+    toast.style.left = '50%';
+    toast.style.transform = 'translate(-50%, -50%)';
+    toast.style.backgroundColor = 'rgba(245, 158, 11, 0.95)'; 
+    toast.style.color = 'white';
+    toast.style.padding = '20px 40px';
+    toast.style.borderRadius = '15px';
+    toast.style.fontSize = '22px';
+    toast.style.fontWeight = '900';
+    toast.style.zIndex = '99999';
+    toast.style.boxShadow = '0 0 30px rgba(245, 158, 11, 0.8)';
+    toast.style.textAlign = 'center';
+    toast.style.pointerEvents = 'none';
+    toast.style.animation = 'pop-in-catch 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
+
+    if (!document.getElementById('catch-toast-styles')) {
+        const style = document.createElement('style');
+        style.id = 'catch-toast-styles';
+        style.innerHTML = `@keyframes pop-in-catch { 0% { opacity: 0; transform: translate(-50%, -60%) scale(0.5); } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); } }`;
+        document.head.appendChild(style);
+    }
+
+    let message = '';
+    if (gameMode === 'single') {
+        message = window.currentLang === 'he' ? `השחקן ${victimName} נתפס ונשלח לכלא!` : `Player ${victimName} was caught and sent to jail!`;
+    } else {
+        message = window.currentLang === 'he' ? `השחקן ${victimName} נתפס ועכשיו הוא משתף פעולה עם המשטרה!` : `Player ${victimName} was caught and is now a snitch!`;
+    }
+
+    toast.innerText = message;
+    document.body.appendChild(toast);
+
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+
+    setTimeout(() => {
+        if (toast && toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+        }
+    }, 5000);
+};
