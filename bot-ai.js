@@ -1,4 +1,4 @@
-// bot-ai.js - Multi-Target Bot Engine with Age Profiles & Smart Spawning
+// bot-ai.js - Multi-Target Bot Engine with Age Profiles & Arena-Scaled Parameters
 
 let botInterval = null;
 let botsActive = false;
@@ -6,34 +6,45 @@ let botCooldowns = {};
 let botStates = {}; // זוכר את נקודות השיטוט והסטטוס של כל בוט
 
 // ============================================================
-// פרופילי קושי לפי גיל - כל הערכים ב-GPS units (0.00001 ≈ 1 מטר)
+// פרופילי קושי לפי גיל - ערכים באחוזים מאלכסון הזירה
+// כך הבוטים מאוזנים בכל גודל זירה
 // ============================================================
 const BOT_PROFILES = {
     rookie: {
         // טירון - ילד בן 10
-        scanSpeed:     0.000015,  // שיטוט איטי (~1.5 מ' לצעד)
-        runSpeed:      0.000025,  // ריצה איטית (~2.5 מ' לצעד)
-        radarRange:    0.00020,   // רדיוס זיהוי ~20 מטר
-        reactionTime:  3000,      // 3 שניות לפני תחילת מרדף
-        catchRange:    0.00015,   // תפיסה אוטומטית ב-~15 מטר
+        scanSpeedPct:   0.010,  // 1.0% מאלכסון הזירה לצעד
+        runSpeedPct:    0.015,  // 1.5% מאלכסון הזירה לצעד
+        radarRangePct:  0.20,   // רדיוס זיהוי = 20% מאלכסון הזירה
+        reactionTime:   3000,   // 3 שניות לפני תחילת מרדף (לא תלוי גודל)
+        catchRange:     0.00015 // תפיסה אוטומטית ב-~15 מטר (פיזי, לא יחסי)
     },
     skilled: {
         // מיומן - ילד בן 14 (ברירת מחדל)
-        scanSpeed:     0.000025,  // שיטוט בינוני (~2.5 מ' לצעד)
-        runSpeed:      0.000050,  // ריצה בינונית (~5 מ' לצעד)
-        radarRange:    0.00035,   // רדיוס זיהוי ~35 מטר
-        reactionTime:  1500,      // 1.5 שניות לפני תחילת מרדף
-        catchRange:    0.00015,   // תפיסה אוטומטית ב-~15 מטר
+        scanSpeedPct:   0.015,  // 1.5% מאלכסון הזירה לצעד
+        runSpeedPct:    0.030,  // 3.0% מאלכסון הזירה לצעד
+        radarRangePct:  0.35,   // רדיוס זיהוי = 35% מאלכסון הזירה
+        reactionTime:   1500,   // 1.5 שניות לפני תחילת מרדף
+        catchRange:     0.00015 // תפיסה אוטומטית ב-~15 מטר
     },
     elite: {
         // עילית - נער בן 18
-        scanSpeed:     0.000040,  // שיטוט מהיר (~4 מ' לצעד)
-        runSpeed:      0.000080,  // ריצה אגרסיבית (~8 מ' לצעד)
-        radarRange:    0.00055,   // רדיוס זיהוי ~55 מטר
-        reactionTime:  400,       // 0.4 שניות - כמעט מיידי
-        catchRange:    0.00015,   // תפיסה אוטומטית ב-~15 מטר
+        scanSpeedPct:   0.025,  // 2.5% מאלכסון הזירה לצעד
+        runSpeedPct:    0.050,  // 5.0% מאלכסון הזירה לצעד
+        radarRangePct:  0.55,   // רדיוס זיהוי = 55% מאלכסון הזירה
+        reactionTime:   400,    // 0.4 שניות - כמעט מיידי
+        catchRange:     0.00015 // תפיסה אוטומטית ב-~15 מטר
     }
 };
+
+// ============================================================
+// חישוב אלכסון הזירה ב-GPS units
+// זהו המרחק הגדול ביותר בין שתי נקודות בתוך הזירה (bbox)
+// ============================================================
+function calcArenaDiagonal(minLat, maxLat, minLng, maxLng) {
+    const latDiff = maxLat - minLat;
+    const lngDiff = maxLng - minLng;
+    return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
+}
 
 function startSinglePlayerAI(roomId, difficulty, arenaData) {
     if (botsActive || !arenaData || !arenaData.points) return;
@@ -41,7 +52,6 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
     console.log(`Starting Co-op vs Bots (${difficulty})...`);
 
     const profile = BOT_PROFILES[difficulty] || BOT_PROFILES.skilled;
-    const { scanSpeed, runSpeed, radarRange, reactionTime, catchRange } = profile;
 
     const lats = arenaData.points.map(p => p[0]);
     const lngs = arenaData.points.map(p => p[1]);
@@ -49,6 +59,18 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
     const maxLat = Math.max(...lats);
     const minLng = Math.min(...lngs);
     const maxLng = Math.max(...lngs);
+
+    // חישוב אלכסון הזירה פעם אחת בלבד
+    const diagonal = calcArenaDiagonal(minLat, maxLat, minLng, maxLng);
+
+    // תרגום אחוזים לערכי GPS אמיתיים לפי גודל הזירה
+    const scanSpeed    = profile.scanSpeedPct  * diagonal;
+    const runSpeed     = profile.runSpeedPct   * diagonal;
+    const radarRange   = profile.radarRangePct * diagonal;
+    const reactionTime = profile.reactionTime;
+    const catchRange   = profile.catchRange;
+
+    console.log(`Arena diagonal: ${(diagonal * 111000).toFixed(0)}m | radar: ${(radarRange * 111000).toFixed(0)}m | run: ${(runSpeed * 111000).toFixed(1)}m/step`);
 
     botInterval = setInterval(() => {
         if (window.isGameFrozen === true) return;
@@ -83,7 +105,7 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     botStates[botId] = {
                         mode: 'wander',
                         target: getValidPointInPolygon(arenaData.points, minLat, maxLat, minLng, maxLng),
-                        chaseDelay: false
+                        detectedAt: null
                     };
                 }
 
@@ -91,7 +113,7 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     botStates[botId] = {
                         mode: 'wander',
                         target: getValidPointInPolygon(arenaData.points, minLat, maxLat, minLng, maxLng),
-                        chaseDelay: false
+                        detectedAt: null
                     };
                 }
 
@@ -117,7 +139,6 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                 if (inRadar) {
                     // גנב בטווח הרדאר - עיכוב ואז מרדף
                     if (botStates[botId].mode !== 'chase') {
-                        // זיהוי ראשוני - מצב המתנה לפני מרדף
                         if (!botStates[botId].detectedAt) {
                             botStates[botId].detectedAt = Date.now();
                         }
@@ -133,7 +154,7 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                         targetLng = closestThief.lng;
                         currentSpeed = runSpeed;
 
-                        // תפיסה אוטומטית בטווח קרוב
+                        // תפיסה אוטומטית בטווח קרוב (15 מטר פיזי)
                         if (minDist <= catchRange) {
                             triggerBotCapture(roomId, botId, bot, 0);
                         }
@@ -154,7 +175,8 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     const distToTarget = Math.sqrt(
                         Math.pow(targetLat - bot.lat, 2) + Math.pow(targetLng - bot.lng, 2)
                     );
-                    if (distToTarget < 0.00002) {
+                    // החלפת יעד שיטוט כשמגיע אליו (5% מאלכסון = "קרוב מספיק")
+                    if (distToTarget < diagonal * 0.005) {
                         botStates[botId].target = getValidPointInPolygon(
                             arenaData.points, minLat, maxLat, minLng, maxLng
                         );
@@ -195,7 +217,7 @@ function getFarthestSpawnPoint(activeThieves, botIndex, numBots, arenaPoints, mi
 
         let bestPoint = null;
         let bestDist = -1;
-        const SAMPLES = 40; // מספר נקודות מדגם בזירה
+        const SAMPLES = 40;
 
         for (let i = 0; i < SAMPLES; i++) {
             const lat = minLat + Math.random() * (maxLat - minLat);
@@ -211,7 +233,7 @@ function getFarthestSpawnPoint(activeThieves, botIndex, numBots, arenaPoints, mi
                 if (d < minDistFromThieves) minDistFromThieves = d;
             });
 
-            // גם התחשב בפיזור בין הבוטים עצמם (בונוס זווית)
+            // בונוס פיזור בין הבוטים עצמם
             const angleOffset = (botIndex / numBots) * 0.0001;
             const score = minDistFromThieves + angleOffset;
 
@@ -226,7 +248,6 @@ function getFarthestSpawnPoint(activeThieves, botIndex, numBots, arenaPoints, mi
         console.error("Spawn calculation error:", e);
     }
 
-    // Fallback - מרכז הזירה
     return { lat: (minLat + maxLat) / 2, lng: (minLng + maxLng) / 2 };
 }
 
