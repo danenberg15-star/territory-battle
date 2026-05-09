@@ -4,7 +4,7 @@
 // 6. Taser Trigger & Feedback (HYBRID)
 // ==========================================
 function triggerCapture() {
-    if (!window.isBriefingComplete || (typeof window.isGameFrozen !== 'undefined' && window.isGameFrozen)) return;
+    if (!window.isBriefingComplete || window.isGameFrozen === true) return;
     const btn = document.getElementById('capture-btn');
     if (!btn || btn.disabled) return;
 
@@ -131,7 +131,6 @@ function confirmCatch(victimId, signalTime, copId) {
                             }
                         });
 
-                        // כתיבת ההתראה לשרת לפני היציאה מהמשחק
                         window.db.ref(`game/${window.currentRoom}/catchAlert`).set({
                             victimName: myName,
                             t: Date.now()
@@ -154,7 +153,7 @@ function confirmCatch(victimId, signalTime, copId) {
 }
 
 function triggerSnitch() {
-    if (typeof window.isGameFrozen !== 'undefined' && window.isGameFrozen) return;
+    if (window.isGameFrozen === true) return;
     const btn = document.getElementById('snitch-btn');
     if (btn.disabled) return;
     btn.disabled = true;
@@ -198,11 +197,58 @@ function startCooldown(seconds) {
 }
 
 // ==========================================
-// 7. Victory & Offline Handling
+// 7. Exit Game
+// ==========================================
+function exitGame() {
+    if (typeof window.killExitWarning === 'function') window.killExitWarning();
+
+    // עצירת GPS
+    if (window.gpsWatchId !== null) {
+        navigator.geolocation.clearWatch(window.gpsWatchId);
+        window.gpsWatchId = null;
+    }
+
+    // עצירת בוטים אם רצים
+    if (typeof stopSinglePlayerAI === 'function') stopSinglePlayerAI();
+
+    if (window.currentRoom && window.playerId) {
+        const playerName = window.playerName || 'שחקן';
+
+        // סימון השחקן כמנותק ב-Firebase
+        const updates = {};
+        updates[`rooms/${window.currentRoom}/players/${window.playerId}/isOffline`] = true;
+        updates[`rooms/${window.currentRoom}/players/${window.playerId}/disconnectedAt`] = Date.now();
+        updates[`game/${window.currentRoom}/players/${window.playerId}/isOffline`] = true;
+
+        // שליחת הודעת עזיבה לצ'אט הקבוצתי
+        const role = window.playerRole || 'thief';
+        const leaveMsg = {
+            senderId: 'system',
+            senderName: 'מערכת',
+            role: role,
+            text: window.currentLang === 'he'
+                ? `${playerName} עזב את המשחק`
+                : `${playerName} left the game`,
+            t: Date.now()
+        };
+        updates[`game/${window.currentRoom}/chat_${role}/leave_${window.playerId}`] = leaveMsg;
+
+        window.db.ref().update(updates).finally(() => {
+            location.reload();
+        });
+    } else {
+        location.reload();
+    }
+}
+
+// ==========================================
+// 8. Victory & Offline Handling
 // ==========================================
 function checkOfflinePlayers() {
     if (!window.isHost || !window.currentRoom) return;
     const now = Date.now();
+
+    // קריאה מ-rooms (שם נשמר isOffline) ולא מ-game
     window.db.ref(`rooms/${window.currentRoom}/players`).once('value', snap => {
         const players = snap.val() || {};
         let activeThieves = 0;
@@ -211,6 +257,8 @@ function checkOfflinePlayers() {
         Object.keys(players).forEach(id => {
             const p = players[id];
             const isBot = id.startsWith('bot_');
+
+            // הסרת שחקן שמנותק יותר מ-3 דקות
             if (!isBot && p.isOffline && p.disconnectedAt && (now - p.disconnectedAt > 180000)) {
                 window.db.ref(`rooms/${window.currentRoom}/players/${id}`).remove();
                 window.db.ref(`game/${window.currentRoom}/players/${id}`).remove();
@@ -233,6 +281,7 @@ function checkOfflinePlayers() {
 function listenToVictory() {
     window.db.ref(`game/${window.currentRoom}/winner`).on('value', snap => {
         if (snap.val() && typeof showVictoryScreen === 'function') {
+            if (typeof stopSinglePlayerAI === 'function') stopSinglePlayerAI();
             if (typeof window.killExitWarning === 'function') window.killExitWarning();
             showVictoryScreen(snap.val());
         }
@@ -242,9 +291,9 @@ function listenToVictory() {
 function listenToCapturedAreas() {
     window.db.ref(`game/${window.currentRoom}/capturedAreas`).on('value', snap => {
         const areas = snap.val();
-        if (typeof window.renderAreas === "function") {
+        if (typeof window.renderAreas === 'function') {
             window.areaLayers = window.renderAreas(window.map, areas, window.areaLayers);
-        } else if (typeof renderAreas === "function") {
+        } else if (typeof renderAreas === 'function') {
             window.areaLayers = renderAreas(window.map, areas, window.areaLayers);
         }
     });

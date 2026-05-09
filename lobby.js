@@ -1,5 +1,10 @@
 // lobby.js - Screen 2: Waiting Lobby, Player Rendering, and Drag & Drop
 
+// תיקון: הגדרת משתני Drag & Drop שחסרו וגרמו ל-ReferenceError
+let activeTouchElement = null;
+let initialX = 0;
+let initialY = 0;
+
 // ==========================================
 // 1. UI Injection (Exact original design)
 // ==========================================
@@ -7,7 +12,6 @@ function renderLobbyScreenUI(roomId) {
     const lobbyContainer = document.getElementById('lobby-screen');
     if (!lobbyContainer) return;
 
-    // הזרקת ה-HTML המדויק של הלובי מגרסה 2.30.4
     lobbyContainer.innerHTML = `
         <h2 id="lbl-lobby-title">לובי המתנה</h2>
         <div style="display: flex; align-items: center; width: 100%; max-width: 350px; margin-bottom: 20px;">
@@ -31,7 +35,6 @@ function renderLobbyScreenUI(roomId) {
         <button class="btn btn-green" id="btn-start-game" style="display:none;" onclick="startGame()">התחל משחק</button>
     `;
     
-    // סנכרון שפה (הפונקציה קיימת ב-login.js)
     if (typeof setLanguage === 'function') setLanguage(currentLang);
 }
 
@@ -39,7 +42,6 @@ function renderLobbyScreenUI(roomId) {
 // 2. Lobby Logic & Rendering
 // ==========================================
 function joinRoomLogic(roomId) {
-    // 1. הזרקת ה-HTML לפני המעבר למסך
     renderLobbyScreenUI(roomId);
 
     document.getElementById('login-screen').style.display = 'none';
@@ -62,7 +64,7 @@ function joinRoomLogic(roomId) {
             window.currentRoom = roomId;
             window.playerId = playerId;
             window.currentLang = currentLang;
-            if(typeof enterGameScene === 'function') enterGameScene();
+            if (typeof enterGameScene === 'function') enterGameScene();
             return;
         }
         renderLobbyPlayers(roomData.players || {}, roomData.gameMode);
@@ -83,7 +85,7 @@ function renderLobbyPlayers(players, gameMode) {
         pDiv.className = 'player-entry';
         pDiv.innerText = p.name + (id === playerId ? " (אתה)" : "");
         
-        // Drag & Drop only for humans and if not in single player
+        // Drag & Drop רק לבני אדם ולא במצב single player
         if (gameMode !== 'single' && !id.startsWith('bot_')) {
             pDiv.draggable = true;
             pDiv.setAttribute('data-id', id);

@@ -35,21 +35,22 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
     const maxLng = Math.max(...lngs);
 
     botInterval = setInterval(() => {
-        if (typeof isGameFrozen !== 'undefined' && isGameFrozen) return;
+        // תיקון: בדיקה נכונה של מצב הקפאה
+        if (window.isGameFrozen === true) return;
 
         window.db.ref(`game/${roomId}/players`).once('value', snap => {
             const players = snap.val();
             if (!players) return;
 
-            // 1. חיפוש הגנב כעוגן לפריסת הבוטים בתחילת המשחק
+            // חיפוש הגנב כעוגן לפריסת הבוטים בתחילת המשחק
             let anchorThief = null;
             Object.keys(players).forEach(id => {
                 if (players[id].role === 'thief' && !players[id].isOffline && players[id].lat) {
-                    anchorThief = players[id]; // תופס את הגנב הראשון עם מיקום חוקי
+                    anchorThief = players[id];
                 }
             });
 
-            // אם אף גנב עדיין לא קיבל מיקום GPS מהלוויין, הבוטים ימתינו ולא ירדו לשטח
+            // אם אף גנב עדיין לא קיבל מיקום GPS, הבוטים ימתינו
             if (!anchorThief) return;
 
             const updates = {};
@@ -61,7 +62,7 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                 
                 // אתחול בוט - פריסה במעגל סביב הגנב הראשון (100 מטר)
                 if (!bot.lat || bot.lat === 0) {
-                    const angle = (index / numBots) * 2 * Math.PI; // חלוקה שווה של 360 מעלות
+                    const angle = (index / numBots) * 2 * Math.PI;
                     const spawnPt = getDirectionalSpawnPoint(anchorThief.lat, anchorThief.lng, angle, arenaData.points);
                     
                     bot.lat = spawnPt.lat;
@@ -74,7 +75,7 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     botStates[botId] = { mode: 'wander', target: getValidPointInPolygon(arenaData.points, minLat, maxLat, minLng, maxLng) };
                 }
 
-                // איתור הגנב הקרוב ביותר (במקרה שיש כמה חברים שמשחקים ביחד)
+                // איתור הגנב הקרוב ביותר
                 let closestThief = null;
                 let minDist = Infinity;
 
@@ -91,7 +92,7 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     }
                 });
 
-                // לוגיקת תנועה (שיטוט לעומת התבייתות)
+                // לוגיקת תנועה
                 let targetLat, targetLng, currentSpeed;
 
                 if (closestThief && minDist <= 0.0003) {
@@ -140,14 +141,13 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
     }, 1000); 
 }
 
-// פונקציה חדשה: מחשבת נקודה בטווח 100 מטר בזווית ספציפית, ומוודאת שהיא בתוך הזירה
+// מחשבת נקודה בטווח 100 מטר בזווית ספציפית, בתוך הזירה
 function getDirectionalSpawnPoint(centerLat, centerLng, angle, arenaPoints) {
     try {
         const polyCoords = arenaPoints.map(p => [p[1], p[0]]);
-        polyCoords.push(polyCoords[0]); // סגירת מעגל
+        polyCoords.push(polyCoords[0]);
         const polygon = turf.polygon([polyCoords]);
 
-        // מתחיל ממרחק 100 מטר (~0.0009 מעלות) ויורד כלפי מטה אם זה מחוץ לזירה
         let dist = 0.0009; 
         
         while (dist > 0) {
@@ -158,17 +158,16 @@ function getDirectionalSpawnPoint(centerLat, centerLng, angle, arenaPoints) {
             if (turf.booleanPointInPolygon(pt, polygon)) {
                 return { lat: lat, lng: lng };
             }
-            dist -= 0.0001; // מתקרב ב-11 מטר בכל פעם שנופל מחוץ לגבול
+            dist -= 0.0001;
         }
     } catch (e) {
         console.error("Spawn calculation error:", e);
     }
     
-    // אם שום נקודה על הקו לא חוקית, מחזיר את מיקום הגנב (לא אמור לקרות אלא אם צוידה נקודה בודדת)
     return { lat: centerLat, lng: centerLng };
 }
 
-// פונקציה לבחירת נקודת שיטוט חוקית עתידית בתוך הפוליגון
+// בחירת נקודת שיטוט חוקית בתוך הפוליגון
 function getValidPointInPolygon(arenaPoints, minLat, maxLat, minLng, maxLng) {
     try {
         const polyCoords = arenaPoints.map(p => [p[1], p[0]]);
@@ -209,6 +208,12 @@ function triggerBotCapture(roomId, botId, botData, reactionTime) {
 }
 
 function stopSinglePlayerAI() {
-    if (botInterval) clearInterval(botInterval);
+    if (botInterval) {
+        clearInterval(botInterval);
+        botInterval = null;
+    }
     botsActive = false;
+    // ניקוי זיכרון הבוטים כדי שלא ישארו נתונים ישנים
+    botStates = {};
+    botCooldowns = {};
 }
