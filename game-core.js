@@ -21,6 +21,9 @@ window.arenaData = null;
 window.policeStationCircle = null;
 window.arenaPolygonLayer = null;
 
+// משתנה גלובלי לשמירת ה-WakeLock הפעיל
+window.wakeLockSentinel = null;
+
 // משתנה חדש: שומר את זמן העדכון האחרון לשרת
 let lastFirebaseUpdate = 0;
 
@@ -31,8 +34,34 @@ document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === 'visible' && window.currentRoom) {
         console.log("App returned to foreground. Restarting GPS...");
         startRealGpsTracking();
+
+        // הדפדפן משחרר WakeLock אוטומטית כשהמסך נכבה או האפליקציה ממוזערת.
+        // לכן בכל חזרה לפוקוס — מבקשים אותו מחדש.
+        reacquireWakeLock();
     }
 });
+
+// ==========================================
+// 1.6. WakeLock Management
+// ==========================================
+async function reacquireWakeLock() {
+    if (!('wakeLock' in navigator)) return;
+
+    // אם כבר יש WakeLock פעיל ותקין — לא צריך לבקש שוב
+    if (window.wakeLockSentinel && !window.wakeLockSentinel.released) return;
+
+    try {
+        window.wakeLockSentinel = await navigator.wakeLock.request('screen');
+        console.log("WakeLock reacquired.");
+
+        // אם ה-WakeLock משתחרר שוב בעתיד — ננסה לחדש אוטומטית (רק אם האפליקציה בפוקוס)
+        window.wakeLockSentinel.addEventListener('release', () => {
+            console.log("WakeLock released by system.");
+        });
+    } catch (err) {
+        console.warn("WakeLock reacquire failed:", err);
+    }
+}
 
 // ==========================================
 // 2. Game Scene Initialization
@@ -57,7 +86,6 @@ function enterGameScene() {
         window.map = null;
     }
 
-    // התיקון: שימוש במיקום האמיתי שנאסף ברקע. תל אביב נשארת רק כגיבוי קיצוני למקרה שאין GPS בכלל.
     const startLat = window.myLat || 32.0853; 
     const startLng = window.myLng || 34.7818;
 
@@ -67,6 +95,9 @@ function enterGameScene() {
     }).setView([startLat, startLng], 18);
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(window.map);
+
+    // בקשת WakeLock בכניסה למשחק
+    reacquireWakeLock();
 
     window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
         window.gameStartTime = snap.val() || Date.now();
@@ -158,7 +189,7 @@ function updateRealPosition() {
     if (window.currentRoom && window.playerId) {
         
         const now = Date.now();
-        // הגבלת כתיבה לשרת: פעם בחצי שנייה לכל היותר.
+        // הגבלת כתיבה לשרת: פעם בחצי שנייה לכל היותר
         if (now - lastFirebaseUpdate >= 500) {
             window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({ 
                 lat: window.myLat, 
