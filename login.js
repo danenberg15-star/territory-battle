@@ -14,10 +14,40 @@ let currentRoom = null;
 let isHost = false;
 let wakeLock = null;
 
-let currentLang = 'he'; 
+let currentLang = 'he';
+
+// כל הטקסטים של המסך — עברית ואנגלית
 const i18n = {
-    'he': { mainTitle: "Territory Battle", btnJoin: "הצטרף", btnCreate: "צור משחק חדש" },
-    'en': { mainTitle: "Territory Battle", btnJoin: "Join", btnCreate: "Create Room" }
+    he: {
+        mainTitle:         "Territory Battle",
+        playerPlaceholder: "הכנס שם שחקן",
+        modeSingle:        "שחק נגד בוטים",
+        modeMulti:         "שוטרים מול גנבים",
+        botCountLabel:     "כמות שוטרים (בוטים)",
+        difficultyLabel:   "רמת קושי",
+        diffLabels:        { rookie: "טירון", skilled: "מיומן", elite: "עילית" },
+        roomPlaceholder:   "קוד משחק",
+        btnJoin:           "הצטרף",
+        btnCreate:         "צור משחק חדש",
+        alertName:         "הכנס שם",
+        alertFill:         "מלא שם וקוד משחק",
+        alertNotFound:     "המשחק לא נמצא"
+    },
+    en: {
+        mainTitle:         "Territory Battle",
+        playerPlaceholder: "Enter player name",
+        modeSingle:        "Play vs Bots",
+        modeMulti:         "Cops vs Thieves",
+        botCountLabel:     "Number of cops (bots)",
+        difficultyLabel:   "Difficulty",
+        diffLabels:        { rookie: "Rookie", skilled: "Skilled", elite: "Elite" },
+        roomPlaceholder:   "Game code",
+        btnJoin:           "Join",
+        btnCreate:         "Create New Game",
+        alertName:         "Please enter a name",
+        alertFill:         "Please enter name and game code",
+        alertNotFound:     "Game not found"
+    }
 };
 
 // ==========================================
@@ -32,7 +62,6 @@ function renderLoginScreen() {
         style.id = 'tactical-login-style';
         style.innerHTML = `
             #login-screen {
-                direction: rtl;
                 display: flex; flex-direction: column; align-items: center; justify-content: center;
                 background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%);
             }
@@ -74,8 +103,6 @@ function renderLoginScreen() {
                 border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
                 background: rgba(30, 41, 59, 0.9);
             }
-
-            /* Toggle Switch — תיקון RTL: האפשרות הימנית היא ברירת מחדל (שוטרים מול גנבים) */
             .mode-toggle-wrapper {
                 display: flex; align-items: center; justify-content: space-between; width: 100%;
                 background: rgba(15, 23, 42, 0.6); padding: 12px 20px; border-radius: 50px;
@@ -105,8 +132,6 @@ function renderLoginScreen() {
             input:checked + .slider-round:before {
                 transform: translateX(24px); background-color: #38bdf8; box-shadow: 0 0 8px #38bdf8;
             }
-
-            /* Bot Settings */
             .bot-settings {
                 width: 100%; display: none; flex-direction: column;
                 align-items: center; animation: fade-in 0.3s ease-out; margin-bottom: 5px;
@@ -115,8 +140,6 @@ function renderLoginScreen() {
                 from { opacity: 0; transform: translateY(-5px); }
                 to { opacity: 1; transform: translateY(0); }
             }
-
-            /* Dial (חוגת רדיו) */
             .dial-wrapper {
                 width: 100%; display: flex; flex-direction: column;
                 align-items: center; margin-bottom: 18px;
@@ -147,8 +170,6 @@ function renderLoginScreen() {
             .dial-value.text-val {
                 font-size: 16px; font-weight: 800; color: #e0f2fe; text-shadow: none;
             }
-
-            /* Buttons */
             .btn-tactical {
                 width: 100%; padding: 16px; border-radius: 12px; border: none;
                 font-size: 17px; font-weight: 800; color: white; cursor: pointer;
@@ -166,27 +187,26 @@ function renderLoginScreen() {
                 margin-top: 10px; margin-bottom: 0;
             }
             .btn-danger:active { transform: translateY(2px); box-shadow: 0 2px 5px rgba(239, 68, 68, 0.4); }
-
             #multi-inputs { width: 100%; display: flex; flex-direction: column; }
             .divider { width: 100%; height: 1px; background: rgba(255,255,255,0.1); margin: 15px 0; }
         `;
         document.head.appendChild(style);
     }
 
+    const t = i18n[currentLang];
+
     loginContainer.innerHTML = `
         <div class="glass-panel">
             <img src="LOGO 512.webp" alt="Logo" class="logo-tactical">
-            <div class="game-title" id="lbl-main-title">Territory Battle</div>
-            
-            <input type="text" id="player-name" class="tactical-input"
-                placeholder="הכנס שם שחקן" value="${playerName}" autocomplete="off" />
+            <div class="game-title" id="lbl-main-title">${t.mainTitle}</div>
 
-            <!-- תיקון RTL: שוטרים מול גנבים בצד ימין (ברירת מחדל, unchecked) -->
-            <!-- שחק נגד בוטים בצד שמאל (checked) -->
+            <input type="text" id="player-name" class="tactical-input"
+                placeholder="${t.playerPlaceholder}" value="${playerName}" autocomplete="off" />
+
             <div class="mode-toggle-wrapper">
                 <span id="lbl-single" class="mode-lbl"
                     onclick="document.getElementById('mode-toggle').checked=true; updateModeUI();">
-                    שחק נגד בוטים
+                    ${t.modeSingle}
                 </span>
                 <label class="switch">
                     <input type="checkbox" id="mode-toggle" onchange="updateModeUI()">
@@ -194,56 +214,53 @@ function renderLoginScreen() {
                 </label>
                 <span id="lbl-multi" class="mode-lbl active"
                     onclick="document.getElementById('mode-toggle').checked=false; updateModeUI();">
-                    שוטרים מול גנבים
+                    ${t.modeMulti}
                 </span>
             </div>
 
-            <!-- הגדרות בוטים -->
             <div id="bot-settings" class="bot-settings">
-
-                <!-- חוגת כמות שוטרים -->
                 <div class="dial-wrapper">
-                    <div class="dial-label">כמות שוטרים (בוטים)</div>
+                    <div class="dial-label">${t.botCountLabel}</div>
                     <div class="dial-control">
-                        <button class="dial-btn" onclick="changeBotCount(-1)">‹</button>
-                        <div class="dial-value" id="bot-count-display">3</div>
-                        <button class="dial-btn" onclick="changeBotCount(1)">›</button>
+                        <button class="dial-btn" onclick="changeBotCount(-1)">&#8249;</button>
+                        <div class="dial-value" id="bot-count-display">${botCount}</div>
+                        <button class="dial-btn" onclick="changeBotCount(1)">&#8250;</button>
                     </div>
                 </div>
 
-                <!-- חוגת רמת קושי -->
                 <div class="dial-wrapper">
-                    <div class="dial-label">רמת קושי</div>
+                    <div class="dial-label">${t.difficultyLabel}</div>
                     <div class="dial-control">
-                        <button class="dial-btn" onclick="changeDifficulty(-1)">‹</button>
-                        <div class="dial-value text-val" id="difficulty-display">מיומן</div>
-                        <button class="dial-btn" onclick="changeDifficulty(1)">›</button>
+                        <button class="dial-btn" onclick="changeDifficulty(-1)">&#8249;</button>
+                        <div class="dial-value text-val" id="difficulty-display">${t.diffLabels[DIFFICULTIES[difficultyIndex]]}</div>
+                        <button class="dial-btn" onclick="changeDifficulty(1)">&#8250;</button>
                     </div>
                 </div>
 
-                <!-- שדות נסתרים לשמירת הערכים -->
-                <input type="hidden" id="bot-slider" value="3">
-                <input type="hidden" id="bot-difficulty" value="skilled">
+                <input type="hidden" id="bot-slider" value="${botCount}">
+                <input type="hidden" id="bot-difficulty" value="${DIFFICULTIES[difficultyIndex]}">
             </div>
 
             <div id="multi-inputs">
                 <input type="number" id="room-code-input" class="tactical-input"
-                    placeholder="קוד משחק" autocomplete="off" />
-                <button class="btn-tactical btn-primary" id="btn-join" onclick="joinRoom()">הצטרף</button>
+                    placeholder="${t.roomPlaceholder}" autocomplete="off" />
+                <button class="btn-tactical btn-primary" id="btn-join" onclick="joinRoom()">${t.btnJoin}</button>
             </div>
-            
+
             <div class="divider"></div>
-            
-            <button class="btn-tactical btn-danger" id="btn-create" onclick="createRoom()">צור משחק חדש</button>
+
+            <button class="btn-tactical btn-danger" id="btn-create" onclick="createRoom()">${t.btnCreate}</button>
         </div>
     `;
 
+    // כיוון הדף לפי שפה
+    document.dir = currentLang === 'he' ? 'rtl' : 'ltr';
+
     const urlParams = new URLSearchParams(window.location.search);
     if (urlParams.has('room')) {
-        document.getElementById('room-code-input').value = urlParams.get('room');
+        const el = document.getElementById('room-code-input');
+        if (el) el.value = urlParams.get('room');
     }
-
-    setLanguage('he');
 }
 
 // ==========================================
@@ -254,7 +271,6 @@ const BOT_MAX = 5;
 let botCount = 3;
 
 const DIFFICULTIES = ['rookie', 'skilled', 'elite'];
-const DIFFICULTY_LABELS = { rookie: 'טירון', skilled: 'מיומן', elite: 'עילית' };
 let difficultyIndex = 1; // ברירת מחדל: מיומן
 
 function changeBotCount(delta) {
@@ -270,7 +286,7 @@ function changeDifficulty(delta) {
     const key = DIFFICULTIES[difficultyIndex];
     const display = document.getElementById('difficulty-display');
     const hidden = document.getElementById('bot-difficulty');
-    if (display) display.innerText = DIFFICULTY_LABELS[key];
+    if (display) display.innerText = i18n[currentLang].diffLabels[key];
     if (hidden) hidden.value = key;
 }
 
@@ -282,29 +298,22 @@ window.onload = () => {
 };
 
 function updateModeUI() {
-    // תיקון: checked = נגד בוטים (שמאל), unchecked = שוטרים מול גנבים (ימין)
     const isSingle = document.getElementById('mode-toggle').checked;
     document.getElementById('bot-settings').style.display = isSingle ? 'flex' : 'none';
     document.getElementById('multi-inputs').style.display = isSingle ? 'none' : 'flex';
-
     document.getElementById('lbl-multi').classList.toggle('active', !isSingle);
     document.getElementById('lbl-single').classList.toggle('active', isSingle);
 }
 
 function setLanguage(lang) {
     currentLang = lang;
-    document.dir = lang === 'he' ? 'rtl' : 'ltr';
-    const t = i18n[lang];
-
-    const mainTitle = document.getElementById('lbl-main-title');
-    if (mainTitle) mainTitle.innerHTML = t.mainTitle;
-    const btnJoin = document.getElementById('btn-join');
-    if (btnJoin) btnJoin.innerHTML = t.btnJoin;
-    const btnCreate = document.getElementById('btn-create');
-    if (btnCreate) btnCreate.innerHTML = t.btnCreate;
+    // רינדור מחדש של כל המסך — מעדכן את כל הטקסטים בבת אחת
+    renderLoginScreen();
 }
 
-function toggleLanguage() { setLanguage(currentLang === 'he' ? 'en' : 'he'); }
+function toggleLanguage() {
+    setLanguage(currentLang === 'he' ? 'en' : 'he');
+}
 
 async function enableWakeLock() {
     try {
@@ -318,8 +327,9 @@ async function enableWakeLock() {
 // 5. Room Actions (Auth & Setup)
 // ==========================================
 function createRoom() {
+    const t = i18n[currentLang];
     const inputName = document.getElementById('player-name').value.trim();
-    if (!inputName) return alert("הכנס שם");
+    if (!inputName) return alert(t.alertName);
     playerName = inputName;
     localStorage.setItem('tb_name', playerName);
 
@@ -355,7 +365,7 @@ function createRoom() {
     if (isSingle) {
         for (let i = 1; i <= roomData.botCount; i++) {
             roomData.players[`bot_cop_${i}`] = {
-                name: `שוטר ${i} (בוט)`,
+                name: currentLang === 'he' ? `שוטר ${i} (בוט)` : `Cop ${i} (Bot)`,
                 role: 'cop',
                 t: Date.now()
             };
@@ -368,9 +378,10 @@ function createRoom() {
 }
 
 function joinRoom() {
+    const t = i18n[currentLang];
     const inputName = document.getElementById('player-name').value.trim();
     const roomId = document.getElementById('room-code-input').value.trim();
-    if (!inputName || !roomId) return alert("מלא שם וקוד משחק");
+    if (!inputName || !roomId) return alert(t.alertFill);
 
     if (roomId === '99999' || roomId === '88888') {
         playerName = inputName;
@@ -386,7 +397,7 @@ function joinRoom() {
     enableWakeLock();
 
     window.db.ref(`rooms/${roomId}`).once('value', snap => {
-        if (!snap.exists()) return alert("המשחק לא נמצא");
+        if (!snap.exists()) return alert(t.alertNotFound);
 
         window.db.ref(`rooms/${roomId}/players/${playerId}`).update({
             name: playerName,
