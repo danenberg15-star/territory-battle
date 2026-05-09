@@ -131,24 +131,26 @@ function isPointInArena(lat, lng, arenaPoints) {
 // 3. Render Captured Areas & Update Progress
 // ==========================================
 window.renderAreas = function(mapInstance, areasData, currentLayers) {
+    // תיקון: מוחקים רק את שכבות השטחים הכבושים — לא את השובל
     if (currentLayers && currentLayers.length > 0) {
         currentLayers.forEach(layer => mapInstance.removeLayer(layer));
     }
     
     let newLayers = [];
     let totalCapturedSqMeters = 0;
-    
     let currentAreaCount = areasData ? Object.keys(areasData).length : 0;
 
     if (areasData) {
         Object.values(areasData).forEach(area => {
             if (area.points && area.points.length >= 3) {
+                // תיקון: z-index נמוך כדי שהשובל יהיה מעל השטח הכבוש
                 const poly = L.polygon(area.points, { 
                     color: '#ef4444', 
                     fillColor: '#ef4444', 
-                    fillOpacity: 0.5, 
-                    weight: 3,
-                    dashArray: null
+                    fillOpacity: 0.45,
+                    weight: 2,
+                    dashArray: null,
+                    pane: 'overlayPane'
                 }).addTo(mapInstance);
                 
                 newLayers.push(poly);
@@ -159,17 +161,24 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
                     const turfPoly = turf.polygon([coords]);
                     totalCapturedSqMeters += turf.area(turfPoly);
                 } catch(e) {
-                    console.error("Error calculating single captured area size:", e);
+                    console.error("Error calculating captured area size:", e);
                 }
             }
         });
     }
 
+    // תיקון: מוודאים שהשובל מצויר מעל השטח הכבוש
+    if (window.trailLayer) {
+        window.trailLayer.bringToFront();
+    }
+
+    // עדכון אחוז השטח הכבוש בתפריט הצף
     let safePercentage = 0;
     if (window.arenaData && window.arenaData.totalArea) {
         const percentage = (totalCapturedSqMeters / window.arenaData.totalArea) * 100;
-        safePercentage = Math.min(100, Math.max(0, percentage)).toFixed(1); 
-        
+        safePercentage = Math.min(100, Math.max(0, percentage)).toFixed(1);
+
+        // תיקון: מוודאים שאלמנט האחוזים קיים ב-DOM לפני שכותבים
         let progressEl = document.getElementById('capture-progress-text');
         if (!progressEl) {
             const statsContainer = document.getElementById('floating-stats');
@@ -191,19 +200,30 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
             progressEl.innerText = `${safePercentage}%`;
         }
 
-        if (safePercentage >= 80 && window.isHost && window.currentRoom) {
-            window.db.ref(`game/${window.currentRoom}/winner`).set('thieves');
+        // ניצחון גנבים ב-80%
+        if (parseFloat(safePercentage) >= 80 && window.isHost && window.currentRoom) {
+            window.db.ref(`game/${window.currentRoom}/winner`).once('value', snap => {
+                if (!snap.val()) {
+                    window.db.ref(`game/${window.currentRoom}/winner`).set('thieves');
+                }
+            });
         }
     }
 
-    // התיקון: חסימת הטוסט מלהופיע על ערכים הנמוכים מ-1% או שווים לערך הקודם
+    // תיקון: Toast דרך Firebase כדי שכל השחקנים יראו — לא רק מי שכבש
     if (typeof window.lastCapturedAreaCount === 'undefined') {
-        window.lastCapturedAreaCount = currentAreaCount; 
+        window.lastCapturedAreaCount = currentAreaCount;
         window.lastDisplayedPercentage = 0;
     } else if (currentAreaCount > window.lastCapturedAreaCount) {
         const currentFloat = parseFloat(safePercentage);
         if (currentFloat >= 1.0 && currentFloat > window.lastDisplayedPercentage) {
-            window.displayCaptureToast(safePercentage);
+            // כתיבה ל-Firebase כדי שכולם יקבלו את ההתראה
+            if (window.isHost && window.currentRoom) {
+                window.db.ref(`game/${window.currentRoom}/captureToast`).set({
+                    percentage: safePercentage,
+                    t: Date.now()
+                });
+            }
             window.lastDisplayedPercentage = currentFloat;
         }
         window.lastCapturedAreaCount = currentAreaCount;
@@ -213,11 +233,33 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
 };
 
 // ==========================================
-// 4. Toast Notification UI
+// 4. האזנה ל-Toast מ-Firebase (כל השחקנים)
+// ==========================================
+window.listenToCaptureToast = function() {
+    if (!window.currentRoom || !window.db) return;
+
+    window.db.ref(`game/${window.currentRoom}/captureToast`).on('value', snap => {
+        const data = snap.val();
+        if (!data) return;
+        // מציגים רק אם ההודעה עדכנית (עד 6 שניות)
+        if (Date.now() - data.t > 6000) return;
+        window.displayCaptureToast(data.percentage);
+    });
+};
+
+// ==========================================
+// 5. Toast Notification UI
 // ==========================================
 window.displayCaptureToast = function(percentage) {
     let oldToast = document.getElementById('capture-toast');
     if (oldToast) oldToast.remove();
+
+    if (!document.getElementById('toast-styles')) {
+        const style = document.createElement('style');
+        style.id = 'toast-styles';
+        style.innerHTML = `@keyframes pop-in { 0% { opacity: 0; transform: translate(-50%, -60%) scale(0.5); } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); } }`;
+        document.head.appendChild(style);
+    }
 
     let toast = document.createElement('div');
     toast.id = 'capture-toast';
@@ -237,21 +279,15 @@ window.displayCaptureToast = function(percentage) {
     toast.style.pointerEvents = 'none';
     toast.style.animation = 'pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards';
 
-    if (!document.getElementById('toast-styles')) {
-        const style = document.createElement('style');
-        style.id = 'toast-styles';
-        style.innerHTML = `@keyframes pop-in { 0% { opacity: 0; transform: translate(-50%, -60%) scale(0.5); } 100% { opacity: 1; transform: translate(-50%, -50%) scale(1); } }`;
-        document.head.appendChild(style);
-    }
+    toast.innerText = window.currentLang === 'he'
+        ? `הגנבים כבשו ${percentage}% מהשטח!`
+        : `Thieves captured ${percentage}%!`;
 
     document.body.appendChild(toast);
-    toast.innerText = window.currentLang === 'he' ? `הגנבים כבשו ${percentage}% מהשטח!` : `Thieves captured ${percentage}%!`;
 
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
 
     setTimeout(() => {
-        if (toast && toast.parentNode) {
-            toast.parentNode.removeChild(toast);
-        }
+        if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
     }, 4000);
 };

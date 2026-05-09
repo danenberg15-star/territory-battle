@@ -13,16 +13,28 @@ window.startThiefMechanics = function() {
         window.map.removeLayer(window.trailLayer);
     }
     if (window.map) {
-        window.trailLayer = L.polyline([], { color: '#dc2626', weight: 6, dashArray: '5, 10', opacity: 0.8 }).addTo(window.map);
+        // השובל מצויר על pane גבוה יותר כדי שיהיה מעל השטחים הכבושים
+        window.trailLayer = L.polyline([], {
+            color: '#dc2626',
+            weight: 6,
+            dashArray: '5, 10',
+            opacity: 0.9,
+            pane: 'markerPane'
+        }).addTo(window.map);
     }
     window.thiefPath = [];
-    
-    // האזנה אקטיבית לשטחים כבושים כדי לדעת מתי אנחנו דורכים עליהם (להשלמת פאות)
+
+    // האזנה לשטחים כבושים (להשלמת פאות)
     if (window.currentRoom) {
-        window.db.ref(`game/${window.currentRoom}/capturedAreas`).off('value'); 
+        window.db.ref(`game/${window.currentRoom}/capturedAreas`).off('value');
         window.db.ref(`game/${window.currentRoom}/capturedAreas`).on('value', snap => {
             localCapturedAreas = snap.val() || {};
         });
+    }
+
+    // תיקון: הפעלת האזנה ל-Toast כדי שכל השחקנים יראו הודעת כיבוש
+    if (typeof window.listenToCaptureToast === 'function') {
+        window.listenToCaptureToast();
     }
 };
 
@@ -38,8 +50,9 @@ function updateThiefLogic(lat, lng) {
 
     checkArenaBoundaries(lat, lng);
     checkCopProximity(lat, lng);
-    
-    if (typeof window.isGameFrozen !== 'undefined' && window.isGameFrozen) return;
+
+    // תיקון: בדיקה נכונה של מצב הקפאה
+    if (window.isGameFrozen === true) return;
 
     handleThiefTrail(lat, lng);
 }
@@ -51,15 +64,13 @@ function checkArenaBoundaries(lat, lng) {
     try {
         const point = turf.point([lng, lat]);
         const polyCoords = window.arenaData.points.map(p => [p[1], p[0]]);
-        polyCoords.push(polyCoords[0]); 
-        
+        polyCoords.push(polyCoords[0]);
+
         const polygon = turf.polygon([polyCoords]);
         const isInside = turf.booleanPointInPolygon(point, polygon);
 
         if (!isInside) {
-            if (!outOfBoundsTimer) {
-                startOutOfBoundsTimer();
-            }
+            if (!outOfBoundsTimer) startOutOfBoundsTimer();
         } else {
             if (outOfBoundsTimer) stopOutOfBoundsTimer();
         }
@@ -71,22 +82,26 @@ function checkArenaBoundaries(lat, lng) {
 function startOutOfBoundsTimer() {
     outOfBoundsSeconds = 10;
     const overlay = document.getElementById('briefing-overlay');
-    if(overlay) overlay.style.display = 'block';
-    
+    if (overlay) overlay.style.display = 'flex';
+
     const timerText = document.getElementById('briefing-timer-text');
-    if(timerText) timerText.style.color = "#ef4444";
-    
+    if (timerText) timerText.style.color = "#ef4444";
+
     outOfBoundsTimer = setInterval(() => {
         outOfBoundsSeconds--;
         const statusText = document.getElementById('briefing-status');
-        if(statusText) statusText.innerText = window.currentLang === 'he' ? "חזור לזירה מיד!" : "Return to Arena!";
-        
-        if(timerText) timerText.innerText = `00:${outOfBoundsSeconds < 10 ? '0' : ''}${outOfBoundsSeconds}`;
-        
+        if (statusText) statusText.innerText = window.currentLang === 'he' ? "חזור לזירה מיד!" : "Return to Arena!";
+
+        const timerEl = document.getElementById('briefing-timer-text');
+        if (timerEl) timerEl.innerText = `00:${outOfBoundsSeconds < 10 ? '0' : ''}${outOfBoundsSeconds}`;
+
         if (outOfBoundsSeconds <= 0) {
             stopOutOfBoundsTimer();
-            alert(window.currentLang === 'he' ? "נפסלת עקב יציאה מהזירה!" : "Disqualified for leaving the arena!");
-            if(typeof exitGame === 'function') exitGame(); 
+            // תיקון: החלפת alert() בטוסט שלא חוסם את ה-GPS
+            showOutOfBoundsToast();
+            setTimeout(() => {
+                if (typeof exitGame === 'function') exitGame();
+            }, 2000);
         }
     }, 1000);
 }
@@ -95,15 +110,77 @@ function stopOutOfBoundsTimer() {
     clearInterval(outOfBoundsTimer);
     outOfBoundsTimer = null;
     const overlay = document.getElementById('briefing-overlay');
-    if(overlay) overlay.style.display = 'none';
-    
+    if (overlay) overlay.style.display = 'none';
+
     const timerText = document.getElementById('briefing-timer-text');
-    if(timerText) timerText.style.color = "#facc15";
+    if (timerText) timerText.style.color = "#facc15";
+}
+
+// תיקון: toast במקום alert — לא חוסם GPS או Firebase
+function showOutOfBoundsToast() {
+    let old = document.getElementById('oob-toast');
+    if (old) old.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'oob-toast';
+    toast.style.cssText = `
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(220, 38, 38, 0.97);
+        color: white;
+        padding: 24px 40px;
+        border-radius: 16px;
+        font-size: 22px;
+        font-weight: 900;
+        z-index: 99999;
+        text-align: center;
+        pointer-events: none;
+        box-shadow: 0 0 40px rgba(220,38,38,0.8);
+    `;
+    toast.innerText = window.currentLang === 'he'
+        ? "נפסלת עקב יציאה מהזירה!"
+        : "Disqualified for leaving the arena!";
+    document.body.appendChild(toast);
+}
+
+// תיקון: toast במקום alert — לא חוסם GPS או Firebase
+function showCopInsideToast() {
+    let old = document.getElementById('cop-inside-toast');
+    if (old) old.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'cop-inside-toast';
+    toast.style.cssText = `
+        position: fixed;
+        top: 40%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(30, 64, 175, 0.97);
+        color: white;
+        padding: 20px 36px;
+        border-radius: 16px;
+        font-size: 20px;
+        font-weight: 900;
+        z-index: 99999;
+        text-align: center;
+        pointer-events: none;
+        box-shadow: 0 0 30px rgba(30,64,175,0.8);
+    `;
+    toast.innerText = window.currentLang === 'he'
+        ? "לא ניתן לגנוב — שוטר נמצא בשטח!"
+        : "Cannot steal — Cop is inside!";
+    document.body.appendChild(toast);
+
+    setTimeout(() => {
+        if (toast && toast.parentNode) toast.parentNode.removeChild(toast);
+    }, 3000);
 }
 
 function checkCopProximity(lat, lng) {
     const now = Date.now();
-    if (now - lastProximityAlert < 5000) return; 
+    if (now - lastProximityAlert < 5000) return;
 
     window.db.ref(`game/${window.currentRoom}/players`).once('value', snap => {
         const players = snap.val() || {};
@@ -112,7 +189,7 @@ function checkCopProximity(lat, lng) {
             if (p.role === 'cop' && id !== window.playerId) {
                 const distance = window.map.distance([lat, lng], [p.lat, p.lng]);
                 if (distance <= 20) {
-                    if (navigator.vibrate) navigator.vibrate(200); 
+                    if (navigator.vibrate) navigator.vibrate(200);
                     lastProximityAlert = now;
                 }
             }
@@ -126,17 +203,17 @@ function checkCopProximity(lat, lng) {
 function isPointInAnyCapturedArea(checkLat, checkLng) {
     if (!localCapturedAreas) return false;
     const pt = turf.point([checkLng, checkLat]);
-    
+
     for (let key in localCapturedAreas) {
         const pts = localCapturedAreas[key].points;
         if (!pts || pts.length < 3) continue;
-        
+
         const coords = pts.map(p => [p[1], p[0]]);
         coords.push(coords[0]);
         try {
             const poly = turf.polygon([coords]);
             if (turf.booleanPointInPolygon(pt, poly)) return true;
-        } catch(e) { }
+        } catch(e) {}
     }
     return false;
 }
@@ -144,13 +221,13 @@ function isPointInAnyCapturedArea(checkLat, checkLng) {
 function handleThiefTrail(lat, lng) {
     if (window.thiefPath.length > 0) {
         const last = window.thiefPath[window.thiefPath.length - 1];
-        if (window.map.distance([lat, lng], last) < 3) return; 
+        if (window.map.distance([lat, lng], last) < 3) return;
     }
 
     let captured = false;
 
     if (window.thiefPath.length > 5) {
-        // 1. חוק האות P - חיתוך עצמי
+        // חוק האות P — חיתוך עצמי
         for (let i = 0; i < window.thiefPath.length - 5; i++) {
             if (window.map.distance([lat, lng], window.thiefPath[i]) < 6) {
                 const areaCoords = window.thiefPath.slice(i);
@@ -165,15 +242,14 @@ function handleThiefTrail(lat, lng) {
         }
     }
 
-    // 2. חוק השלמת הפאות - שימוש בטריטוריות קיימות כדי לסגור שטחים
+    // חוק השלמת הפאות — שימוש בטריטוריות קיימות לסגירת שטחים
     if (!captured && localCapturedAreas && window.thiefPath.length > 5) {
         if (isPointInAnyCapturedArea(lat, lng)) {
-            // דורכים כרגע על טריטוריה, נבדוק אם גם יצאנו מהטריטוריה מתישהו בעבר השביל
             for (let i = 0; i < window.thiefPath.length - 5; i++) {
                 if (isPointInAnyCapturedArea(window.thiefPath[i][0], window.thiefPath[i][1])) {
                     const areaCoords = window.thiefPath.slice(i);
                     const areaSqM = calculatePathArea(areaCoords);
-                    
+
                     if (areaSqM > 25) {
                         tryCaptureArea([...areaCoords, [lat, lng]], i);
                         captured = true;
@@ -200,7 +276,7 @@ function calculatePathArea(points) {
 
 function tryCaptureArea(points, splitIndex) {
     const polygonCoords = points.map(p => [p[1], p[0]]);
-    polygonCoords.push(polygonCoords[0]); 
+    polygonCoords.push(polygonCoords[0]);
     const polygon = turf.polygon([polygonCoords]);
 
     window.db.ref(`game/${window.currentRoom}/players`).once('value', snap => {
@@ -214,12 +290,12 @@ function tryCaptureArea(points, splitIndex) {
         });
 
         if (copInside) {
-            alert(window.currentLang === 'he' ? "לא ניתן לגנוב - שוטר נמצא בשטח!" : "Cannot steal - Cop is inside!");
-            // עונש על כליאת שוטר - השארת הרגל בלבד
+            // תיקון: toast במקום alert
+            showCopInsideToast();
             if (splitIndex !== undefined) {
                 window.thiefPath = window.thiefPath.slice(0, splitIndex + 1);
             } else {
-                window.thiefPath = []; 
+                window.thiefPath = [];
             }
             if (window.trailLayer) window.trailLayer.setLatLngs(window.thiefPath);
             return;
@@ -238,13 +314,13 @@ function tryCaptureArea(points, splitIndex) {
             checkTreasureInCapturedArea(points);
         }
 
-        // הצלחה! משאירים את ה"רגל" בחיים (או את נקודת העוגן) כדי שנוכל להמשיך ממנה
+        // משאירים את ה"רגל" כנקודת עוגן להמשך
         if (splitIndex !== undefined) {
             window.thiefPath = window.thiefPath.slice(0, splitIndex + 1);
         } else {
-            window.thiefPath = []; 
+            window.thiefPath = [];
         }
-        
+
         if (window.trailLayer) window.trailLayer.setLatLngs(window.thiefPath);
     });
 }
