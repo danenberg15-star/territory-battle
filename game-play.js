@@ -91,7 +91,6 @@ function listenForCaptureSignals() {
         }
     });
 
-    // מאזין להתראות על שחקנים שנתפסו כדי להציג את ההודעה לכולם
     window.db.ref(`game/${window.currentRoom}/catchAlert`).on('value', snap => {
         const alertData = snap.val();
         if (!alertData || Date.now() - alertData.t > 8000) return;
@@ -202,25 +201,21 @@ function startCooldown(seconds) {
 function exitGame() {
     if (typeof window.killExitWarning === 'function') window.killExitWarning();
 
-    // עצירת GPS
     if (window.gpsWatchId !== null) {
         navigator.geolocation.clearWatch(window.gpsWatchId);
         window.gpsWatchId = null;
     }
 
-    // עצירת בוטים אם רצים
     if (typeof stopSinglePlayerAI === 'function') stopSinglePlayerAI();
 
     if (window.currentRoom && window.playerId) {
         const playerName = window.playerName || 'שחקן';
 
-        // סימון השחקן כמנותק ב-Firebase
         const updates = {};
         updates[`rooms/${window.currentRoom}/players/${window.playerId}/isOffline`] = true;
         updates[`rooms/${window.currentRoom}/players/${window.playerId}/disconnectedAt`] = Date.now();
         updates[`game/${window.currentRoom}/players/${window.playerId}/isOffline`] = true;
 
-        // שליחת הודעת עזיבה לצ'אט הקבוצתי
         const role = window.playerRole || 'thief';
         const leaveMsg = {
             senderId: 'system',
@@ -248,7 +243,6 @@ function checkOfflinePlayers() {
     if (!window.isHost || !window.currentRoom) return;
     const now = Date.now();
 
-    // קריאה מ-rooms (שם נשמר isOffline) ולא מ-game
     window.db.ref(`rooms/${window.currentRoom}/players`).once('value', snap => {
         const players = snap.val() || {};
         let activeThieves = 0;
@@ -258,7 +252,6 @@ function checkOfflinePlayers() {
             const p = players[id];
             const isBot = id.startsWith('bot_');
 
-            // הסרת שחקן שמנותק יותר מ-3 דקות
             if (!isBot && p.isOffline && p.disconnectedAt && (now - p.disconnectedAt > 180000)) {
                 window.db.ref(`rooms/${window.currentRoom}/players/${id}`).remove();
                 window.db.ref(`game/${window.currentRoom}/players/${id}`).remove();
@@ -290,7 +283,8 @@ function listenToVictory() {
 
 function listenToCapturedAreas() {
     window.db.ref(`game/${window.currentRoom}/capturedAreas`).on('value', snap => {
-        const areas = snap.val();
+        // שולחים אובייקט ריק כדי להבטיח עדכון מוקדם של ה-UI (באג ה-0%)
+        const areas = snap.val() || {}; 
         if (typeof window.renderAreas === 'function') {
             window.areaLayers = window.renderAreas(window.map, areas, window.areaLayers);
         } else if (typeof renderAreas === 'function') {
@@ -387,7 +381,6 @@ function listenToOtherPlayers() {
     });
 }
 
-// פונקציית תצוגת ההודעה מעוצבת באופן גלובלי
 window.displayCatchToast = function(victimName, gameMode) {
     let oldToast = document.getElementById('catch-toast');
     if (oldToast) oldToast.remove();
@@ -417,21 +410,12 @@ window.displayCatchToast = function(victimName, gameMode) {
         document.head.appendChild(style);
     }
 
-    let message = '';
-    if (gameMode === 'single') {
-        message = window.currentLang === 'he' ? `השחקן ${victimName} נתפס ונשלח לכלא!` : `Player ${victimName} was caught and sent to jail!`;
-    } else {
-        message = window.currentLang === 'he' ? `השחקן ${victimName} נתפס ועכשיו הוא משתף פעולה עם המשטרה!` : `Player ${victimName} was caught and is now a snitch!`;
-    }
+    let message = (gameMode === 'single') ? 
+        `השחקן ${victimName} נתפס ונשלח לכלא!` : 
+        `השחקן ${victimName} נתפס ועכשיו הוא משתף פעולה עם המשטרה!`;
 
     toast.innerText = message;
     document.body.appendChild(toast);
-
     if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
-
-    setTimeout(() => {
-        if (toast && toast.parentNode) {
-            toast.parentNode.removeChild(toast);
-        }
-    }, 5000);
+    setTimeout(() => { if (toast && toast.parentNode) toast.parentNode.removeChild(toast); }, 5000);
 };
