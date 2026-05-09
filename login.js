@@ -27,7 +27,6 @@ function renderLoginScreen() {
     const loginContainer = document.getElementById('login-screen');
     if (!loginContainer) return;
 
-    // הזרקת סגנונות ה-CSS (רק אם טרם הוזרקו)
     if (!document.getElementById('tactical-login-style')) {
         const style = document.createElement('style');
         style.id = 'tactical-login-style';
@@ -61,8 +60,9 @@ function renderLoginScreen() {
                 50% { filter: drop-shadow(0 0 20px rgba(56, 189, 248, 0.8)); transform: scale(1.03); }
             }
             .game-title {
-                color: #e0f2fe; font-size: 24px; font-weight: 900; margin-bottom: 25px; text-transform: uppercase;
-                letter-spacing: 2px; text-shadow: 0 0 10px rgba(56,189,248,0.5); text-align: center;
+                color: #e0f2fe; font-size: 24px; font-weight: 900; margin-bottom: 25px;
+                text-transform: uppercase; letter-spacing: 2px;
+                text-shadow: 0 0 10px rgba(56,189,248,0.5); text-align: center;
             }
             .tactical-input {
                 width: 100%; padding: 15px; margin-bottom: 15px; border-radius: 12px;
@@ -71,43 +71,102 @@ function renderLoginScreen() {
                 transition: all 0.3s ease; outline: none; font-family: inherit;
             }
             .tactical-input:focus {
-                border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.4); background: rgba(30, 41, 59, 0.9);
+                border-color: #38bdf8; box-shadow: 0 0 15px rgba(56, 189, 248, 0.4);
+                background: rgba(30, 41, 59, 0.9);
             }
-            
-            /* Toggle Switch */
+
+            /* Toggle Switch — תיקון RTL: האפשרות הימנית היא ברירת מחדל (שוטרים מול גנבים) */
             .mode-toggle-wrapper {
                 display: flex; align-items: center; justify-content: space-between; width: 100%;
                 background: rgba(15, 23, 42, 0.6); padding: 12px 20px; border-radius: 50px;
                 border: 1px solid rgba(56, 189, 248, 0.2); margin-bottom: 20px; box-sizing: border-box;
             }
-            .mode-lbl { font-size: 14px; font-weight: 700; color: #64748b; transition: 0.3s; flex: 1; text-align: center; cursor: pointer; }
+            .mode-lbl {
+                font-size: 13px; font-weight: 700; color: #64748b;
+                transition: 0.3s; flex: 1; text-align: center; cursor: pointer;
+            }
             .mode-lbl.active { color: #38bdf8; text-shadow: 0 0 8px rgba(56,189,248,0.5); }
-            .switch { position: relative; display: inline-block; width: 54px; height: 30px; margin: 0 10px; flex-shrink: 0; }
+            .switch {
+                position: relative; display: inline-block;
+                width: 54px; height: 30px; margin: 0 10px; flex-shrink: 0;
+            }
             .switch input { opacity: 0; width: 0; height: 0; }
-            .slider-round { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #334155; transition: .4s; border-radius: 30px; border: 1px solid #475569; }
-            .slider-round:before { position: absolute; content: ""; height: 22px; width: 22px; left: 3px; bottom: 3px; background-color: #94a3b8; transition: .4s; border-radius: 50%; }
+            .slider-round {
+                position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+                background-color: #334155; transition: .4s; border-radius: 30px;
+                border: 1px solid #475569;
+            }
+            .slider-round:before {
+                position: absolute; content: ""; height: 22px; width: 22px;
+                left: 3px; bottom: 3px; background-color: #94a3b8;
+                transition: .4s; border-radius: 50%;
+            }
             input:checked + .slider-round { background-color: #0f172a; border-color: #38bdf8; }
-            input:checked + .slider-round:before { transform: translateX(24px); background-color: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
+            input:checked + .slider-round:before {
+                transform: translateX(24px); background-color: #38bdf8; box-shadow: 0 0 8px #38bdf8;
+            }
 
-            /* Range Slider */
-            .bot-settings { width: 100%; display: none; flex-direction: column; align-items: center; animation: fade-in 0.3s ease-out; margin-bottom: 5px; }
-            @keyframes fade-in { from { opacity: 0; transform: translateY(-5px); } to { opacity: 1; transform: translateY(0); } }
-            .bot-range { -webkit-appearance: none; width: 100%; height: 6px; border-radius: 5px; background: #334155; outline: none; margin: 15px 0 20px 0; }
-            .bot-range::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 26px; height: 26px; border-radius: 50%; background: #38bdf8; cursor: pointer; border: 3px solid #0f172a; box-shadow: 0 0 10px #38bdf8; transition: transform 0.1s; }
-            .bot-range::-webkit-slider-thumb:active { transform: scale(1.2); }
-            .bot-val-display { font-size: 32px; font-weight: 900; color: #38bdf8; line-height: 1; margin-top: -10px; margin-bottom: 20px; text-shadow: 0 0 12px rgba(56,189,248,0.5); }
+            /* Bot Settings */
+            .bot-settings {
+                width: 100%; display: none; flex-direction: column;
+                align-items: center; animation: fade-in 0.3s ease-out; margin-bottom: 5px;
+            }
+            @keyframes fade-in {
+                from { opacity: 0; transform: translateY(-5px); }
+                to { opacity: 1; transform: translateY(0); }
+            }
+
+            /* Dial (חוגת רדיו) */
+            .dial-wrapper {
+                width: 100%; display: flex; flex-direction: column;
+                align-items: center; margin-bottom: 18px;
+            }
+            .dial-label {
+                font-size: 12px; font-weight: 700; color: #94a3b8;
+                margin-bottom: 10px; letter-spacing: 1px;
+            }
+            .dial-control {
+                display: flex; align-items: center; justify-content: center;
+                gap: 0; width: 100%;
+                background: rgba(15, 23, 42, 0.7);
+                border: 1px solid rgba(56, 189, 248, 0.25);
+                border-radius: 50px; overflow: hidden;
+            }
+            .dial-btn {
+                background: transparent; border: none; color: #38bdf8;
+                font-size: 22px; font-weight: 900; cursor: pointer;
+                padding: 10px 20px; transition: background 0.15s;
+                flex-shrink: 0; line-height: 1;
+            }
+            .dial-btn:active { background: rgba(56, 189, 248, 0.15); }
+            .dial-value {
+                flex: 1; text-align: center; font-size: 28px; font-weight: 900;
+                color: #38bdf8; text-shadow: 0 0 10px rgba(56,189,248,0.5);
+                min-width: 80px; padding: 8px 0; line-height: 1;
+            }
+            .dial-value.text-val {
+                font-size: 16px; font-weight: 800; color: #e0f2fe; text-shadow: none;
+            }
 
             /* Buttons */
             .btn-tactical {
-                width: 100%; padding: 16px; border-radius: 12px; border: none; font-size: 17px; font-weight: 800;
-                color: white; cursor: pointer; margin-bottom: 12px; transition: all 0.2s ease;
+                width: 100%; padding: 16px; border-radius: 12px; border: none;
+                font-size: 17px; font-weight: 800; color: white; cursor: pointer;
+                margin-bottom: 12px; transition: all 0.2s ease;
                 display: flex; align-items: center; justify-content: center; letter-spacing: 1px;
             }
-            .btn-primary { background: linear-gradient(135deg, #1e40af, #3b82f6); box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4); }
+            .btn-primary {
+                background: linear-gradient(135deg, #1e40af, #3b82f6);
+                box-shadow: 0 4px 15px rgba(59, 130, 246, 0.4);
+            }
             .btn-primary:active { transform: translateY(2px); box-shadow: 0 2px 5px rgba(59, 130, 246, 0.4); }
-            .btn-danger { background: linear-gradient(135deg, #991b1b, #ef4444); box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4); margin-top: 10px; margin-bottom: 0; }
+            .btn-danger {
+                background: linear-gradient(135deg, #991b1b, #ef4444);
+                box-shadow: 0 4px 15px rgba(239, 68, 68, 0.4);
+                margin-top: 10px; margin-bottom: 0;
+            }
             .btn-danger:active { transform: translateY(2px); box-shadow: 0 2px 5px rgba(239, 68, 68, 0.4); }
-            
+
             #multi-inputs { width: 100%; display: flex; flex-direction: column; }
             .divider { width: 100%; height: 1px; background: rgba(255,255,255,0.1); margin: 15px 0; }
         `;
@@ -119,31 +178,57 @@ function renderLoginScreen() {
             <img src="LOGO 512.webp" alt="Logo" class="logo-tactical">
             <div class="game-title" id="lbl-main-title">Territory Battle</div>
             
-            <input type="text" id="player-name" class="tactical-input" placeholder="הכנס שם שחקן" value="${playerName}" autocomplete="off" />
+            <input type="text" id="player-name" class="tactical-input"
+                placeholder="הכנס שם שחקן" value="${playerName}" autocomplete="off" />
 
+            <!-- תיקון RTL: שוטרים מול גנבים בצד ימין (ברירת מחדל, unchecked) -->
+            <!-- שחק נגד בוטים בצד שמאל (checked) -->
             <div class="mode-toggle-wrapper">
-                <span id="lbl-multi" class="mode-lbl active" onclick="document.getElementById('mode-toggle').checked=false; updateModeUI();">רב משתתפים</span>
+                <span id="lbl-single" class="mode-lbl"
+                    onclick="document.getElementById('mode-toggle').checked=true; updateModeUI();">
+                    שחק נגד בוטים
+                </span>
                 <label class="switch">
                     <input type="checkbox" id="mode-toggle" onchange="updateModeUI()">
                     <span class="slider-round"></span>
                 </label>
-                <span id="lbl-single" class="mode-lbl" onclick="document.getElementById('mode-toggle').checked=true; updateModeUI();">נגד בוטים</span>
+                <span id="lbl-multi" class="mode-lbl active"
+                    onclick="document.getElementById('mode-toggle').checked=false; updateModeUI();">
+                    שוטרים מול גנבים
+                </span>
             </div>
 
+            <!-- הגדרות בוטים -->
             <div id="bot-settings" class="bot-settings">
-                <span style="color:#94a3b8; font-size:12px; font-weight:700;">כמות שוטרים (בוטים)</span>
-                <input type="range" id="bot-slider" class="bot-range" min="1" max="5" value="3" oninput="document.getElementById('bot-val').innerText = this.value">
-                <div id="bot-val" class="bot-val-display">3</div>
-                
-                <select id="bot-difficulty" class="tactical-input" style="margin-bottom:0;">
-                    <option value="rookie">רמה: טירון</option>
-                    <option value="skilled" selected>רמה: מיומן</option>
-                    <option value="elite">רמה: עילית</option>
-                </select>
+
+                <!-- חוגת כמות שוטרים -->
+                <div class="dial-wrapper">
+                    <div class="dial-label">כמות שוטרים (בוטים)</div>
+                    <div class="dial-control">
+                        <button class="dial-btn" onclick="changeBotCount(-1)">‹</button>
+                        <div class="dial-value" id="bot-count-display">3</div>
+                        <button class="dial-btn" onclick="changeBotCount(1)">›</button>
+                    </div>
+                </div>
+
+                <!-- חוגת רמת קושי -->
+                <div class="dial-wrapper">
+                    <div class="dial-label">רמת קושי</div>
+                    <div class="dial-control">
+                        <button class="dial-btn" onclick="changeDifficulty(-1)">‹</button>
+                        <div class="dial-value text-val" id="difficulty-display">מיומן</div>
+                        <button class="dial-btn" onclick="changeDifficulty(1)">›</button>
+                    </div>
+                </div>
+
+                <!-- שדות נסתרים לשמירת הערכים -->
+                <input type="hidden" id="bot-slider" value="3">
+                <input type="hidden" id="bot-difficulty" value="skilled">
             </div>
 
             <div id="multi-inputs">
-                <input type="number" id="room-code-input" class="tactical-input" placeholder="קוד משחק" autocomplete="off" />
+                <input type="number" id="room-code-input" class="tactical-input"
+                    placeholder="קוד משחק" autocomplete="off" />
                 <button class="btn-tactical btn-primary" id="btn-join" onclick="joinRoom()">הצטרף</button>
             </div>
             
@@ -154,25 +239,54 @@ function renderLoginScreen() {
     `;
 
     const urlParams = new URLSearchParams(window.location.search);
-    if(urlParams.has('room')) {
+    if (urlParams.has('room')) {
         document.getElementById('room-code-input').value = urlParams.get('room');
     }
-    
+
     setLanguage('he');
 }
 
 // ==========================================
-// 3. Logic & Handlers
+// 3. Dial Controls
+// ==========================================
+const BOT_MIN = 1;
+const BOT_MAX = 5;
+let botCount = 3;
+
+const DIFFICULTIES = ['rookie', 'skilled', 'elite'];
+const DIFFICULTY_LABELS = { rookie: 'טירון', skilled: 'מיומן', elite: 'עילית' };
+let difficultyIndex = 1; // ברירת מחדל: מיומן
+
+function changeBotCount(delta) {
+    botCount = Math.min(BOT_MAX, Math.max(BOT_MIN, botCount + delta));
+    const display = document.getElementById('bot-count-display');
+    const hidden = document.getElementById('bot-slider');
+    if (display) display.innerText = botCount;
+    if (hidden) hidden.value = botCount;
+}
+
+function changeDifficulty(delta) {
+    difficultyIndex = (difficultyIndex + delta + DIFFICULTIES.length) % DIFFICULTIES.length;
+    const key = DIFFICULTIES[difficultyIndex];
+    const display = document.getElementById('difficulty-display');
+    const hidden = document.getElementById('bot-difficulty');
+    if (display) display.innerText = DIFFICULTY_LABELS[key];
+    if (hidden) hidden.value = key;
+}
+
+// ==========================================
+// 4. Logic & Handlers
 // ==========================================
 window.onload = () => {
     renderLoginScreen();
 };
 
 function updateModeUI() {
+    // תיקון: checked = נגד בוטים (שמאל), unchecked = שוטרים מול גנבים (ימין)
     const isSingle = document.getElementById('mode-toggle').checked;
     document.getElementById('bot-settings').style.display = isSingle ? 'flex' : 'none';
     document.getElementById('multi-inputs').style.display = isSingle ? 'none' : 'flex';
-    
+
     document.getElementById('lbl-multi').classList.toggle('active', !isSingle);
     document.getElementById('lbl-single').classList.toggle('active', isSingle);
 }
@@ -181,7 +295,7 @@ function setLanguage(lang) {
     currentLang = lang;
     document.dir = lang === 'he' ? 'rtl' : 'ltr';
     const t = i18n[lang];
-    
+
     const mainTitle = document.getElementById('lbl-main-title');
     if (mainTitle) mainTitle.innerHTML = t.mainTitle;
     const btnJoin = document.getElementById('btn-join');
@@ -193,22 +307,22 @@ function setLanguage(lang) {
 function toggleLanguage() { setLanguage(currentLang === 'he' ? 'en' : 'he'); }
 
 async function enableWakeLock() {
-    try { 
-        if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen'); 
+    try {
+        if ('wakeLock' in navigator) wakeLock = await navigator.wakeLock.request('screen');
     } catch (err) {
         console.warn("WakeLock failed");
     }
 }
 
 // ==========================================
-// 4. Room Actions (Auth & Setup)
+// 5. Room Actions (Auth & Setup)
 // ==========================================
 function createRoom() {
     const inputName = document.getElementById('player-name').value.trim();
     if (!inputName) return alert("הכנס שם");
     playerName = inputName;
     localStorage.setItem('tb_name', playerName);
-    
+
     const roomId = Math.floor(1000 + Math.random() * 9000).toString();
     currentRoom = roomId;
     isHost = true;
@@ -216,13 +330,13 @@ function createRoom() {
 
     const isSingle = document.getElementById('mode-toggle').checked;
     const gameMode = isSingle ? 'single' : 'multi';
-    
-    const roomData = { 
-        status: 'lobby', 
-        host: playerId, 
+
+    const roomData = {
+        status: 'lobby',
+        host: playerId,
         createdAt: Date.now(),
         gameMode: gameMode,
-        players: {} 
+        players: {}
     };
 
     if (isSingle) {
@@ -230,9 +344,9 @@ function createRoom() {
         roomData.botCount = parseInt(document.getElementById('bot-slider').value) || 3;
     }
 
-    roomData.players[playerId] = { 
-        name: playerName, 
-        role: 'thief', 
+    roomData.players[playerId] = {
+        name: playerName,
+        role: 'thief',
         t: Date.now(),
         isOffline: false,
         disconnectedAt: null
@@ -240,10 +354,10 @@ function createRoom() {
 
     if (isSingle) {
         for (let i = 1; i <= roomData.botCount; i++) {
-            roomData.players[`bot_cop_${i}`] = { 
-                name: `שוטר ${i} (בוט)`, 
-                role: 'cop', 
-                t: Date.now() 
+            roomData.players[`bot_cop_${i}`] = {
+                name: `שוטר ${i} (בוט)`,
+                role: 'cop',
+                t: Date.now()
             };
         }
     }
@@ -257,23 +371,23 @@ function joinRoom() {
     const inputName = document.getElementById('player-name').value.trim();
     const roomId = document.getElementById('room-code-input').value.trim();
     if (!inputName || !roomId) return alert("מלא שם וקוד משחק");
-    
+
     if (roomId === '99999' || roomId === '88888') {
         playerName = inputName;
         currentRoom = roomId;
         enableWakeLock();
-        if (typeof initQARoom === 'function') initQARoom(roomId); 
+        if (typeof initQARoom === 'function') initQARoom(roomId);
         return;
     }
-    
+
     playerName = inputName;
     currentRoom = roomId;
     localStorage.setItem('tb_name', playerName);
     enableWakeLock();
-    
+
     window.db.ref(`rooms/${roomId}`).once('value', snap => {
         if (!snap.exists()) return alert("המשחק לא נמצא");
-        
+
         window.db.ref(`rooms/${roomId}/players/${playerId}`).update({
             name: playerName,
             role: 'thief',
