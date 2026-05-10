@@ -6,7 +6,29 @@ let botCooldowns = {};
 let botStates = {};
 
 // ============================================================
+// תקרות מהירות אנושיות מוחלטות - בלי קשר לגודל הזירה
+// 1 GPS unit ≈ 111,000 מטר
+// interval = 1 שניה, אז speed = מטר/שניה = מ"ש
+// 5 קמ"ש = 1.39 מ"ש = 0.0000125 GPS/שניה
+// ============================================================
+const MAX_SPEEDS = {
+    rookie: {
+        scan: 0.0000125,  // ~5 קמ"ש שיטוט
+        run:  0.0000278   // ~10 קמ"ש ריצה
+    },
+    skilled: {
+        scan: 0.0000194,  // ~7 קמ"ש שיטוט
+        run:  0.0000417   // ~15 קמ"ש ריצה
+    },
+    elite: {
+        scan: 0.0000250,  // ~9 קמ"ש שיטוט
+        run:  0.0000556   // ~20 קמ"ש ריצה
+    }
+};
+
+// ============================================================
 // פרופילי קושי לפי גיל - ערכים באחוזים מאלכסון הזירה
+// המהירות הסופית = min(ערך יחסי, תקרה אנושית)
 // ============================================================
 const BOT_PROFILES = {
     rookie: {
@@ -14,6 +36,7 @@ const BOT_PROFILES = {
         runSpeedPct:    0.015,
         radarRangePct:  0.20,
         reactionTime:   3000,
+        memoryTime:     4000,  // זמן זיכרון אחרי איבוד גנב (ms)
         catchRange:     0.00015
     },
     skilled: {
@@ -21,6 +44,7 @@ const BOT_PROFILES = {
         runSpeedPct:    0.030,
         radarRangePct:  0.35,
         reactionTime:   1500,
+        memoryTime:     6000,
         catchRange:     0.00015
     },
     elite: {
@@ -28,6 +52,7 @@ const BOT_PROFILES = {
         runSpeedPct:    0.050,
         radarRangePct:  0.55,
         reactionTime:   400,
+        memoryTime:     10000,
         catchRange:     0.00015
     }
 };
@@ -43,7 +68,8 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
     botsActive = true;
     console.log(`Starting Co-op vs Bots (${difficulty})...`);
 
-    const profile = BOT_PROFILES[difficulty] || BOT_PROFILES.skilled;
+    const profile  = BOT_PROFILES[difficulty]  || BOT_PROFILES.skilled;
+    const maxSpeed = MAX_SPEEDS[difficulty]     || MAX_SPEEDS.skilled;
 
     const lats = arenaData.points.map(p => p[0]);
     const lngs = arenaData.points.map(p => p[1]);
@@ -54,16 +80,23 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
 
     const diagonal = calcArenaDiagonal(minLat, maxLat, minLng, maxLng);
 
-    const scanSpeed    = profile.scanSpeedPct  * diagonal;
-    const runSpeed     = profile.runSpeedPct   * diagonal;
+    // מהירות סופית = min(יחסי לזירה, תקרה אנושית)
+    const scanSpeed    = Math.min(profile.scanSpeedPct * diagonal, maxSpeed.scan);
+    const runSpeed     = Math.min(profile.runSpeedPct  * diagonal, maxSpeed.run);
     const radarRange   = profile.radarRangePct * diagonal;
     const reactionTime = profile.reactionTime;
+    const memoryTime   = profile.memoryTime;
     const catchRange   = profile.catchRange;
 
-    console.log(`Arena diagonal: ${(diagonal * 111000).toFixed(0)}m | radar: ${(radarRange * 111000).toFixed(0)}m | run: ${(runSpeed * 111000).toFixed(1)}m/step`);
+    console.log(
+        `Arena diagonal: ${(diagonal * 111000).toFixed(0)}m | ` +
+        `radar: ${(radarRange * 111000).toFixed(0)}m | ` +
+        `scan: ${(scanSpeed * 111000 * 3.6).toFixed(1)}km/h | ` +
+        `run: ${(runSpeed * 111000 * 3.6).toFixed(1)}km/h`
+    );
 
-    // נקודות הפתיחה של הבוטים שכבר הוצבו - לפיזור ביניהם
     const spawnedBotPositions = [];
+    let spawnReady = false; // דגל: מחכים שכל הגנבים יקבלו GPS לפני Spawn
 
     botInterval = setInterval(() => {
         if (window.isGameFrozen === true) return;
@@ -76,19 +109,32 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                 p => p.role === 'thief' && !p.isOffline && p.lat
             );
 
+            // ============================================================
+            // תיקון Spawn: מחכים שכל הגנבים קיבלו GPS לפני שמציבים בוטים
+            // ============================================================
+            const allThieves = Object.values(players).filter(
+                p => p.role === 'thief' && !p.isOffline
+            );
+            if (!spawnReady) {
+                const allHaveGPS = allThieves.length > 0 &&
+                    allThieves.every(p => p.lat && p.lat !== 0);
+                if (!allHaveGPS) return; // מחכים לעוד סיבוב
+                spawnReady = true;
+                console.log('All thieves have GPS – spawning bots now');
+            }
+
             if (activeThieves.length === 0) return;
 
             const updates = {};
             const botIds = Object.keys(players).filter(id => id.startsWith('bot_cop_'));
 
-            botIds.forEach((botId, index) => {
+            botIds.forEach((botId) => {
                 let bot = players[botId];
 
-                // אתחול בוט - פריסה על גבול הזירה, מפוזר
+                // אתחול בוט - פריסה על גבול הזירה רחוק מגנבים ומבוטים
                 if (!bot.lat || bot.lat === 0) {
                     const spawnPt = getBorderSpawnPoint(
-                        activeThieves, spawnedBotPositions,
-                        arenaData.points
+                        activeThieves, spawnedBotPositions, arenaData.points
                     );
                     bot.lat = spawnPt.lat;
                     bot.lng = spawnPt.lng;
@@ -97,7 +143,9 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     botStates[botId] = {
                         mode: 'wander',
                         target: getValidPointInPolygon(arenaData.points, minLat, maxLat, minLng, maxLng),
-                        detectedAt: null
+                        detectedAt: null,
+                        lastSeenThief: null,
+                        lastSeenAt: null
                     };
                 }
 
@@ -105,15 +153,17 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     botStates[botId] = {
                         mode: 'wander',
                         target: getValidPointInPolygon(arenaData.points, minLat, maxLat, minLng, maxLng),
-                        detectedAt: null
+                        detectedAt: null,
+                        lastSeenThief: null,
+                        lastSeenAt: null
                     };
                 }
 
                 // ============================================================
-                // רדאר: הבוט עיוור לחלוטין - מזהה גנב רק כשנכנס לטווח שלו
+                // רדאר: הבוט עיוור - מזהה גנב רק בטווח הרדאר שלו
                 // ============================================================
                 let detectedThief = null;
-                let detectedDist = Infinity;
+                let detectedDist  = Infinity;
 
                 activeThieves.forEach(thief => {
                     const latDiff = thief.lat - bot.lat;
@@ -121,54 +171,81 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     const dist = Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
 
                     if (dist <= radarRange && dist < detectedDist) {
-                        detectedDist = dist;
+                        detectedDist  = dist;
                         detectedThief = thief;
                     }
                 });
+
+                // ============================================================
+                // זיכרון קצר: אם הגנב יצא מהרדאר, הבוט זוכר את המיקום האחרון
+                // שלו למשך memoryTime מילישניות לפני שחוזר לשיטוט
+                // ============================================================
+                const state = botStates[botId];
+                const now   = Date.now();
+
+                if (detectedThief) {
+                    // גנב ברדאר - מעדכן זיכרון
+                    state.lastSeenThief = { lat: detectedThief.lat, lng: detectedThief.lng };
+                    state.lastSeenAt    = now;
+                } else if (state.lastSeenThief && state.lastSeenAt) {
+                    // גנב מחוץ לרדאר - בודק אם הזיכרון עדיין תקף
+                    const timeSinceSeen = now - state.lastSeenAt;
+                    if (timeSinceSeen <= memoryTime) {
+                        // הזיכרון תקף - ממשיך לרוץ למיקום האחרון שנראה
+                        detectedThief = state.lastSeenThief;
+                        detectedDist  = Infinity; // לא תופס, רק רץ לכיוון
+                    } else {
+                        // הזיכרון פג - חוזר לשיטוט
+                        state.lastSeenThief = null;
+                        state.lastSeenAt    = null;
+                    }
+                }
 
                 // לוגיקת תנועה
                 let targetLat, targetLng, currentSpeed;
 
                 if (detectedThief) {
-                    // גנב זוהה בטווח הרדאר - עיכוב תגובה ואז מרדף
-                    if (botStates[botId].mode !== 'chase') {
-                        if (!botStates[botId].detectedAt) {
-                            botStates[botId].detectedAt = Date.now();
+                    // גנב זוהה (ישיר או בזיכרון) - עיכוב תגובה ואז מרדף
+                    if (state.mode !== 'chase') {
+                        if (!state.detectedAt) {
+                            state.detectedAt = now;
                         }
-                        const elapsed = Date.now() - botStates[botId].detectedAt;
+                        const elapsed = now - state.detectedAt;
                         if (elapsed >= reactionTime) {
-                            botStates[botId].mode = 'chase';
-                            botStates[botId].detectedAt = null;
+                            state.mode      = 'chase';
+                            state.detectedAt = null;
                         }
                     }
 
-                    if (botStates[botId].mode === 'chase') {
-                        targetLat = detectedThief.lat;
-                        targetLng = detectedThief.lng;
+                    if (state.mode === 'chase') {
+                        targetLat    = detectedThief.lat;
+                        targetLng    = detectedThief.lng;
                         currentSpeed = runSpeed;
 
+                        // תפיסה רק אם זה גנב אמיתי (לא זיכרון) ובטווח
                         if (detectedDist <= catchRange) {
                             triggerBotCapture(roomId, botId, bot, 0);
                         }
                     } else {
                         // עדיין בעיכוב תגובה - ממשיך לשוטט
                         currentSpeed = scanSpeed;
-                        targetLat = botStates[botId].target.lat;
-                        targetLng = botStates[botId].target.lng;
+                        targetLat    = state.target.lat;
+                        targetLng    = state.target.lng;
                     }
                 } else {
-                    // אין גנב בטווח - שיטוט רנדומלי לחלוטין
-                    botStates[botId].mode = 'wander';
-                    botStates[botId].detectedAt = null;
-                    currentSpeed = scanSpeed;
-                    targetLat = botStates[botId].target.lat;
-                    targetLng = botStates[botId].target.lng;
+                    // אין גנב ואין זיכרון - שיטוט רנדומלי לחלוטין
+                    state.mode       = 'wander';
+                    state.detectedAt = null;
+                    currentSpeed     = scanSpeed;
+                    targetLat        = state.target.lat;
+                    targetLng        = state.target.lng;
 
                     const distToTarget = Math.sqrt(
-                        Math.pow(targetLat - bot.lat, 2) + Math.pow(targetLng - bot.lng, 2)
+                        Math.pow(targetLat - bot.lat, 2) +
+                        Math.pow(targetLng - bot.lng, 2)
                     );
                     if (distToTarget < diagonal * 0.005) {
-                        botStates[botId].target = getValidPointInPolygon(
+                        state.target = getValidPointInPolygon(
                             arenaData.points, minLat, maxLat, minLng, maxLng
                         );
                     }
@@ -177,7 +254,7 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                 // ביצוע התנועה
                 const moveLatDiff = targetLat - bot.lat;
                 const moveLngDiff = targetLng - bot.lng;
-                const moveDist = Math.sqrt(moveLatDiff * moveLatDiff + moveLngDiff * moveLngDiff);
+                const moveDist    = Math.sqrt(moveLatDiff * moveLatDiff + moveLngDiff * moveLngDiff);
 
                 if (moveDist > 0) {
                     bot.lat += (moveLatDiff / moveDist) * currentSpeed;
@@ -186,7 +263,7 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
 
                 updates[`game/${roomId}/players/${botId}/lat`] = bot.lat;
                 updates[`game/${roomId}/players/${botId}/lng`] = bot.lng;
-                updates[`game/${roomId}/players/${botId}/t`] = Date.now();
+                updates[`game/${roomId}/players/${botId}/t`]   = Date.now();
             });
 
             if (Object.keys(updates).length > 0) {
@@ -198,17 +275,14 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
 
 // ============================================================
 // פריסה על גבול הזירה בלבד
-// עוברת על כל נקודות הגבול ובוחרת את זו שהיא:
-// 1. הרחוקה ביותר מהגנבים
-// 2. הרחוקה ביותר מבוטים שכבר הוצבו
+// בוחרת נקודת גבול הרחוקה ביותר מגנבים ומבוטים קיימים
 // ============================================================
 function getBorderSpawnPoint(activeThieves, existingBotPositions, arenaPoints) {
     let bestPoint = null;
     let bestScore = -1;
 
-    // בניית רשימת נקודות לאורך כל צלעות הגבול (לא רק קודקודים)
     const borderPoints = [];
-    const INTERPOLATION_STEPS = 10; // כמה נקודות בין כל שני קודקודים
+    const INTERPOLATION_STEPS = 10;
 
     for (let i = 0; i < arenaPoints.length; i++) {
         const p1 = arenaPoints[i];
@@ -224,7 +298,6 @@ function getBorderSpawnPoint(activeThieves, existingBotPositions, arenaPoints) {
     }
 
     borderPoints.forEach(pt => {
-        // מרחק מינימלי מכל הגנבים
         let minDistFromThieves = Infinity;
         activeThieves.forEach(thief => {
             const d = Math.sqrt(
@@ -234,7 +307,6 @@ function getBorderSpawnPoint(activeThieves, existingBotPositions, arenaPoints) {
             if (d < minDistFromThieves) minDistFromThieves = d;
         });
 
-        // מרחק מינימלי מבוטים שכבר הוצבו
         let minDistFromBots = Infinity;
         existingBotPositions.forEach(bPos => {
             const d = Math.sqrt(
@@ -244,10 +316,8 @@ function getBorderSpawnPoint(activeThieves, existingBotPositions, arenaPoints) {
             if (d < minDistFromBots) minDistFromBots = d;
         });
 
-        // ציון: 50% ריחוק מגנבים + 50% ריחוק מבוטים
-        // אם אין בוטים עדיין - 100% ריחוק מגנבים
         const hasBots = existingBotPositions.length > 0;
-        const score = hasBots
+        const score   = hasBots
             ? (minDistFromThieves * 0.5) + (minDistFromBots * 0.5)
             : minDistFromThieves;
 
@@ -262,7 +332,6 @@ function getBorderSpawnPoint(activeThieves, existingBotPositions, arenaPoints) {
         return bestPoint;
     }
 
-    // Fallback - קודקוד ראשון של הזירה
     return { lat: arenaPoints[0][0], lng: arenaPoints[0][1] };
 }
 
@@ -277,10 +346,10 @@ function getValidPointInPolygon(arenaPoints, minLat, maxLat, minLng, maxLng) {
         while (attempts < 100) {
             const lat = minLat + Math.random() * (maxLat - minLat);
             const lng = minLng + Math.random() * (maxLng - minLng);
-            const pt = turf.point([lng, lat]);
+            const pt  = turf.point([lng, lat]);
 
             if (turf.booleanPointInPolygon(pt, polygon)) {
-                return { lat: lat, lng: lng };
+                return { lat, lng };
             }
             attempts++;
         }
@@ -298,9 +367,9 @@ function triggerBotCapture(roomId, botId, botData, reactionTime) {
     setTimeout(() => {
         window.db.ref(`game/${roomId}/captureSignal`).set({
             sender: botId,
-            t: Date.now(),
-            lat: botData.lat,
-            lng: botData.lng
+            t:      Date.now(),
+            lat:    botData.lat,
+            lng:    botData.lng
         });
         console.log(`Bot ${botId} fired Taser!`);
     }, reactionTime);
@@ -311,7 +380,7 @@ function stopSinglePlayerAI() {
         clearInterval(botInterval);
         botInterval = null;
     }
-    botsActive = false;
-    botStates = {};
+    botsActive   = false;
+    botStates    = {};
     botCooldowns = {};
 }
