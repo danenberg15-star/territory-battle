@@ -300,12 +300,8 @@ function listenToOtherPlayers() {
         const roomPlayers = snapRooms.val() || {};
         
         const humans = Object.keys(roomPlayers).filter(id => !id.startsWith('bot_'));
-        const chatUI = document.getElementById('chat-container');
         const micUI = document.getElementById('chat-mic-btn');
-        if (humans.length <= 1) {
-            if (chatUI) chatUI.style.display = 'none';
-            if (micUI) micUI.style.display = 'none';
-        }
+        if (micUI) micUI.style.display = 'flex';
 
         window.db.ref(`game/${window.currentRoom}/players`).on('value', snapGame => {
             const gamePlayers = snapGame.val() || {};

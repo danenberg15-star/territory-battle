@@ -79,7 +79,6 @@
     </style>
 </head>
 <body>
-    <!-- תיקון: הוספת display:none כדי שה-overlay לא יחסום קליקים בטעינה -->
     <div id="security-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:7000; background:rgba(15,23,42,0.85); backdrop-filter:blur(20px); display:none; pointer-events:none;">
         <div style="font-size: 2rem; font-weight: bold; transform: rotate(-30deg); opacity: 0.2; text-align: center; color: white; width: 100%; height: 100%; display: flex; align-items: center; justify-content: center;">Territory Battle</div>
     </div>
@@ -134,16 +133,21 @@
     </div>
 
     <div id="chat-container">
-        <div id="chat-messages"></div>
-        <button id="chat-mic-btn" title="מיקרופון">
-            <svg viewBox="0 0 24 24">
-                <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-            </svg>
-        </button>
+        <div id="chat-header">
+            <span id="chat-title">📡 צ'אט</span>
+            <button id="chat-toggle-btn" title="הסתר/הצג">▲</button>
+        </div>
+        <div id="chat-body">
+            <div id="chat-messages"></div>
+            <button id="chat-mic-btn" title="מיקרופון">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                </svg>
+            </button>
+        </div>
     </div>
 
-    <!-- תיקון: display:flex במקום display:none כדי שהתוכן יתמרכז נכון כשמוצג -->
     <div id="briefing-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:3500; background:rgba(15,23,42,0.85); display:none; flex-direction:column; align-items:center; justify-content:center;">
         <div id="briefing-timer-text" style="font-size:60px; color:#facc15; font-weight:bold;">00:30</div>
         <div id="briefing-status" style="margin-top:20px; font-size:16px; text-align:center; padding: 0 20px;">ממתין...</div>

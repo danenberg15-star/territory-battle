@@ -1,16 +1,34 @@
-// chat.js - Phase 5.2: Voice-Only Team Chat (Walkie-Talkie) - Optimized Layout[cite: 7, 11]
+// chat.js - Phase 5.2: Voice-Only Team Chat (Walkie-Talkie) - Optimized Layout
 
 let recognition = null;
+let chatVisible = true;
 
 document.addEventListener('DOMContentLoaded', () => {
     const micBtn = document.getElementById('chat-mic-btn');
+    const toggleBtn = document.getElementById('chat-toggle-btn');
 
-    // מאזין רק לכפתור מכשיר הקשר (הכתבה קולית)
     if (micBtn) {
         initSpeechRecognition();
         micBtn.addEventListener('click', toggleSpeechRecognition);
     }
+
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', toggleChatBody);
+    }
 });
+
+/**
+ * הסתרה/הצגה של גוף הצ'אט (הודעות + מיקרופון)
+ */
+function toggleChatBody() {
+    const body = document.getElementById('chat-body');
+    const toggleBtn = document.getElementById('chat-toggle-btn');
+    if (!body || !toggleBtn) return;
+
+    chatVisible = !chatVisible;
+    body.style.display = chatVisible ? 'flex' : 'none';
+    toggleBtn.textContent = chatVisible ? '▲' : '▼';
+}
 
 /**
  * אתחול מנגנון זיהוי הדיבור של הדפדפן
@@ -26,8 +44,6 @@ function initSpeechRecognition() {
     }
 
     recognition = new SpeechRecognition();
-    
-    // הגדרת שפה דינמית לפי הגדרות המשחק (עברית או אנגלית)
     recognition.lang = window.currentLang === 'he' ? 'he-IL' : 'en-US';
     recognition.interimResults = false;
     recognition.continuous = false;
@@ -40,19 +56,19 @@ function initSpeechRecognition() {
     recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
         if (transcript && transcript.trim() !== "") {
-            // שליחה ישירה לשרת ללא צורך בשורת קלט[cite: 5]
-            sendMessage(transcript.trim()); 
+            sendMessage(transcript.trim());
         }
     };
 
-    recognition.onerror = () => stopMicUI();
+    recognition.onerror = (e) => {
+        console.warn("Speech recognition error:", e.error);
+        stopMicUI();
+    };
     recognition.onend = () => stopMicUI();
 }
 
 function toggleSpeechRecognition() {
     if (!recognition) return;
-    
-    // עדכון שפה לפני כל הפעלה למקרה שהמשתמש שינה שפה באמצע המשחק
     recognition.lang = window.currentLang === 'he' ? 'he-IL' : 'en-US';
     
     try {
@@ -74,10 +90,8 @@ function initChat(roomId) {
     const messagesDiv = document.getElementById('chat-messages');
     if (!messagesDiv || !window.db || !window.playerRole) return;
 
-    // ניקוי הודעות ישנות מתצוגה מקומית (אם קיימות)
     messagesDiv.innerHTML = "";
 
-    // האזנה רק לערוץ של התפקיד הנוכחי (chat_cop או chat_thief)[cite: 5]
     const teamChatPath = `game/${roomId}/chat_${window.playerRole}`;
     
     window.db.ref(teamChatPath).limitToLast(20).on('child_added', (snapshot) => {
@@ -88,7 +102,6 @@ function initChat(roomId) {
 
 /**
  * שליחת הודעה לשרת לערוץ הקבוצתי
- * @param {string} text - הטקסט שזוהה על ידי המיקרופון
  */
 function sendMessage(text) {
     if (!text || !window.currentRoom || !window.db || !window.playerRole) return;
@@ -101,7 +114,6 @@ function sendMessage(text) {
         t: firebase.database.ServerValue.TIMESTAMP
     };
 
-    // שליחה רק לערוץ של התפקיד הנוכחי (chat_cop או chat_thief)[cite: 5]
     const teamChatPath = `game/${window.currentRoom}/chat_${window.playerRole}`;
 
     window.db.ref(teamChatPath).push(newMessage)
@@ -109,7 +121,7 @@ function sendMessage(text) {
 }
 
 /**
- * הצגת ההודעה בממשק המשתמש (עיצוב מינימליסטי)
+ * הצגת ההודעה בממשק המשתמש
  */
 function renderChatMessage(data) {
     const messagesDiv = document.getElementById('chat-messages');
@@ -118,27 +130,22 @@ function renderChatMessage(data) {
     const msgEl = document.createElement('div');
     msgEl.className = 'msg';
 
-    // הצגת שם השולח בכל הודעה[cite: 5]
     const senderHtml = `<span class="msg-sender">${data.senderName}:</span>`;
     
-    msgEl.innerHTML = `
-        ${senderHtml} <span class="msg-text">${data.text}</span>
-    `;
+    msgEl.innerHTML = `${senderHtml} <span class="msg-text">${data.text}</span>`;
 
     messagesDiv.appendChild(msgEl);
-    
-    // גלילה אוטומטית להודעה הכי חדשה
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
 /**
- * שליטה על נראות הצ'אט במסך המשחק
+ * שליטה על נראות הצ'אט במסך המשחק - תמיד מוצג
  */
 function toggleChatVisibility(show) {
     const chatContainer = document.getElementById('chat-container');
     if (chatContainer) {
-        chatContainer.style.display = show ? 'flex' : 'none';
-        if (show && window.currentRoom) {
+        chatContainer.style.display = 'flex';
+        if (window.currentRoom) {
             initChat(window.currentRoom);
         }
     }
