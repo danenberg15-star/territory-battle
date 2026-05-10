@@ -49,7 +49,7 @@
         .btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; max-width: 350px; width: 100%; margin: 15px 0 0 0; }
         
         /* Game Overlays */
-        #floating-stats { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: none; flex-direction: row; justify-content: center; gap: 15px; z-index: 4000; background: rgba(15, 23, 42, 0.6); backdrop-filter: blur(8px); padding: 8px 20px; border-radius: 20px; border: 1px solid rgba(56, 189, 248, 0.3); font-size: 12px; font-weight: bold; }
+        #floating-stats { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: none; flex-direction: row; justify-content: center; gap: 12px; z-index: 4000; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(10px); padding: 11px 24px; border-radius: 24px; border: 1px solid rgba(56, 189, 248, 0.4); font-size: 14px; font-weight: bold; white-space: nowrap; }
         .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 4100; background: rgba(220, 38, 38, 0.8); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; font-weight: bold; display: none; align-items: center; justify-content: center; }
         
         /* Radar */
@@ -122,6 +122,8 @@
         <div class="stat-item"><span id="audio-status">אודיו ⏳</span></div>
         <div class="stat-item">|</div>
         <div class="stat-item"><span id="players-count">שחקנים: 0</span></div>
+        <div class="stat-item">|</div>
+        <div class="stat-item">שטח: <span id="capture-progress-text" style="color:#ef4444; font-weight:bold;">0%</span></div>
     </div>
     
     <div id="radar-overlay"></div>

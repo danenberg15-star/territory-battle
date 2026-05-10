@@ -24,19 +24,18 @@ window.arenaPolygonLayer = null;
 // משתנה גלובלי לשמירת ה-WakeLock הפעיל
 window.wakeLockSentinel = null;
 
-// משתנה חדש: שומר את זמן העדכון האחרון לשרת
+// שכבות שובלי גנבים אחרים (מפת id -> polyline)
+window.otherTrailLayers = {};
+
 let lastFirebaseUpdate = 0;
 
 // ==========================================
-// 1.5. Browser Wake-Up & GPS Unfreeze Mechanism (v2.2 logic)
+// 1.5. Browser Wake-Up & GPS Unfreeze Mechanism
 // ==========================================
 document.addEventListener("visibilitychange", () => {
     if (document.visibilityState === 'visible' && window.currentRoom) {
         console.log("App returned to foreground. Restarting GPS...");
         startRealGpsTracking();
-
-        // הדפדפן משחרר WakeLock אוטומטית כשהמסך נכבה או האפליקציה ממוזערת.
-        // לכן בכל חזרה לפוקוס — מבקשים אותו מחדש.
         reacquireWakeLock();
     }
 });
@@ -46,15 +45,11 @@ document.addEventListener("visibilitychange", () => {
 // ==========================================
 async function reacquireWakeLock() {
     if (!('wakeLock' in navigator)) return;
-
-    // אם כבר יש WakeLock פעיל ותקין — לא צריך לבקש שוב
     if (window.wakeLockSentinel && !window.wakeLockSentinel.released) return;
 
     try {
         window.wakeLockSentinel = await navigator.wakeLock.request('screen');
         console.log("WakeLock reacquired.");
-
-        // אם ה-WakeLock משתחרר שוב בעתיד — ננסה לחדש אוטומטית (רק אם האפליקציה בפוקוס)
         window.wakeLockSentinel.addEventListener('release', () => {
             console.log("WakeLock released by system.");
         });
@@ -96,7 +91,6 @@ function enterGameScene() {
 
     L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { maxZoom: 20 }).addTo(window.map);
 
-    // בקשת WakeLock בכניסה למשחק
     reacquireWakeLock();
 
     window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
@@ -115,9 +109,59 @@ function enterGameScene() {
     // האזנה להודעת יציאה מטריטוריה — לכל השחקנים
     if (typeof window.listenToOutOfBoundsAlert === 'function') window.listenToOutOfBoundsAlert();
 
+    // האזנה ל-Toast כיבוש שטח — לכל השחקנים (לא רק גנבים)
+    if (typeof window.listenToCaptureToast === 'function') window.listenToCaptureToast();
+
+    // האזנה לשובלי גנבים אחרים
+    listenToOtherTrails();
+
     setInterval(() => {
         if (typeof checkOfflinePlayers === 'function') checkOfflinePlayers();
     }, 10000); 
+}
+
+// ==========================================
+// 2.5. ציור שובלי גנבים אחרים מ-Firebase
+// ==========================================
+function listenToOtherTrails() {
+    if (!window.currentRoom || !window.db) return;
+
+    window.db.ref(`game/${window.currentRoom}/trails`).on('value', snap => {
+        const allTrails = snap.val() || {};
+
+        // עדכון / יצירה של polyline לכל גנב אחר
+        Object.keys(allTrails).forEach(id => {
+            if (id === window.playerId) return; // את השובל שלי אני מצייר בעצמי
+
+            const trailData = allTrails[id];
+            if (!trailData || !trailData.path || trailData.path.length < 2) return;
+
+            // אם השובל ישן מ-5 דקות — מתעלמים
+            if (Date.now() - trailData.t > 300000) return;
+
+            if (window.otherTrailLayers[id]) {
+                // עדכון שובל קיים
+                window.otherTrailLayers[id].setLatLngs(trailData.path);
+            } else {
+                // יצירת שובל חדש לגנב זה
+                window.otherTrailLayers[id] = L.polyline(trailData.path, {
+                    color: '#f97316', // כתום — להבדיל מהשובל שלי (אדום)
+                    weight: 5,
+                    dashArray: '5, 10',
+                    opacity: 0.8,
+                    pane: 'markerPane'
+                }).addTo(window.map);
+            }
+        });
+
+        // הסרת שובלי שחקנים שכבר לא קיימים
+        Object.keys(window.otherTrailLayers).forEach(id => {
+            if (!allTrails[id]) {
+                window.map.removeLayer(window.otherTrailLayers[id]);
+                delete window.otherTrailLayers[id];
+            }
+        });
+    });
 }
 
 // ==========================================
@@ -192,7 +236,6 @@ function updateRealPosition() {
     if (window.currentRoom && window.playerId) {
         
         const now = Date.now();
-        // הגבלת כתיבה לשרת: פעם בחצי שנייה לכל היותר
         if (now - lastFirebaseUpdate >= 500) {
             window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({ 
                 lat: window.myLat, 
@@ -208,7 +251,6 @@ function updateRealPosition() {
             const inStation = dist <= window.arenaData.policeStation.radius;
             window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/inStation`).set(inStation);
 
-            // בדיקת גבולות טריטוריה לשוטרים — טיימר 20 שניות
             if (window.isBriefingComplete && typeof window.checkArenaBoundariesForCop === 'function') {
                 window.checkArenaBoundariesForCop(window.myLat, window.myLng);
             }

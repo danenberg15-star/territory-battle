@@ -131,19 +131,16 @@ function isPointInArena(lat, lng, arenaPoints) {
 // 3. Render Captured Areas & Update Progress
 // ==========================================
 window.renderAreas = function(mapInstance, areasData, currentLayers) {
-    // תיקון: מוחקים רק את שכבות השטחים הכבושים — לא את השובל
     if (currentLayers && currentLayers.length > 0) {
         currentLayers.forEach(layer => mapInstance.removeLayer(layer));
     }
     
     let newLayers = [];
     let totalCapturedSqMeters = 0;
-    let currentAreaCount = areasData ? Object.keys(areasData).length : 0;
 
     if (areasData) {
         Object.values(areasData).forEach(area => {
             if (area.points && area.points.length >= 3) {
-                // תיקון: z-index נמוך כדי שהשובל יהיה מעל השטח הכבוש
                 const poly = L.polygon(area.points, { 
                     color: '#ef4444', 
                     fillColor: '#ef4444', 
@@ -167,35 +164,18 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
         });
     }
 
-    // תיקון: מוודאים שהשובל מצויר מעל השטח הכבוש
+    // שובל תמיד מעל השטח הכבוש
     if (window.trailLayer) {
         window.trailLayer.bringToFront();
     }
 
-    // עדכון אחוז השטח הכבוש בתפריט הצף
+    // עדכון אחוז השטח — האלמנט תמיד קיים ב-HTML
     let safePercentage = 0;
     if (window.arenaData && window.arenaData.totalArea) {
         const percentage = (totalCapturedSqMeters / window.arenaData.totalArea) * 100;
         safePercentage = Math.min(100, Math.max(0, percentage)).toFixed(1);
 
-        // תיקון: מוודאים שאלמנט האחוזים קיים ב-DOM לפני שכותבים
-        let progressEl = document.getElementById('capture-progress-text');
-        if (!progressEl) {
-            const statsContainer = document.getElementById('floating-stats');
-            if (statsContainer) {
-                const sep = document.createElement('div');
-                sep.className = 'stat-item';
-                sep.innerText = '|';
-                statsContainer.appendChild(sep);
-
-                const stat = document.createElement('div');
-                stat.className = 'stat-item';
-                stat.innerHTML = `שטח: <span id="capture-progress-text" style="color:#ef4444; font-weight:bold;">0%</span>`;
-                statsContainer.appendChild(stat);
-                progressEl = document.getElementById('capture-progress-text');
-            }
-        }
-        
+        const progressEl = document.getElementById('capture-progress-text');
         if (progressEl) {
             progressEl.innerText = `${safePercentage}%`;
         }
@@ -210,45 +190,38 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
         }
     }
 
-    // תיקון: Toast דרך Firebase כדי שכל השחקנים יראו — לא רק מי שכבש
-    if (typeof window.lastCapturedAreaCount === 'undefined') {
-        window.lastCapturedAreaCount = currentAreaCount;
-        window.lastDisplayedPercentage = 0;
-    } else if (currentAreaCount > window.lastCapturedAreaCount) {
-        const currentFloat = parseFloat(safePercentage);
-        if (currentFloat >= 1.0 && currentFloat > window.lastDisplayedPercentage) {
-            // כתיבה ל-Firebase כדי שכולם יקבלו את ההתראה
-            if (window.isHost && window.currentRoom) {
-                window.db.ref(`game/${window.currentRoom}/captureToast`).set({
-                    percentage: safePercentage,
-                    t: Date.now()
-                });
-            }
-            window.lastDisplayedPercentage = currentFloat;
-        }
-        window.lastCapturedAreaCount = currentAreaCount;
-    }
-
     return newLayers;
 };
 
 // ==========================================
-// 4. האזנה ל-Toast מ-Firebase (כל השחקנים)
+// 4. כתיבת Toast כיבוש ל-Firebase (כל גנב שכובש)
+// ==========================================
+window.broadcastCaptureToast = function(percentage) {
+    if (!window.currentRoom || !window.db) return;
+    window.db.ref(`game/${window.currentRoom}/captureToast`).set({
+        percentage: percentage,
+        t: Date.now()
+    });
+};
+
+// ==========================================
+// 5. האזנה ל-Toast מ-Firebase (כל השחקנים)
 // ==========================================
 window.listenToCaptureToast = function() {
     if (!window.currentRoom || !window.db) return;
+    if (window._captureToastListenerAttached) return;
+    window._captureToastListenerAttached = true;
 
     window.db.ref(`game/${window.currentRoom}/captureToast`).on('value', snap => {
         const data = snap.val();
         if (!data) return;
-        // מציגים רק אם ההודעה עדכנית (עד 6 שניות)
         if (Date.now() - data.t > 6000) return;
         window.displayCaptureToast(data.percentage);
     });
 };
 
 // ==========================================
-// 5. Toast Notification UI
+// 6. Toast Notification UI
 // ==========================================
 window.displayCaptureToast = function(percentage) {
     let oldToast = document.getElementById('capture-toast');

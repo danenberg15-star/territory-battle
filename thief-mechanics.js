@@ -13,7 +13,6 @@ window.startThiefMechanics = function() {
         window.map.removeLayer(window.trailLayer);
     }
     if (window.map) {
-        // השובל מצויר על pane גבוה יותר כדי שיהיה מעל השטחים הכבושים
         window.trailLayer = L.polyline([], {
             color: '#dc2626',
             weight: 6,
@@ -26,7 +25,6 @@ window.startThiefMechanics = function() {
 
     // האזנה לשטחים כבושים (להשלמת פאות)
     if (window.currentRoom) {
-        // הוסר ה-off('value') שדרס את מאזין הציור! הוספת בקרת כפילויות במקום.
         if (!window.localCapturedAreasListenerAttached) {
             window.db.ref(`game/${window.currentRoom}/capturedAreas`).on('value', snap => {
                 localCapturedAreas = snap.val() || {};
@@ -35,11 +33,47 @@ window.startThiefMechanics = function() {
         }
     }
 
-    // תיקון: הפעלת האזנה ל-Toast כדי שכל השחקנים יראו הודעת כיבוש
-    if (typeof window.listenToCaptureToast === 'function') {
-        window.listenToCaptureToast();
-    }
+    // שחזור שובל שנשמר ב-Firebase (אחרי reconnect)
+    restoreTrailFromFirebase();
 };
+
+// ==========================================
+// 1.5 שחזור שובל מ-Firebase
+// ==========================================
+function restoreTrailFromFirebase() {
+    if (!window.currentRoom || !window.playerId || !window.db) return;
+
+    window.db.ref(`game/${window.currentRoom}/trails/${window.playerId}`).once('value', snap => {
+        const savedTrail = snap.val();
+        if (!savedTrail || !savedTrail.path || savedTrail.path.length < 2) return;
+
+        // משחזרים רק אם השובל הנוכחי ריק
+        if (window.thiefPath && window.thiefPath.length > 0) return;
+
+        window.thiefPath = savedTrail.path;
+        if (window.trailLayer) {
+            window.trailLayer.setLatLngs(window.thiefPath);
+        }
+        console.log(`Trail restored: ${window.thiefPath.length} points`);
+    });
+}
+
+// ==========================================
+// 1.6 שמירת שובל ל-Firebase (תקופתית)
+// ==========================================
+let lastTrailSave = 0;
+
+function saveTrailToFirebase() {
+    if (!window.currentRoom || !window.playerId || !window.db) return;
+    const now = Date.now();
+    if (now - lastTrailSave < 3000) return; // שמירה כל 3 שניות לכל היותר
+    lastTrailSave = now;
+
+    window.db.ref(`game/${window.currentRoom}/trails/${window.playerId}`).set({
+        path: window.thiefPath || [],
+        t: now
+    });
+}
 
 // ==========================================
 // 2. Core Logic Loop
@@ -54,7 +88,6 @@ function updateThiefLogic(lat, lng) {
     checkArenaBoundaries(lat, lng);
     checkCopProximity(lat, lng);
 
-    // תיקון: בדיקה נכונה של מצב הקפאה
     if (window.isGameFrozen === true) return;
 
     handleThiefTrail(lat, lng);
@@ -82,7 +115,6 @@ function checkArenaBoundaries(lat, lng) {
     }
 }
 
-// בדיקת גבולות עבור שוטרים — נקראת מ-game-play.js
 window.checkArenaBoundariesForCop = function(lat, lng) {
     if (!window.isBriefingComplete || !window.arenaData) return;
     try {
@@ -104,13 +136,12 @@ window.checkArenaBoundariesForCop = function(lat, lng) {
 };
 
 // ==========================================
-// Territory Overlay (ייעודי — לא briefing-overlay)
+// Territory Overlay
 // ==========================================
 function getTerritoryOverlay() {
     let overlay = document.getElementById('territory-exit-overlay');
     if (overlay) return overlay;
 
-    // יצירת overlay ייעודי
     overlay = document.createElement('div');
     overlay.id = 'territory-exit-overlay';
     overlay.style.cssText = `
@@ -139,7 +170,6 @@ function getTerritoryOverlay() {
         animation: territory-pulse-border 1s ease-in-out infinite alternate;
     `;
 
-    // CSS animations
     if (!document.getElementById('territory-exit-styles')) {
         const style = document.createElement('style');
         style.id = 'territory-exit-styles';
@@ -221,13 +251,9 @@ function stopOutOfBoundsTimer() {
     if (overlay) overlay.style.display = 'none';
 }
 
-// ==========================================
-// פעולה בסיום הטיימר — יציאה מהמשחק + הודעה לכולם
-// ==========================================
 function handleTerritoryExit() {
     showOutOfBoundsToast();
 
-    // שליחת הודעה לכל השחקנים דרך Firebase
     if (window.currentRoom && window.playerId) {
         const playerName = window.playerName || 'שחקן';
         const role = window.playerRole || 'thief';
@@ -242,12 +268,10 @@ function handleTerritoryExit() {
             t: Date.now()
         };
 
-        // כתיבה לשני ערוצי הצ'אט (שוטרים + גנבים) כדי שכולם יראו
         const updates = {};
         updates[`game/${window.currentRoom}/chat_cop/oob_${window.playerId}_${Date.now()}`] = exitMsg;
         updates[`game/${window.currentRoom}/chat_thief/oob_${window.playerId}_${Date.now() + 1}`] = exitMsg;
 
-        // שידור toast ייעודי לכל המכשירים
         updates[`game/${window.currentRoom}/outOfBoundsAlert`] = {
             playerName: playerName,
             role: role,
@@ -266,7 +290,6 @@ function handleTerritoryExit() {
     }
 }
 
-// Toast לשחקן עצמו
 function showOutOfBoundsToast() {
     let old = document.getElementById('oob-toast');
     if (old) old.remove();
@@ -295,14 +318,13 @@ function showOutOfBoundsToast() {
     document.body.appendChild(toast);
 }
 
-// Toast לשאר השחקנים (מאזין ל-Firebase)
 window.listenToOutOfBoundsAlert = function() {
     if (!window.currentRoom) return;
     window.db.ref(`game/${window.currentRoom}/outOfBoundsAlert`).on('value', snap => {
         const data = snap.val();
         if (!data) return;
         if (Date.now() - data.t > 8000) return;
-        if (data.playerName === (window.playerName || '')) return; // לא מציגים לעצמי
+        if (data.playerName === (window.playerName || '')) return;
 
         let old = document.getElementById('oob-broadcast-toast');
         if (old) old.remove();
@@ -336,7 +358,6 @@ window.listenToOutOfBoundsAlert = function() {
     });
 };
 
-// תיקון: toast במקום alert — לא חוסם GPS או Firebase
 function showCopInsideToast() {
     let old = document.getElementById('cop-inside-toast');
     if (old) old.remove();
@@ -389,7 +410,7 @@ function checkCopProximity(lat, lng) {
 }
 
 // ==========================================
-// 4. Trail & Polygon Detection (The "P" & Territory Rules)
+// 4. Trail & Polygon Detection
 // ==========================================
 function isPointInAnyCapturedArea(checkLat, checkLng) {
     if (!localCapturedAreas) return false;
@@ -433,7 +454,7 @@ function handleThiefTrail(lat, lng) {
         }
     }
 
-    // חוק השלמת הפאות — שימוש בטריטוריות קיימות לסגירת שטחים
+    // חוק השלמת הפאות
     if (!captured && localCapturedAreas && window.thiefPath.length > 5) {
         if (isPointInAnyCapturedArea(lat, lng)) {
             for (let i = 0; i < window.thiefPath.length - 5; i++) {
@@ -454,6 +475,8 @@ function handleThiefTrail(lat, lng) {
     if (!captured) {
         window.thiefPath.push([lat, lng]);
         if (window.trailLayer) window.trailLayer.setLatLngs(window.thiefPath);
+        // שמירה תקופתית של השובל ל-Firebase
+        saveTrailToFirebase();
     }
 }
 
@@ -481,7 +504,6 @@ function tryCaptureArea(points, splitIndex) {
         });
 
         if (copInside) {
-            // תיקון: toast במקום alert
             showCopInsideToast();
             if (splitIndex !== undefined) {
                 window.thiefPath = window.thiefPath.slice(0, splitIndex + 1);
@@ -497,6 +519,27 @@ function tryCaptureArea(points, splitIndex) {
             points: points,
             capturedBy: window.playerId,
             t: Date.now()
+        }).then(() => {
+            // חישוב אחוז עדכני ושידור Toast לכולם
+            if (window.arenaData && window.arenaData.totalArea) {
+                window.db.ref(`game/${window.currentRoom}/capturedAreas`).once('value', areasSnap => {
+                    const allAreas = areasSnap.val() || {};
+                    let totalSqM = 0;
+                    Object.values(allAreas).forEach(area => {
+                        if (area.points && area.points.length >= 3) {
+                            try {
+                                const coords = area.points.map(p => [p[1], p[0]]);
+                                coords.push(coords[0]);
+                                totalSqM += turf.area(turf.polygon([coords]));
+                            } catch(e) {}
+                        }
+                    });
+                    const pct = Math.min(100, (totalSqM / window.arenaData.totalArea) * 100).toFixed(1);
+                    if (typeof window.broadcastCaptureToast === 'function') {
+                        window.broadcastCaptureToast(pct);
+                    }
+                });
+            }
         });
 
         window.db.ref(`game/${window.currentRoom}/players/${window.playerId}/flashUntil`).set(Date.now() + 3000);
@@ -505,13 +548,13 @@ function tryCaptureArea(points, splitIndex) {
             checkTreasureInCapturedArea(points);
         }
 
-        // משאירים את ה"רגל" כנקודת עוגן להמשך
+        // ניקוי שובל ב-Firebase אחרי כיבוש
         if (splitIndex !== undefined) {
             window.thiefPath = window.thiefPath.slice(0, splitIndex + 1);
         } else {
             window.thiefPath = [];
         }
-
         if (window.trailLayer) window.trailLayer.setLatLngs(window.thiefPath);
+        saveTrailToFirebase();
     });
 }
