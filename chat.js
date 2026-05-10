@@ -1,24 +1,16 @@
-// chat.js - Phase 5.2: Voice-Only Team Chat (Walkie-Talkie) - Optimized Layout
+// chat.js - Phase 5.2: Team Chat with Native Keyboard Mic
 
-let recognition = null;
 let chatVisible = true;
 
 document.addEventListener('DOMContentLoaded', () => {
-    const micBtn = document.getElementById('chat-mic-btn');
     const toggleBtn = document.getElementById('chat-toggle-btn');
-
-    if (micBtn) {
-        initSpeechRecognition();
-        micBtn.addEventListener('click', toggleSpeechRecognition);
-    }
-
     if (toggleBtn) {
         toggleBtn.addEventListener('click', toggleChatBody);
     }
 });
 
 /**
- * הסתרה/הצגה של גוף הצ'אט (הודעות + מיקרופון)
+ * הסתרה/הצגה של גוף הצ'אט
  */
 function toggleChatBody() {
     const body = document.getElementById('chat-body');
@@ -31,59 +23,6 @@ function toggleChatBody() {
 }
 
 /**
- * אתחול מנגנון זיהוי הדיבור של הדפדפן
- */
-function initSpeechRecognition() {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    
-    if (!SpeechRecognition) {
-        console.warn("Speech recognition not supported in this browser.");
-        const micBtn = document.getElementById('chat-mic-btn');
-        if (micBtn) micBtn.style.display = 'none';
-        return;
-    }
-
-    recognition = new SpeechRecognition();
-    recognition.lang = window.currentLang === 'he' ? 'he-IL' : 'en-US';
-    recognition.interimResults = false;
-    recognition.continuous = false;
-
-    recognition.onstart = () => {
-        const micBtn = document.getElementById('chat-mic-btn');
-        if (micBtn) micBtn.classList.add('recording');
-    };
-
-    recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        if (transcript && transcript.trim() !== "") {
-            sendMessage(transcript.trim());
-        }
-    };
-
-    recognition.onerror = (e) => {
-        console.warn("Speech recognition error:", e.error);
-        stopMicUI();
-    };
-    recognition.onend = () => stopMicUI();
-}
-
-function toggleSpeechRecognition() {
-    if (!recognition) return;
-    recognition.lang = window.currentLang === 'he' ? 'he-IL' : 'en-US';
-    
-    try {
-        recognition.start();
-    } catch (e) {
-        recognition.stop();
-    }
-}
-
-function stopMicUI() {
-    const micBtn = document.getElementById('chat-mic-btn');
-    if (micBtn) micBtn.classList.remove('recording');
-}
-
-/**
  * אתחול האזנה להודעות בערוץ של הקבוצה הנוכחית בלבד
  */
 function initChat(roomId) {
@@ -93,11 +32,47 @@ function initChat(roomId) {
     messagesDiv.innerHTML = "";
 
     const teamChatPath = `game/${roomId}/chat_${window.playerRole}`;
-    
+
     window.db.ref(teamChatPath).limitToLast(20).on('child_added', (snapshot) => {
         const msgData = snapshot.val();
         renderChatMessage(msgData);
     });
+
+    const micBtn = document.getElementById('chat-mic-btn');
+    const chatInput = document.getElementById('chat-input');
+
+    if (micBtn && chatInput) {
+        // לחיצה על כפתור המיקרופון - פותח מקלדת עם פוקוס
+        // באנדרואיד המקלדת כוללת כפתור מיקרופון מובנה שעובד מיידית
+        micBtn.addEventListener('click', () => {
+            chatInput.focus();
+        });
+
+        chatInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                submitChatInput();
+            }
+        });
+
+        // זיהוי סיום הכתבה קולית - המקלדת מעדכנת את הערך ואז מאבדת פוקוס
+        chatInput.addEventListener('blur', () => {
+            const text = chatInput.value.trim();
+            if (text) {
+                submitChatInput();
+            }
+        });
+    }
+}
+
+function submitChatInput() {
+    const chatInput = document.getElementById('chat-input');
+    if (!chatInput) return;
+    const text = chatInput.value.trim();
+    if (text) {
+        sendMessage(text);
+        chatInput.value = '';
+    }
 }
 
 /**
@@ -130,23 +105,19 @@ function renderChatMessage(data) {
     const msgEl = document.createElement('div');
     msgEl.className = 'msg';
 
-    const senderHtml = `<span class="msg-sender">${data.senderName}:</span>`;
-    
-    msgEl.innerHTML = `${senderHtml} <span class="msg-text">${data.text}</span>`;
+    const isMine = data.senderId === window.playerId;
+    msgEl.innerHTML = `<span class="msg-sender">${isMine ? 'אני' : data.senderName}:</span> <span class="msg-text">${data.text}</span>`;
 
     messagesDiv.appendChild(msgEl);
     messagesDiv.scrollTop = messagesDiv.scrollHeight;
 }
 
 /**
- * שליטה על נראות הצ'אט במסך המשחק - תמיד מוצג
+ * שליטה על נראות הצ'אט
  */
 function toggleChatVisibility(show) {
     const chatContainer = document.getElementById('chat-container');
     if (chatContainer) {
-        chatContainer.style.display = 'flex';
-        if (window.currentRoom) {
-            initChat(window.currentRoom);
-        }
+        chatContainer.style.display = show ? 'flex' : 'none';
     }
 }

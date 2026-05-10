@@ -59,7 +59,7 @@
         /* Chat UI */
         #chat-container { position: absolute; top: 70px; width: 45%; max-width: 210px; z-index: 5000; display: none; flex-direction: column; pointer-events: auto; }
         #chat-messages { width: 100%; height: 150px; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(4px); border-radius: 12px; overflow-y: auto; padding: 10px; font-size: 13px; border: 2px solid rgba(56, 189, 248, 0.3); margin-bottom: 8px; box-sizing: border-box; }
-        #chat-mic-btn { width: 52px; height: 52px; background: #1e293b; border: 3px solid #38bdf8; border-radius: 50%; cursor: pointer; display: none; align-items: center; justify-content: center; transition: 0.2s; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.8)); outline: none; pointer-events: auto; margin-right: 5px; }
+        #chat-mic-btn { width: 52px; height: 52px; background: #1e293b; border: 3px solid #38bdf8; border-radius: 50%; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: 0.2s; filter: drop-shadow(0 4px 10px rgba(0,0,0,0.8)); outline: none; pointer-events: auto; margin-right: 5px; }
 
         /* Setup/Drawing UI */
         #setup-ui { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 95%; max-width: 450px; display: none; flex-direction: column; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; }
@@ -118,8 +118,6 @@
     <div id="floating-stats">
         <div class="stat-item"><span id="gps-status">GPS ❌</span></div>
         <div class="stat-item">|</div>
-        <div class="stat-item"><span id="audio-status">אודיו ⏳</span></div>
-        <div class="stat-item">|</div>
         <div class="stat-item"><span id="players-count">שחקנים: 0</span></div>
         <div class="stat-item">|</div>
         <div class="stat-item">שטח: <span id="capture-progress-text" style="color:#ef4444; font-weight:bold;">0%</span></div>
@@ -139,12 +137,17 @@
         </div>
         <div id="chat-body">
             <div id="chat-messages"></div>
-            <button id="chat-mic-btn" title="מיקרופון">
-                <svg viewBox="0 0 24 24">
-                    <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
-                    <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
-                </svg>
-            </button>
+            <div id="chat-input-row">
+                <input id="chat-input" type="text" inputmode="text"
+                    placeholder="הקלד או הכתב..."
+                    autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" />
+                <button id="chat-mic-btn" title="מיקרופון">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3z"/>
+                        <path d="M17 11c0 2.76-2.24 5-5 5s-5-2.24-5-5H5c0 3.53 2.61 6.43 6 6.92V21h2v-3.08c3.39-.49 6-3.39 6-6.92h-2z"/>
+                    </svg>
+                </button>
+            </div>
         </div>
     </div>
 

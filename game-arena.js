@@ -4,7 +4,6 @@
 // 0. Early GPS Activation (Login Screen)
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-    // הפעלת GPS באופן מיידי ברקע עם טעינת הדף (ללא המתנה להקלדת שם)
     if (typeof startRealGpsTracking === 'function' && !window.earlyGpsStarted) {
         window.earlyGpsStarted = true;
         console.log("Early GPS tracking started automatically on load...");
@@ -66,7 +65,6 @@ function checkArenaStatus() {
                         window.isBriefingComplete = true; 
                         document.getElementById('briefing-overlay').style.display = 'none';
                         
-                        // הבטחת ציור השובל לגנב ברגע שהמשחק מתחיל
                         if (window.playerRole === 'thief') {
                             if (!window.trailLayer && typeof startThiefMechanics === 'function') {
                                 startThiefMechanics();
@@ -84,8 +82,6 @@ function checkArenaStatus() {
             const controls = document.getElementById('controls-container');
             const captureContainer = document.getElementById('capture-btn-container');
             const snitchContainer = document.getElementById('snitch-btn-container');
-            const micBtn = document.getElementById('chat-mic-btn');
-            const chatUI = document.getElementById('chat-container');
 
             if (controls) controls.style.display = 'block';
 
@@ -100,29 +96,14 @@ function checkArenaStatus() {
                 if (snitchContainer) snitchContainer.style.display = 'none';
             }
 
-            // הגדרות צ'אט
+            // הצגת הצ'אט תמיד לאחר אישור הזירה
             if (!window.chatSetupDone) {
                 window.chatSetupDone = true;
-                window.db.ref(`rooms/${window.currentRoom}/players`).once('value', pSnap => {
-                    const roomPlayers = pSnap.val() || {};
-                    let myTeamHumans = 0;
-                    const amICop = (window.playerRole === 'cop');
-                    
-                    Object.keys(roomPlayers).forEach(id => {
-                        if (!id.startsWith('bot_')) {
-                            const isCop = (roomPlayers[id].role === 'cop');
-                            if (isCop === amICop) myTeamHumans++;
-                        }
-                    });
-
-                    if (myTeamHumans > 1) {
-                        if (micBtn) micBtn.style.display = 'flex';
-                        if (chatUI) chatUI.style.display = 'flex';
-                    } else {
-                        if (micBtn) micBtn.style.display = 'none';
-                        if (chatUI) chatUI.style.display = 'none';
-                    }
-                });
+                const chatUI = document.getElementById('chat-container');
+                const micBtn = document.getElementById('chat-mic-btn');
+                if (chatUI) chatUI.style.display = 'flex';
+                if (micBtn) micBtn.style.display = 'flex';
+                if (typeof initChat === 'function') initChat(window.currentRoom);
             }
         }
     });
