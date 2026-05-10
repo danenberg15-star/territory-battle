@@ -93,6 +93,9 @@ function enterGameScene() {
 
     reacquireWakeLock();
 
+    // הצגת הצ'אט תמיד עם כניסה למשחק
+    if (typeof toggleChatVisibility === 'function') toggleChatVisibility(true);
+
     window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
         window.gameStartTime = snap.val() || Date.now();
         if (typeof checkArenaStatus === 'function') checkArenaStatus();
@@ -129,23 +132,19 @@ function listenToOtherTrails() {
     window.db.ref(`game/${window.currentRoom}/trails`).on('value', snap => {
         const allTrails = snap.val() || {};
 
-        // עדכון / יצירה של polyline לכל גנב אחר
         Object.keys(allTrails).forEach(id => {
-            if (id === window.playerId) return; // את השובל שלי אני מצייר בעצמי
+            if (id === window.playerId) return;
 
             const trailData = allTrails[id];
             if (!trailData || !trailData.path || trailData.path.length < 2) return;
 
-            // אם השובל ישן מ-5 דקות — מתעלמים
             if (Date.now() - trailData.t > 300000) return;
 
             if (window.otherTrailLayers[id]) {
-                // עדכון שובל קיים
                 window.otherTrailLayers[id].setLatLngs(trailData.path);
             } else {
-                // יצירת שובל חדש לגנב זה
                 window.otherTrailLayers[id] = L.polyline(trailData.path, {
-                    color: '#f97316', // כתום — להבדיל מהשובל שלי (אדום)
+                    color: '#f97316',
                     weight: 5,
                     dashArray: '5, 10',
                     opacity: 0.8,
@@ -154,7 +153,6 @@ function listenToOtherTrails() {
             }
         });
 
-        // הסרת שובלי שחקנים שכבר לא קיימים
         Object.keys(window.otherTrailLayers).forEach(id => {
             if (!allTrails[id]) {
                 window.map.removeLayer(window.otherTrailLayers[id]);
