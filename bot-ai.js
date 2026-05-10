@@ -7,28 +7,24 @@ let botStates = {};
 
 // ============================================================
 // תקרות מהירות אנושיות מוחלטות - בלי קשר לגודל הזירה
-// 1 GPS unit ≈ 111,000 מטר
-// interval = 1 שניה, אז speed = מטר/שניה = מ"ש
-// 5 קמ"ש = 1.39 מ"ש = 0.0000125 GPS/שניה
 // ============================================================
 const MAX_SPEEDS = {
     rookie: {
-        scan: 0.0000125,  // ~5 קמ"ש שיטוט
-        run:  0.0000278   // ~10 קמ"ש ריצה
+        scan: 0.0000125,
+        run:  0.0000278
     },
     skilled: {
-        scan: 0.0000194,  // ~7 קמ"ש שיטוט
-        run:  0.0000417   // ~15 קמ"ש ריצה
+        scan: 0.0000194,
+        run:  0.0000417
     },
     elite: {
-        scan: 0.0000250,  // ~9 קמ"ש שיטוט
-        run:  0.0000556   // ~20 קמ"ש ריצה
+        scan: 0.0000250,
+        run:  0.0000556
     }
 };
 
 // ============================================================
-// פרופילי קושי לפי גיל - ערכים באחוזים מאלכסון הזירה
-// המהירות הסופית = min(ערך יחסי, תקרה אנושית)
+// פרופילי קושי לפי גיל
 // ============================================================
 const BOT_PROFILES = {
     rookie: {
@@ -36,7 +32,7 @@ const BOT_PROFILES = {
         runSpeedPct:    0.015,
         radarRangePct:  0.20,
         reactionTime:   3000,
-        memoryTime:     4000,  // זמן זיכרון אחרי איבוד גנב (ms)
+        memoryTime:     4000,
         catchRange:     0.00015
     },
     skilled: {
@@ -63,6 +59,18 @@ function calcArenaDiagonal(minLat, maxLat, minLng, maxLng) {
     return Math.sqrt(latDiff * latDiff + lngDiff * lngDiff);
 }
 
+// ============================================================
+// מצב רדאר גלובלי לכל הבוטים — מופעל בעת כיבוש שטח
+// ============================================================
+let captureRadarTarget = null;     // { lat, lng } של הגנב שכבש
+let captureRadarUntil  = 0;        // timestamp שבו מסתיים מצב הרדאר
+
+function activateCaptureRadar(thiefLat, thiefLng) {
+    captureRadarTarget = { lat: thiefLat, lng: thiefLng };
+    captureRadarUntil  = Date.now() + 3000; // 3 שניות
+    console.log(`[BotAI] Capture Radar activated → [${thiefLat.toFixed(5)}, ${thiefLng.toFixed(5)}]`);
+}
+
 function startSinglePlayerAI(roomId, difficulty, arenaData) {
     if (botsActive || !arenaData || !arenaData.points) return;
     botsActive = true;
@@ -80,7 +88,6 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
 
     const diagonal = calcArenaDiagonal(minLat, maxLat, minLng, maxLng);
 
-    // מהירות סופית = min(יחסי לזירה, תקרה אנושית)
     const scanSpeed    = Math.min(profile.scanSpeedPct * diagonal, maxSpeed.scan);
     const runSpeed     = Math.min(profile.runSpeedPct  * diagonal, maxSpeed.run);
     const radarRange   = profile.radarRangePct * diagonal;
@@ -95,8 +102,25 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
         `run: ${(runSpeed * 111000 * 3.6).toFixed(1)}km/h`
     );
 
+    // ============================================================
+    // האזנה לכיבוש שטח — מפעיל מצב רדאר לבוטים
+    // ============================================================
+    window.db.ref(`game/${roomId}/capturedAreas`).on('child_added', snap => {
+        const area = snap.val();
+        if (!area || !area.capturedBy || !area.t) return;
+        if (Date.now() - area.t > 5000) return; // כיבוש ישן — מתעלמים
+
+        // מוצאים את מיקום הגנב שכבש
+        window.db.ref(`game/${roomId}/players/${area.capturedBy}`).once('value', pSnap => {
+            const thief = pSnap.val();
+            if (thief && thief.lat && thief.lng) {
+                activateCaptureRadar(thief.lat, thief.lng);
+            }
+        });
+    });
+
     const spawnedBotPositions = [];
-    let spawnReady = false; // דגל: מחכים שכל הגנבים יקבלו GPS לפני Spawn
+    let spawnReady = false;
 
     botInterval = setInterval(() => {
         if (window.isGameFrozen === true) return;
@@ -109,16 +133,13 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                 p => p.role === 'thief' && !p.isOffline && p.lat
             );
 
-            // ============================================================
-            // תיקון Spawn: מחכים שכל הגנבים קיבלו GPS לפני שמציבים בוטים
-            // ============================================================
             const allThieves = Object.values(players).filter(
                 p => p.role === 'thief' && !p.isOffline
             );
             if (!spawnReady) {
                 const allHaveGPS = allThieves.length > 0 &&
                     allThieves.every(p => p.lat && p.lat !== 0);
-                if (!allHaveGPS) return; // מחכים לעוד סיבוב
+                if (!allHaveGPS) return;
                 spawnReady = true;
                 console.log('All thieves have GPS – spawning bots now');
             }
@@ -128,10 +149,12 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
             const updates = {};
             const botIds = Object.keys(players).filter(id => id.startsWith('bot_cop_'));
 
+            // בדיקה האם מצב רדאר כיבוש פעיל
+            const isInCaptureRadar = Date.now() < captureRadarUntil && captureRadarTarget;
+
             botIds.forEach((botId) => {
                 let bot = players[botId];
 
-                // אתחול בוט - פריסה על גבול הזירה רחוק מגנבים ומבוטים
                 if (!bot.lat || bot.lat === 0) {
                     const spawnPt = getBorderSpawnPoint(
                         activeThieves, spawnedBotPositions, arenaData.points
@@ -159,8 +182,41 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     };
                 }
 
+                const state = botStates[botId];
+                const now   = Date.now();
+
                 // ============================================================
-                // רדאר: הבוט עיוור - מזהה גנב רק בטווח הרדאר שלו
+                // מצב רדאר כיבוש: הבוט מתקדם ישירות לעבר הגנב שכבש
+                // מבטל שיטוט ורדאר רגיל למשך 3 שניות
+                // ============================================================
+                if (isInCaptureRadar) {
+                    const targetLat  = captureRadarTarget.lat;
+                    const targetLng  = captureRadarTarget.lng;
+                    const moveLatDiff = targetLat - bot.lat;
+                    const moveLngDiff = targetLng - bot.lng;
+                    const moveDist    = Math.sqrt(moveLatDiff * moveLatDiff + moveLngDiff * moveLngDiff);
+
+                    if (moveDist > 0) {
+                        bot.lat += (moveLatDiff / moveDist) * runSpeed;
+                        bot.lng += (moveLngDiff / moveDist) * runSpeed;
+                    }
+
+                    state.mode       = 'chase';
+                    state.detectedAt = null;
+
+                    // תפיסה אם הגיע לטווח
+                    if (moveDist <= catchRange) {
+                        triggerBotCapture(roomId, botId, bot, 0);
+                    }
+
+                    updates[`game/${roomId}/players/${botId}/lat`] = bot.lat;
+                    updates[`game/${roomId}/players/${botId}/lng`] = bot.lng;
+                    updates[`game/${roomId}/players/${botId}/t`]   = now;
+                    return; // דילוג על שאר הלוגיקה
+                }
+
+                // ============================================================
+                // רדאר רגיל: זיהוי גנב בטווח
                 // ============================================================
                 let detectedThief = null;
                 let detectedDist  = Infinity;
@@ -177,42 +233,32 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                 });
 
                 // ============================================================
-                // זיכרון קצר: אם הגנב יצא מהרדאר, הבוט זוכר את המיקום האחרון
-                // שלו למשך memoryTime מילישניות לפני שחוזר לשיטוט
+                // זיכרון קצר
                 // ============================================================
-                const state = botStates[botId];
-                const now   = Date.now();
-
                 if (detectedThief) {
-                    // גנב ברדאר - מעדכן זיכרון
                     state.lastSeenThief = { lat: detectedThief.lat, lng: detectedThief.lng };
                     state.lastSeenAt    = now;
                 } else if (state.lastSeenThief && state.lastSeenAt) {
-                    // גנב מחוץ לרדאר - בודק אם הזיכרון עדיין תקף
                     const timeSinceSeen = now - state.lastSeenAt;
                     if (timeSinceSeen <= memoryTime) {
-                        // הזיכרון תקף - ממשיך לרוץ למיקום האחרון שנראה
                         detectedThief = state.lastSeenThief;
-                        detectedDist  = Infinity; // לא תופס, רק רץ לכיוון
+                        detectedDist  = Infinity;
                     } else {
-                        // הזיכרון פג - חוזר לשיטוט
                         state.lastSeenThief = null;
                         state.lastSeenAt    = null;
                     }
                 }
 
-                // לוגיקת תנועה
                 let targetLat, targetLng, currentSpeed;
 
                 if (detectedThief) {
-                    // גנב זוהה (ישיר או בזיכרון) - עיכוב תגובה ואז מרדף
                     if (state.mode !== 'chase') {
                         if (!state.detectedAt) {
                             state.detectedAt = now;
                         }
                         const elapsed = now - state.detectedAt;
                         if (elapsed >= reactionTime) {
-                            state.mode      = 'chase';
+                            state.mode       = 'chase';
                             state.detectedAt = null;
                         }
                     }
@@ -222,18 +268,15 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                         targetLng    = detectedThief.lng;
                         currentSpeed = runSpeed;
 
-                        // תפיסה רק אם זה גנב אמיתי (לא זיכרון) ובטווח
                         if (detectedDist <= catchRange) {
                             triggerBotCapture(roomId, botId, bot, 0);
                         }
                     } else {
-                        // עדיין בעיכוב תגובה - ממשיך לשוטט
                         currentSpeed = scanSpeed;
                         targetLat    = state.target.lat;
                         targetLng    = state.target.lng;
                     }
                 } else {
-                    // אין גנב ואין זיכרון - שיטוט רנדומלי לחלוטין
                     state.mode       = 'wander';
                     state.detectedAt = null;
                     currentSpeed     = scanSpeed;
@@ -251,7 +294,6 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
                     }
                 }
 
-                // ביצוע התנועה
                 const moveLatDiff = targetLat - bot.lat;
                 const moveLngDiff = targetLng - bot.lng;
                 const moveDist    = Math.sqrt(moveLatDiff * moveLatDiff + moveLngDiff * moveLngDiff);
@@ -263,7 +305,7 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
 
                 updates[`game/${roomId}/players/${botId}/lat`] = bot.lat;
                 updates[`game/${roomId}/players/${botId}/lng`] = bot.lng;
-                updates[`game/${roomId}/players/${botId}/t`]   = Date.now();
+                updates[`game/${roomId}/players/${botId}/t`]   = now;
             });
 
             if (Object.keys(updates).length > 0) {
@@ -274,8 +316,7 @@ function startSinglePlayerAI(roomId, difficulty, arenaData) {
 }
 
 // ============================================================
-// פריסה על גבול הזירה בלבד
-// בוחרת נקודת גבול הרחוקה ביותר מגנבים ומבוטים קיימים
+// פריסה על גבול הזירה
 // ============================================================
 function getBorderSpawnPoint(activeThieves, existingBotPositions, arenaPoints) {
     let bestPoint = null;
@@ -335,7 +376,6 @@ function getBorderSpawnPoint(activeThieves, existingBotPositions, arenaPoints) {
     return { lat: arenaPoints[0][0], lng: arenaPoints[0][1] };
 }
 
-// בחירת נקודת שיטוט חוקית בתוך הפוליגון
 function getValidPointInPolygon(arenaPoints, minLat, maxLat, minLng, maxLng) {
     try {
         const polyCoords = arenaPoints.map(p => [p[1], p[0]]);
@@ -380,7 +420,9 @@ function stopSinglePlayerAI() {
         clearInterval(botInterval);
         botInterval = null;
     }
-    botsActive   = false;
-    botStates    = {};
-    botCooldowns = {};
+    botsActive        = false;
+    botStates         = {};
+    botCooldowns      = {};
+    captureRadarTarget = null;
+    captureRadarUntil  = 0;
 }
