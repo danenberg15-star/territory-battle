@@ -80,12 +80,35 @@ function clearDrawing() {
 }
 
 // ==========================================
-// 2. Finalize & Calculate Arena
+// 2. Simplify path - מסנן נקודות עודפות
+// ==========================================
+function simplifyPath(path, toleranceDeg) {
+    if (path.length < 3) return path;
+    const tol = toleranceDeg || 0.00003; // ~3 מטר בקירוב
+    const result = [path[0]];
+    for (let i = 1; i < path.length - 1; i++) {
+        const prev = result[result.length - 1];
+        const curr = path[i];
+        const dLat = curr[0] - prev[0];
+        const dLng = curr[1] - prev[1];
+        if (Math.sqrt(dLat * dLat + dLng * dLng) >= tol) {
+            result.push(curr);
+        }
+    }
+    result.push(path[path.length - 1]);
+    return result;
+}
+
+// ==========================================
+// 3. Finalize & Calculate Arena
 // ==========================================
 function finalizeDrawing() {
     if (drawingPath.length < 10) return null;
 
-    const coords = drawingPath.map(p => [p[1], p[0]]);
+    // סינון נקודות עודפות לפוליגון נקי
+    const simplified = simplifyPath(drawingPath, 0.00003);
+
+    const coords = simplified.map(p => [p[1], p[0]]);
     coords.push(coords[0]);
 
     try {
@@ -102,8 +125,10 @@ function finalizeDrawing() {
             radius: Math.max(15, stationRadius) 
         };
 
+        console.log(`Arena total area: ${areaSqMeters.toFixed(1)} sqm, points: ${simplified.length}`);
+
         return {
-            points: drawingPath,
+            points: simplified,
             totalArea: areaSqMeters,
             policeStation: centerCoords
         };
@@ -128,7 +153,7 @@ function isPointInArena(lat, lng, arenaPoints) {
 }
 
 // ==========================================
-// 3. Render Captured Areas & Update Progress
+// 4. Render Captured Areas & Update Progress
 // ==========================================
 window.renderAreas = function(mapInstance, areasData, currentLayers) {
     if (currentLayers && currentLayers.length > 0) {
@@ -139,6 +164,8 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
     let totalCapturedSqMeters = 0;
 
     if (areasData) {
+        const validPolygons = [];
+
         Object.values(areasData).forEach(area => {
             if (area.points && area.points.length >= 3) {
                 const poly = L.polygon(area.points, { 
@@ -154,14 +181,33 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
 
                 try {
                     const coords = area.points.map(p => [p[1], p[0]]);
-                    coords.push(coords[0]); 
-                    const turfPoly = turf.polygon([coords]);
-                    totalCapturedSqMeters += turf.area(turfPoly);
+                    coords.push(coords[0]);
+                    validPolygons.push(turf.polygon([coords]));
                 } catch(e) {
-                    console.error("Error calculating captured area size:", e);
+                    console.error("Error building captured polygon:", e);
                 }
             }
         });
+
+        // איחוד כל השטחים למניעת ספירה כפולה של חפיפות
+        if (validPolygons.length > 0) {
+            try {
+                let united = validPolygons[0];
+                for (let i = 1; i < validPolygons.length; i++) {
+                    try {
+                        const u = turf.union(united, validPolygons[i]);
+                        if (u) united = u;
+                    } catch(e) {
+                        // אם union נכשל על פוליגון ספציפי - מדלגים
+                    }
+                }
+                totalCapturedSqMeters = turf.area(united);
+            } catch(e) {
+                // fallback: סכום פשוט אם union נכשל לחלוטין
+                validPolygons.forEach(p => { totalCapturedSqMeters += turf.area(p); });
+                console.warn("Union failed, using simple sum:", e);
+            }
+        }
     }
 
     if (window.trailLayer) {
@@ -172,6 +218,8 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
     if (window.arenaData && window.arenaData.totalArea) {
         const percentage = (totalCapturedSqMeters / window.arenaData.totalArea) * 100;
         safePercentage = Math.min(100, Math.max(0, percentage)).toFixed(1);
+
+        console.log(`Captured: ${totalCapturedSqMeters.toFixed(1)} sqm / ${window.arenaData.totalArea.toFixed(1)} sqm = ${safePercentage}%`);
 
         const progressEl = document.getElementById('capture-progress-text');
         if (progressEl) {
@@ -192,7 +240,7 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
 };
 
 // ==========================================
-// 4. כתיבת Toast כיבוש ל-Firebase (כל גנב שכובש)
+// 5. כתיבת Toast כיבוש ל-Firebase (כל גנב שכובש)
 // ==========================================
 window.broadcastCaptureToast = function(percentage) {
     if (!window.currentRoom || !window.db) return;
@@ -203,7 +251,7 @@ window.broadcastCaptureToast = function(percentage) {
 };
 
 // ==========================================
-// 5. האזנה ל-Toast מ-Firebase (כל השחקנים)
+// 6. האזנה ל-Toast מ-Firebase (כל השחקנים)
 // ==========================================
 window.listenToCaptureToast = function() {
     if (!window.currentRoom || !window.db) return;
@@ -219,7 +267,7 @@ window.listenToCaptureToast = function() {
 };
 
 // ==========================================
-// 6. Toast Notification UI
+// 7. Toast Notification UI
 // ==========================================
 window.displayCaptureToast = function(percentage) {
     let oldToast = document.getElementById('capture-toast');
