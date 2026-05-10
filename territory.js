@@ -164,12 +164,10 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
         });
     }
 
-    // שובל תמיד מעל השטח הכבוש
     if (window.trailLayer) {
         window.trailLayer.bringToFront();
     }
 
-    // עדכון אחוז השטח — האלמנט תמיד קיים ב-HTML
     let safePercentage = 0;
     if (window.arenaData && window.arenaData.totalArea) {
         const percentage = (totalCapturedSqMeters / window.arenaData.totalArea) * 100;
@@ -180,8 +178,8 @@ window.renderAreas = function(mapInstance, areasData, currentLayers) {
             progressEl.innerText = `${safePercentage}%`;
         }
 
-        // ניצחון גנבים ב-80%
-        if (parseFloat(safePercentage) >= 80 && window.isHost && window.currentRoom) {
+        // ניצחון גנבים ב-51%
+        if (parseFloat(safePercentage) >= 51 && window.isHost && window.currentRoom) {
             window.db.ref(`game/${window.currentRoom}/winner`).once('value', snap => {
                 if (!snap.val()) {
                     window.db.ref(`game/${window.currentRoom}/winner`).set('thieves');

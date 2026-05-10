@@ -7,50 +7,50 @@ function showVictoryScreen(winnerRole) {
     const title = document.getElementById('victory-title');
     const defaultTrophy = document.getElementById('default-trophy');
 
-    // מציג את מסך הניצחון מעל הכל
     screen.style.display = 'flex';
 
     if (winnerRole === 'cops') {
-        // --- לוגיקת שוטרים: מנגנים סרטון וזורקים חזרה ללובי ---
+        video.src = 'cop_win.webm';
         video.style.display = 'block';
         uiOverlay.style.display = 'none';
 
-        // מנסים לנגן את הסרטון
         video.play().then(() => {
-            // כשהסרטון מסתיים באופן טבעי
             video.onended = () => {
-                location.reload(); // רענון הדף מחזיר אוטומטית ללובי
+                location.reload();
             };
         }).catch(err => {
-            console.warn("Video failed to auto-play, failing back to standard UI:", err);
-            // מנגנון הגנה: אם הדפדפן חסם את ניגון הסרטון בגלל הגדרות מדיה
+            console.warn("Video failed to auto-play:", err);
             video.style.display = 'none';
             title.innerText = "השוטרים ניצחו!";
             title.style.color = "#3b82f6";
             defaultTrophy.style.display = 'none';
             uiOverlay.style.display = 'block';
-            
-            // במקרה של כישלון וידאו, עדיין נעשה ריפרש אחרי 5 שניות
-            setTimeout(() => {
-                location.reload();
-            }, 5000);
+            setTimeout(() => { location.reload(); }, 5000);
         });
 
-    } else {
-        // --- לוגיקת גנבים: UI רגיל + קונפטי + כפתור חזרה ---
-        video.style.display = 'none';
-        title.innerText = "הגנבים ניצחו!";
-        title.style.color = "#ef4444";
-        defaultTrophy.style.display = 'block';
-        uiOverlay.style.display = 'block';
+    } else if (winnerRole === 'thieves') {
+        // סרטון ניצחון גנבים
+        video.src = 'thieves_win.MP4';
+        video.style.display = 'block';
+        uiOverlay.style.display = 'none';
 
-        // מפעיל את אפקט הקונפטי
-        if (typeof confetti === 'function') {
-            confetti({
-                particleCount: 150,
-                spread: 70,
-                origin: { y: 0.6 }
-            });
-        }
+        video.play().then(() => {
+            video.onended = () => {
+                location.reload();
+            };
+        }).catch(err => {
+            console.warn("Thieves video failed to auto-play:", err);
+            video.style.display = 'none';
+            title.innerText = "הגנבים ניצחו!";
+            title.style.color = "#ef4444";
+            defaultTrophy.style.display = 'block';
+            uiOverlay.style.display = 'block';
+
+            if (typeof confetti === 'function') {
+                confetti({ particleCount: 150, spread: 70, origin: { y: 0.6 } });
+            }
+
+            setTimeout(() => { location.reload(); }, 5000);
+        });
     }
 }
