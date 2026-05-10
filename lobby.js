@@ -1,6 +1,5 @@
 // lobby.js - Screen 2: Waiting Lobby, Player Rendering, and Drag & Drop
 
-// תיקון: הגדרת משתני Drag & Drop שחסרו וגרמו ל-ReferenceError
 let activeTouchElement = null;
 let initialX = 0;
 let initialY = 0;
@@ -63,6 +62,7 @@ function joinRoomLogic(roomId) {
             window.playerRole = roomData.players[playerId]?.role || 'thief';
             window.currentRoom = roomId;
             window.playerId = playerId;
+            window.playerName = playerName;
             window.currentLang = currentLang;
             if (typeof enterGameScene === 'function') enterGameScene();
             return;
@@ -85,7 +85,6 @@ function renderLobbyPlayers(players, gameMode) {
         pDiv.className = 'player-entry';
         pDiv.innerText = p.name + (id === playerId ? " (אתה)" : "");
         
-        // Drag & Drop רק לבני אדם ולא במצב single player
         if (gameMode !== 'single' && !id.startsWith('bot_')) {
             pDiv.draggable = true;
             pDiv.setAttribute('data-id', id);

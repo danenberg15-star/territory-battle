@@ -3,6 +3,7 @@
 let chatVisible = true;
 let recognition = null;
 let isRecording = false;
+let chatListenerActive = false;
 
 document.addEventListener('DOMContentLoaded', () => {
     const toggleBtn = document.getElementById('chat-toggle-btn');
@@ -45,12 +46,12 @@ function initSpeechRecognition() {
     recognition.onstart = () => {
         isRecording = true;
         setMicUI('recording');
-        console.log("Recording started, playerRole:", window.playerRole, "room:", window.currentRoom);
+        console.log("Recording started, role:", window.playerRole, "room:", window.currentRoom);
     };
 
     recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
-        console.log("Transcript received:", transcript);
+        console.log("Transcript:", transcript);
         if (transcript && transcript.trim()) {
             sendMessage(transcript.trim());
         }
@@ -70,7 +71,6 @@ function initSpeechRecognition() {
     };
 
     recognition.onend = () => {
-        console.log("Recognition ended.");
         stopRecording();
     };
 }
@@ -130,11 +130,10 @@ function showChatNotice(text) {
 }
 
 /**
- * אתחול האזנה להודעות - תמיד עם window.currentRoom ו-window.playerRole
+ * אתחול האזנה להודעות
  */
 function initChat(roomId) {
-    const messagesDiv = document.getElementById('chat-messages');
-    if (!messagesDiv || !window.db) return;
+    if (!window.db) return;
 
     if (!window.playerRole || !window.currentRoom) {
         console.warn("initChat: missing playerRole or currentRoom, retrying...");
@@ -142,52 +141,60 @@ function initChat(roomId) {
         return;
     }
 
+    // מניעת רישום כפול של listener
+    if (chatListenerActive) return;
+    chatListenerActive = true;
+
     const resolvedRoom = window.currentRoom;
     const resolvedRole = window.playerRole;
-
-    console.log("initChat OK - room:", resolvedRoom, "role:", resolvedRole);
-
-    messagesDiv.innerHTML = "";
-
     const teamChatPath = `game/${resolvedRoom}/chat_${resolvedRole}`;
-    console.log("Listening on:", teamChatPath);
 
-    window.db.ref(teamChatPath).limitToLast(20).on('child_added', (snapshot) => {
-        const msg = snapshot.val();
-        console.log("Message received:", msg);
-        renderChatMessage(msg);
+    console.log("initChat - listening on:", teamChatPath);
+
+    const messagesDiv = document.getElementById('chat-messages');
+    if (messagesDiv) messagesDiv.innerHTML = "";
+
+    // שימוש ב-on('value') לקבלת כל ההודעות בכל עדכון
+    window.db.ref(teamChatPath).limitToLast(20).on('value', (snapshot) => {
+        const messagesDiv = document.getElementById('chat-messages');
+        if (!messagesDiv) return;
+
+        messagesDiv.innerHTML = "";
+        snapshot.forEach(child => {
+            renderChatMessage(child.val());
+        });
     });
 
-    // אתחול כפתור מיקרופון - מניעת כפילות listeners
+    // אתחול כפתור מיקרופון
     const micBtn = document.getElementById('chat-mic-btn');
     if (micBtn) {
         const freshMic = micBtn.cloneNode(true);
         micBtn.parentNode.replaceChild(freshMic, micBtn);
-        freshMic.addEventListener('click', toggleRecording);
+        document.getElementById('chat-mic-btn').addEventListener('click', toggleRecording);
     }
 
     initSpeechRecognition();
 }
 
 /**
- * שליחת הודעה - תמיד עם window.currentRoom ו-window.playerRole
+ * שליחת הודעה לשרת
  */
 function sendMessage(text) {
-    if (!text) { console.warn("sendMessage: no text"); return; }
+    if (!text) return;
     if (!window.currentRoom) { console.warn("sendMessage: no currentRoom"); return; }
     if (!window.db) { console.warn("sendMessage: no db"); return; }
     if (!window.playerRole) { console.warn("sendMessage: no playerRole"); return; }
 
     const newMessage = {
         senderId: window.playerId,
-        senderName: window.playerName,
+        senderName: window.playerName || 'שחקן',
         role: window.playerRole,
         text: text,
         t: firebase.database.ServerValue.TIMESTAMP
     };
 
     const teamChatPath = `game/${window.currentRoom}/chat_${window.playerRole}`;
-    console.log("Sending to:", teamChatPath, newMessage);
+    console.log("Sending to:", teamChatPath);
 
     window.db.ref(teamChatPath).push(newMessage)
         .then(() => console.log("Message sent OK"))
