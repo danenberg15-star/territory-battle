@@ -45,12 +45,12 @@ function initSpeechRecognition() {
     recognition.onstart = () => {
         isRecording = true;
         setMicUI('recording');
-        console.log("Recording started...");
+        console.log("Recording started, playerRole:", window.playerRole, "room:", window.currentRoom);
     };
 
     recognition.onresult = (event) => {
         const transcript = event.results[0][0].transcript;
-        console.log("Got transcript:", transcript, "playerRole:", window.playerRole, "room:", window.currentRoom);
+        console.log("Transcript received:", transcript);
         if (transcript && transcript.trim()) {
             sendMessage(transcript.trim());
         }
@@ -70,13 +70,13 @@ function initSpeechRecognition() {
     };
 
     recognition.onend = () => {
-        console.log("Recording ended.");
+        console.log("Recognition ended.");
         stopRecording();
     };
 }
 
 /**
- * לחיצה על כפתור המיקרופון - מתחיל/עוצר הקלטה
+ * לחיצה על כפתור המיקרופון
  */
 function toggleRecording() {
     if (!recognition) {
@@ -130,41 +130,47 @@ function showChatNotice(text) {
 }
 
 /**
- * אתחול האזנה להודעות בערוץ של הקבוצה הנוכחית בלבד
+ * אתחול האזנה להודעות - תמיד עם window.currentRoom ו-window.playerRole
  */
 function initChat(roomId) {
     const messagesDiv = document.getElementById('chat-messages');
     if (!messagesDiv || !window.db) return;
 
-    // המתנה ל-playerRole אם עדיין לא מוגדר
-    if (!window.playerRole) {
-        console.warn("initChat: playerRole not set yet, retrying in 500ms...");
+    if (!window.playerRole || !window.currentRoom) {
+        console.warn("initChat: missing playerRole or currentRoom, retrying...");
         setTimeout(() => initChat(roomId), 500);
         return;
     }
 
-    console.log("initChat called, roomId:", roomId, "playerRole:", window.playerRole);
+    const resolvedRoom = window.currentRoom;
+    const resolvedRole = window.playerRole;
+
+    console.log("initChat OK - room:", resolvedRoom, "role:", resolvedRole);
 
     messagesDiv.innerHTML = "";
 
-    const teamChatPath = `game/${roomId}/chat_${window.playerRole}`;
+    const teamChatPath = `game/${resolvedRoom}/chat_${resolvedRole}`;
+    console.log("Listening on:", teamChatPath);
+
     window.db.ref(teamChatPath).limitToLast(20).on('child_added', (snapshot) => {
-        renderChatMessage(snapshot.val());
+        const msg = snapshot.val();
+        console.log("Message received:", msg);
+        renderChatMessage(msg);
     });
 
+    // אתחול כפתור מיקרופון - מניעת כפילות listeners
     const micBtn = document.getElementById('chat-mic-btn');
     if (micBtn) {
-        // הסרת listener ישן למניעת כפילויות
-        micBtn.replaceWith(micBtn.cloneNode(true));
-        const freshMicBtn = document.getElementById('chat-mic-btn');
-        freshMicBtn.addEventListener('click', toggleRecording);
+        const freshMic = micBtn.cloneNode(true);
+        micBtn.parentNode.replaceChild(freshMic, micBtn);
+        freshMic.addEventListener('click', toggleRecording);
     }
 
     initSpeechRecognition();
 }
 
 /**
- * שליחת הודעה לשרת
+ * שליחת הודעה - תמיד עם window.currentRoom ו-window.playerRole
  */
 function sendMessage(text) {
     if (!text) { console.warn("sendMessage: no text"); return; }
@@ -184,8 +190,8 @@ function sendMessage(text) {
     console.log("Sending to:", teamChatPath, newMessage);
 
     window.db.ref(teamChatPath).push(newMessage)
-        .then(() => console.log("Message sent successfully"))
-        .catch(err => console.error("Team chat sync error:", err));
+        .then(() => console.log("Message sent OK"))
+        .catch(err => console.error("Send error:", err));
 }
 
 /**

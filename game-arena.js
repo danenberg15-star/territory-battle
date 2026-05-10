@@ -44,7 +44,6 @@ function checkArenaStatus() {
                 initTreasuresMaster();
             }
 
-            // הפעלת מנוע הבוטים
             if (!window.aiStarted) {
                 window.aiStarted = true;
                 window.db.ref(`rooms/${window.currentRoom}`).once('value', rSnap => {
@@ -57,7 +56,6 @@ function checkArenaStatus() {
                 });
             }
 
-            // סנכרון גלובלי: מוודא שברגע שהמשחק מתחיל, כל הקבצים יודעים והשובל מופעל
             if (!window.briefingListenerAttached) {
                 window.briefingListenerAttached = true;
                 window.db.ref(`game/${window.currentRoom}/briefing/complete`).on('value', bSnap => {
@@ -96,7 +94,7 @@ function checkArenaStatus() {
                 if (snitchContainer) snitchContainer.style.display = 'none';
             }
 
-            // הצגת הצ'אט תמיד לאחר אישור הזירה
+            // הצגת הצ'אט תמיד לאחר אישור הזירה - שימוש ב-window.currentRoom
             if (!window.chatSetupDone) {
                 window.chatSetupDone = true;
                 const chatUI = document.getElementById('chat-container');
