@@ -93,9 +93,6 @@ function enterGameScene() {
 
     reacquireWakeLock();
 
-    // הצגת הצ'אט תמיד עם כניסה למשחק
-    if (typeof toggleChatVisibility === 'function') toggleChatVisibility(true);
-
     window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
         window.gameStartTime = snap.val() || Date.now();
         if (typeof checkArenaStatus === 'function') checkArenaStatus();
@@ -109,13 +106,9 @@ function enterGameScene() {
     if (typeof listenForCaptureSignals === 'function') listenForCaptureSignals(); 
     if (typeof listenToTreasures === 'function') listenToTreasures();
 
-    // האזנה להודעת יציאה מטריטוריה — לכל השחקנים
     if (typeof window.listenToOutOfBoundsAlert === 'function') window.listenToOutOfBoundsAlert();
-
-    // האזנה ל-Toast כיבוש שטח — לכל השחקנים (לא רק גנבים)
     if (typeof window.listenToCaptureToast === 'function') window.listenToCaptureToast();
 
-    // האזנה לשובלי גנבים אחרים
     listenToOtherTrails();
 
     setInterval(() => {
