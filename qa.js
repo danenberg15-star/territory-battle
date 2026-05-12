@@ -15,6 +15,7 @@ function initQARoom(roomId) {
     console.log("Starting Automated QA Simulator for room:", roomId);
     window.currentRoom = roomId;
     window.qaMode = true;
+    installQACaptureCooldownBypass();
     window.playerId = localStorage.getItem('tb_uuid') || 'p_qa_' + Date.now();
     window.playerName = localStorage.getItem('tb_name') || "QA Tester";
     window.currentLang = typeof currentLang !== 'undefined' ? currentLang : 'he';
@@ -118,6 +119,7 @@ function setupQAServerData(roomId, centerLat, centerLng) {
             if (typeof enterGameScene === 'function') enterGameScene();
 
             disableRealGpsForQA();
+            installQACaptureCooldownBypass();
             showQAArrows(roomId, arenaData);
             startQABotEngine(roomId, arenaData, botRole);
             startQAWinCheck(roomId, arenaData);
@@ -132,6 +134,25 @@ function setupQAServerData(roomId, centerLat, centerLng) {
         alert("שגיאת חישוב QA: " + e.message);
         console.error(e);
     }
+}
+
+// ==========================================
+// ביטול קולדאון כפתור הלכידה במצב QA בלבד
+// (triggerCapture עדיין קורא ל-startCooldown — דורסים כאן)
+// ==========================================
+function installQACaptureCooldownBypass() {
+    if (typeof startCooldown !== 'function' || window._qaStartCooldownPatched) return;
+    window._originalStartCooldownForQA = startCooldown;
+    window._qaStartCooldownPatched = true;
+    window.startCooldown = function (seconds) {
+        if (!window.qaMode) {
+            return window._originalStartCooldownForQA(seconds);
+        }
+        const btn = document.getElementById('capture-btn');
+        if (btn) btn.disabled = false;
+        const circle = document.getElementById('cooldown-circle');
+        if (circle) circle.style.strokeDashoffset = '358';
+    };
 }
 
 // ==========================================
@@ -485,6 +506,11 @@ function updateBotThiefTrail(roomId, botId, lat, lng) {
 // ניקוי QA
 // ==========================================
 window.stopQAMode = function() {
+    if (window._qaStartCooldownPatched && window._originalStartCooldownForQA) {
+        window.startCooldown = window._originalStartCooldownForQA;
+        window._originalStartCooldownForQA = null;
+        window._qaStartCooldownPatched = false;
+    }
     if (window.qaBotEngineInterval)    { clearInterval(window.qaBotEngineInterval);    window.qaBotEngineInterval    = null; }
     if (window.qaCaptureCheckInterval) { clearInterval(window.qaCaptureCheckInterval); window.qaCaptureCheckInterval = null; }
     if (window.qaWinCheckInterval)     { clearInterval(window.qaWinCheckInterval);     window.qaWinCheckInterval     = null; }
