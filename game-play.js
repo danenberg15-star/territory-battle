@@ -73,7 +73,7 @@ function triggerCapture() {
                         confirmCatch(id, timestamp, window.playerId);
                     }
                 } else {
-                    botConsecutiveHits[id] = 0; // איפוס אם יצא מהרדיוס
+                    botConsecutiveHits[id] = 0;
                 }
             });
         });
@@ -82,7 +82,7 @@ function triggerCapture() {
     // ========== סיום ניסיון אחרי 10 שניות ==========
     setTimeout(() => {
         clearInterval(botGpsInterval);
-        botCaught = true; // מונע תפיסה מאוחרת
+        botCaught = true;
 
         window.captureAttemptActive = false;
         btn.classList.remove('active-capture');
@@ -92,7 +92,6 @@ function triggerCapture() {
             window.taserVisualRing = null;
         }
 
-        // קירור 60 שניות לשוטר אנושי
         btn.disabled = true;
         startCooldown(60);
     }, 10000);
@@ -109,17 +108,10 @@ function listenForCaptureSignals() {
 
         const distNow = window.map.distance([window.myLat, window.myLng], [sig.lat, sig.lng]);
 
-        // ====== תפיסה על ידי בוט שוטר — GPS בלבד ======
-        if (sig.sender && sig.sender.startsWith('bot_')) {
-            // הבוט מטפל בזה מצד checkGpsCatch, לא צריך כפל
-            return;
-        }
+        if (sig.sender && sig.sender.startsWith('bot_')) return;
 
-        // ====== תפיסה על ידי שוטר אנושי — זיהוי מקבילי ======
-        // רק אם הגנב בטווח ראשוני של 30מ' (כדי להפעיל את החלון)
         if (distNow > 30) return;
 
-        // מניעת כפל הפעלה לאותו אות
         if (window.activeParallelSignal === sig.t) return;
         window.activeParallelSignal = sig.t;
 
@@ -148,7 +140,6 @@ function listenForCaptureSignals() {
                     confirmCatch(window.playerId, sig.t, sig.sender);
                 }
             }
-            // לא מאפסים — מצטבר גם אם יש הפסקות קצרות (בניינים)
         }, GPS_CHECK_INTERVAL);
 
         // --- מונה אקוסטי: 0.8 שניות מצטברות ---
@@ -163,7 +154,6 @@ function listenForCaptureSignals() {
             });
         }
 
-        // ניקוי בסוף חלון
         setTimeout(() => {
             clearInterval(gpsParallelInterval);
             window.activeParallelSignal = null;
@@ -181,6 +171,141 @@ function listenForCaptureSignals() {
                 window.displayCatchToast(alertData.victimName, mode);
             }
         });
+    });
+
+    // האזנה להתראות חשיפה (Snitch Reveal) — בצד הגנב
+    window.db.ref(`game/${window.currentRoom}/snitchSignal`).on('value', snap => {
+        const sig = snap.val();
+        if (!sig || Date.now() - sig.t > 10000) return;
+        if (window.playerRole !== 'thief') return;
+        if (window.activeSnitchSignal === sig.t) return;
+        window.activeSnitchSignal = sig.t;
+
+        const distNow = window.map.distance([window.myLat, window.myLng], [sig.lat, sig.lng]);
+        if (distNow > 30) return;
+
+        console.log("Snitch signal detected. Starting Parallel Reveal window...");
+
+        let revealed = false;
+        const windowEnd = sig.t + 10000;
+
+        // --- מונה GPS: 2.0 שניות ב-5מ' ---
+        let gpsAccumulatedMs = 0;
+        const GPS_TARGET_MS = 2000;
+        const GPS_CHECK_INTERVAL = 500;
+
+        const gpsRevealInterval = setInterval(() => {
+            if (revealed || Date.now() > windowEnd) {
+                clearInterval(gpsRevealInterval);
+                return;
+            }
+            const d = window.map.distance([window.myLat, window.myLng], [sig.lat, sig.lng]);
+            if (d <= 5) {
+                gpsAccumulatedMs += GPS_CHECK_INTERVAL;
+                if (gpsAccumulatedMs >= GPS_TARGET_MS) {
+                    revealed = true;
+                    clearInterval(gpsRevealInterval);
+                    console.log("GPS reveal counter reached target.");
+                    confirmReveal(window.playerId, sig.t, sig.sender);
+                }
+            }
+        }, GPS_CHECK_INTERVAL);
+
+        // --- מונה אקוסטי: 0.8 שניות מצטברות ---
+        if (typeof startListeningForCops === 'function') {
+            startListeningForCops(() => {
+                if (!revealed && Date.now() <= windowEnd) {
+                    revealed = true;
+                    clearInterval(gpsRevealInterval);
+                    console.log("Acoustic reveal counter reached target.");
+                    confirmReveal(window.playerId, sig.t, sig.sender);
+                }
+            });
+        }
+
+        setTimeout(() => {
+            clearInterval(gpsRevealInterval);
+            window.activeSnitchSignal = null;
+        }, windowEnd - Date.now() + 100);
+    });
+
+    // האזנה להתראת חשיפה — בצד השוטרים (רטט + toast)
+    window.db.ref(`game/${window.currentRoom}/revealAlert`).on('value', snap => {
+        const alertData = snap.val();
+        if (!alertData || Date.now() - alertData.t > 8000) return;
+        if (window.playerRole !== 'cop' && window.playerRole !== 'snitch') return;
+
+        if (navigator.vibrate) navigator.vibrate([300, 100, 300, 100, 300]);
+
+        let old = document.getElementById('reveal-toast');
+        if (old) old.remove();
+
+        const toast = document.createElement('div');
+        toast.id = 'reveal-toast';
+        toast.style.cssText = `
+            position: fixed; top: 15%; left: 50%; transform: translate(-50%, -50%);
+            background: rgba(234, 179, 8, 0.95); color: #0f172a;
+            padding: 20px 40px; border-radius: 15px; font-size: 20px;
+            font-weight: 900; z-index: 99999; text-align: center;
+            pointer-events: none; box-shadow: 0 0 30px rgba(234,179,8,0.8);
+        `;
+        toast.innerText = window.currentLang === 'he'
+            ? `🎯 ${alertData.thiefName} זוהה על ידי המלשין!`
+            : `🎯 ${alertData.thiefName} was spotted by the snitch!`;
+        document.body.appendChild(toast);
+        setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 5000);
+    });
+}
+
+// ==========================================
+// אישור חשיפה (Reveal) — מופעל בצד הגנב
+// ==========================================
+function confirmReveal(thiefId, signalTime, snitchId) {
+    // מניעת כפל עם transaction
+    window.db.ref(`game/${window.currentRoom}/reveals/${thiefId}_${signalTime}`).transaction(current => {
+        if (current) return;
+        return { t: Date.now(), snitch: snitchId };
+    }, (error, committed) => {
+        if (!committed) return;
+
+        // Flash למשך 5 שניות
+        window.db.ref(`game/${window.currentRoom}/players/${thiefId}/flashUntil`)
+            .set(Date.now() + 5000);
+
+        // שם הגנב לצורך toast
+        window.db.ref(`rooms/${window.currentRoom}/players/${thiefId}`).once('value', pSnap => {
+            const thiefData = pSnap.val() || {};
+            const thiefName = thiefData.name || 'גנב';
+
+            // שידור revealAlert לכל השוטרים
+            window.db.ref(`game/${window.currentRoom}/revealAlert`).set({
+                thiefName,
+                thiefId,
+                t: Date.now()
+            });
+        });
+
+        // התראה לגנב עצמו
+        if (thiefId === window.playerId) {
+            if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+            let old = document.getElementById('revealed-toast');
+            if (old) old.remove();
+
+            const toast = document.createElement('div');
+            toast.id = 'revealed-toast';
+            toast.style.cssText = `
+                position: fixed; top: 40%; left: 50%; transform: translate(-50%, -50%);
+                background: rgba(220, 38, 38, 0.97); color: white;
+                padding: 22px 38px; border-radius: 15px; font-size: 20px;
+                font-weight: 900; z-index: 99999; text-align: center;
+                pointer-events: none; box-shadow: 0 0 30px rgba(220,38,38,0.8);
+            `;
+            toast.innerText = window.currentLang === 'he'
+                ? '⚠️ הוסגרת! המשטרה רואה אותך!'
+                : '⚠️ You\'ve been revealed! Police can see you!';
+            document.body.appendChild(toast);
+            setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 5000);
+        }
     });
 }
 
@@ -231,30 +356,103 @@ function confirmCatch(victimId, signalTime, copId) {
     });
 }
 
+// ==========================================
+// Snitch Trigger v2.70 — Parallel Detection
+// ==========================================
+window.snitchAttemptActive = false;
+
 function triggerSnitch() {
     if (window.isGameFrozen === true) return;
     const btn = document.getElementById('snitch-btn');
-    if (btn.disabled) return;
-    btn.disabled = true;
-    btn.style.opacity = '0.5';
+    if (!btn || btn.disabled) return;
+    if (window.snitchAttemptActive) return;
 
-    window.db.ref(`game/${window.currentRoom}/players`).once('value', snap => {
-        const players = snap.val() || {};
-        let foundThief = false;
-        Object.keys(players).forEach(id => {
-            const p = players[id];
-            if (p.role === 'thief' && !p.isOffline) {
-                const dist = window.map.distance([window.myLat, window.myLng], [p.lat, p.lng]);
-                if (dist <= 15) {
-                    window.db.ref(`game/${window.currentRoom}/players/${id}/flashUntil`).set(Date.now() + 3000);
-                    foundThief = true;
-                }
-            }
-        });
-        if (foundThief && navigator.vibrate) navigator.vibrate([100, 50, 100]);
+    window.snitchAttemptActive = true;
+    btn.classList.add('active-capture'); // אפקט פועם זהה לטייזר
+
+    if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
+    const timestamp = Date.now();
+    const snitchLat = window.myLat;
+    const snitchLng = window.myLng;
+
+    // שידור אות סניץ' לגנבים
+    window.db.ref(`game/${window.currentRoom}/snitchSignal`).set({
+        sender: window.playerId,
+        t: timestamp,
+        lat: snitchLat,
+        lng: snitchLng
     });
 
-    setTimeout(() => { btn.disabled = false; btn.style.opacity = '1'; }, 10000);
+    // שידור אקוסטי זהה לטייזר
+    if (typeof broadcastCapture === 'function') broadcastCapture();
+
+    // ========== לוגיקת בוטים (Single Player) — GPS בלבד ==========
+    // רדיוס 10מ' + 2 דגימות רצופות
+    let botConsecutiveHits = {};
+    let botRevealed = false;
+    let botGpsChecks = 0;
+
+    const botSnitchInterval = setInterval(() => {
+        if (botRevealed || botGpsChecks >= 10) {
+            clearInterval(botSnitchInterval);
+            return;
+        }
+        botGpsChecks++;
+
+        window.db.ref(`game/${window.currentRoom}/players`).once('value', snap => {
+            const players = snap.val() || {};
+            Object.keys(players).forEach(id => {
+                const p = players[id];
+                if (p.role !== 'thief' || p.isOffline) return;
+                const isBotThief = id.startsWith('bot_');
+                if (!isBotThief) return; // רק בוטים כאן
+
+                const dist = window.map.distance([snitchLat, snitchLng], [p.lat, p.lng]);
+                if (dist <= 10) {
+                    botConsecutiveHits[id] = (botConsecutiveHits[id] || 0) + 1;
+                    if (botConsecutiveHits[id] >= 2 && !botRevealed) {
+                        botRevealed = true;
+                        clearInterval(botSnitchInterval);
+                        confirmReveal(id, timestamp, window.playerId);
+                    }
+                } else {
+                    botConsecutiveHits[id] = 0;
+                }
+            });
+        });
+    }, 1000);
+
+    // ========== סיום ניסיון אחרי 10 שניות ==========
+    setTimeout(() => {
+        clearInterval(botSnitchInterval);
+        botRevealed = true;
+
+        window.snitchAttemptActive = false;
+        btn.classList.remove('active-capture');
+
+        btn.disabled = true;
+        startSnitchCooldown(60);
+    }, 10000);
+}
+
+function startSnitchCooldown(seconds) {
+    const btn = document.getElementById('snitch-btn');
+    if (!btn) return;
+    let left = seconds;
+    const originalText = btn.innerText;
+    btn.innerText = `${left}s`;
+
+    const interval = setInterval(() => {
+        left--;
+        btn.innerText = `${left}s`;
+        if (left <= 0) {
+            clearInterval(interval);
+            btn.disabled = false;
+            btn.innerText = originalText;
+            if (navigator.vibrate) navigator.vibrate(50);
+        }
+    }, 1000);
 }
 
 function startCooldown(seconds) {
