@@ -5,6 +5,8 @@
 // ==========================================
 window.qaMode = false;
 window.qaBotEngineInterval = null;
+window.qaCaptureCheckInterval = null;
+window.qaWinCheckInterval = null;
 
 /**
  * מאתחל חדר QA לפי מספר החדר (99999 או 88888)
@@ -22,13 +24,10 @@ function initQARoom(roomId) {
     document.getElementById('briefing-status').innerText = "מייצר זירת סימולציה (10,000 מ\"ר) ובוטים...";
     document.getElementById('briefing-overlay').style.display = 'flex';
 
-    // במצב QA לא צריך GPS אמיתי — משתמשים במיקום ברירת מחדל (תל אביב)
-    // אך אם GPS זמין נשתמש בו למיקום ראשוני בלבד
     if (navigator.geolocation) {
         navigator.geolocation.getCurrentPosition((pos) => {
             setupQAServerData(roomId, pos.coords.latitude, pos.coords.longitude);
         }, () => {
-            // fallback: תל אביב
             setupQAServerData(roomId, 32.0853, 34.7818);
         }, { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 });
     } else {
@@ -46,7 +45,6 @@ function setupQAServerData(roomId, centerLat, centerLng) {
             return;
         }
 
-        // ריבוע 100x100 מטר = 10,000 מ"ר סביב המיקום
         const center = turf.point([centerLng, centerLat]);
         const distToCornerKm = Math.sqrt(5000) / 1000;
 
@@ -72,8 +70,8 @@ function setupQAServerData(roomId, centerLat, centerLng) {
         // חדר 99999: שחקן = גנב, 1 שוטר-בוט
         const is88888 = (roomId === '88888');
         window.playerRole = is88888 ? 'cop' : 'thief';
-        const botRole   = is88888 ? 'thief' : 'cop';
-        const botCount  = is88888 ? 4 : 1;
+        const botRole  = is88888 ? 'thief' : 'cop';
+        const botCount = is88888 ? 4 : 1;
 
         const bots = {};
 
@@ -91,7 +89,6 @@ function setupQAServerData(roomId, centerLat, centerLng) {
             };
         }
 
-        // השחקן עצמו
         window.myLat = centerLat;
         window.myLng = centerLng;
         window.isHost = false;
@@ -120,18 +117,14 @@ function setupQAServerData(roomId, centerLat, centerLng) {
             document.getElementById('briefing-overlay').style.display = 'none';
             if (typeof enterGameScene === 'function') enterGameScene();
 
-            // מבטלים את ה-GPS הרגיל — במצב QA השחקן נע בחצים
             disableRealGpsForQA();
-
-            // מציגים חצי ניווט
             showQAArrows(roomId, arenaData);
-
-            // מפעילים מנוע בוטים
             startQABotEngine(roomId, arenaData, botRole);
+            startQAWinCheck(roomId, arenaData);
 
-            // חדר 88888: מאלצים חשיפת גנבים לשוטר
             if (is88888) {
-                forceThiefVisibilityForCop();
+                qaKeepThievesVisible(roomId);
+                startQACaptureCheck(roomId);
             }
         });
 
@@ -149,7 +142,6 @@ function disableRealGpsForQA() {
         navigator.geolocation.clearWatch(window.gpsWatchId);
         window.gpsWatchId = null;
     }
-    // patch: מונעים הפעלה מחדש של GPS אמיתי
     window._realStartGpsTracking = window.startRealGpsTracking;
     window.startRealGpsTracking = function() {
         console.log("[QA] GPS tracking disabled in QA mode.");
@@ -166,7 +158,6 @@ function disableRealGpsForQA() {
 // חצי ניווט על המסך
 // ==========================================
 function showQAArrows(roomId, arenaData) {
-    // מסיר אם כבר קיים
     let existing = document.getElementById('qa-arrow-pad');
     if (existing) existing.remove();
 
@@ -178,13 +169,14 @@ function showQAArrows(roomId, arenaData) {
         right: 20px;
         z-index: 9000;
         display: grid;
+        grid-template-areas: ". up ." "right . left" ". down .";
         grid-template-columns: repeat(3, 52px);
         grid-template-rows: repeat(3, 52px);
         gap: 6px;
         pointer-events: auto;
     `;
 
-    // 5 מטר בדרגות — ~0.000045 lat, ~0.000055 lng (קירוב סביר)
+    // ~5 מטר
     const STEP_LAT = 0.000045;
     const STEP_LNG = 0.000055;
 
@@ -198,17 +190,14 @@ function showQAArrows(roomId, arenaData) {
         const newLat = window.myLat + dLat;
         const newLng = window.myLng + dLng;
 
-        // בדיקת גבולות זירה
         const pt = turf.point([newLng, newLat]);
         if (!turf.booleanPointInPolygon(pt, polygon)) return;
 
         window.myLat = newLat;
         window.myLng = newLng;
 
-        // עדכון מפה
         if (window.map) window.map.panTo([newLat, newLng], { animate: true, duration: 0.15 });
 
-        // עדכון Firebase
         if (window.db && window.currentRoom && window.playerId) {
             window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({
                 lat: newLat,
@@ -218,13 +207,11 @@ function showQAArrows(roomId, arenaData) {
             });
         }
 
-        // הפעלת לוגיקת גנב אם צריך
         if (window.playerRole === 'thief' && window.isBriefingComplete && typeof updateThiefLogic === 'function') {
             updateThiefLogic(newLat, newLng);
         }
     }
 
-    // עיצוב כפתור חץ
     function makeArrowBtn(label, dLat, dLng, gridArea) {
         const btn = document.createElement('button');
         btn.innerText = label;
@@ -261,25 +248,18 @@ function showQAArrows(roomId, arenaData) {
         return btn;
     }
 
-    // סידור גריד 3x3: רק 4 כפתורי כיוון + אמצע ריק
-    pad.style.gridTemplateAreas = `
-        ". up ."
-        "left . right"
-        ". down ."
-    `;
-
-    pad.appendChild(makeArrowBtn('↑',  STEP_LAT,  0,        'up'));
-    pad.appendChild(makeArrowBtn('↓', -STEP_LAT,  0,        'down'));
-    pad.appendChild(makeArrowBtn('←',  0,        -STEP_LNG, 'left'));
-    pad.appendChild(makeArrowBtn('→',  0,         STEP_LNG, 'right'));
+    // ← במיקום ימני, → במיקום שמאלי (מוחלפים במיקום בלבד, הפעולה זהה)
+    pad.appendChild(makeArrowBtn('↑',  STEP_LAT,  0,         'up'));
+    pad.appendChild(makeArrowBtn('↓', -STEP_LAT,  0,         'down'));
+    pad.appendChild(makeArrowBtn('←',  0,        -STEP_LNG,  'right'));
+    pad.appendChild(makeArrowBtn('→',  0,         STEP_LNG,  'left'));
 
     document.body.appendChild(pad);
 
-    // label QA
     const label = document.createElement('div');
     label.style.cssText = `
         position: fixed;
-        bottom: 175px;
+        bottom: 215px;
         right: 20px;
         z-index: 9000;
         background: rgba(15, 23, 42, 0.8);
@@ -297,12 +277,132 @@ function showQAArrows(roomId, arenaData) {
 }
 
 // ==========================================
-// חשיפת גנבים לשוטר בחדר 88888
+// חשיפת גנבים תמיד בחדר 88888
 // ==========================================
-function forceThiefVisibilityForCop() {
-    // patch listenToOtherPlayers כך שגנבים תמיד מוצגים (ללא הסתרה)
-    // עושים זאת על ידי override של הבדיקה שמסתירה גנבים ממפה
-    window._qaForceShowThieves = true;
+function qaKeepThievesVisible(roomId) {
+    // הפעלה מיידית + כל 5 שניות
+    function doFlash() {
+        if (!window.db || !window.currentRoom) return;
+        window.db.ref(`game/${roomId}/players`).once('value', snap => {
+            const players = snap.val();
+            if (!players) return;
+            const updates = {};
+            Object.keys(players).forEach(id => {
+                if (id.startsWith('bot_thief')) {
+                    updates[`game/${roomId}/players/${id}/flashUntil`] = Date.now() + 10000;
+                }
+            });
+            if (Object.keys(updates).length > 0) window.db.ref().update(updates);
+        });
+    }
+    doFlash();
+    setInterval(doFlash, 5000);
+}
+
+// ==========================================
+// בדיקת לכידה עצמאית ל-QA (חדר 88888)
+// בודקת כל 500ms — אם הטייזר פעיל ומרחק <= 15מ' מגנב
+// ==========================================
+function startQACaptureCheck(roomId) {
+    if (window.qaCaptureCheckInterval) clearInterval(window.qaCaptureCheckInterval);
+
+    window.qaCaptureCheckInterval = setInterval(() => {
+        const captureBtn = document.getElementById('capture-btn');
+        if (!captureBtn || !captureBtn.classList.contains('active-capture')) return;
+        if (!window.myLat || !window.myLng || !window.map) return;
+
+        window.db.ref(`game/${roomId}/players`).once('value', snap => {
+            const players = snap.val();
+            if (!players) return;
+
+            Object.keys(players).forEach(id => {
+                if (!id.startsWith('bot_thief')) return;
+                const p = players[id];
+                if (!p || p.isOffline) return;
+
+                const dist = window.map.distance(
+                    [window.myLat, window.myLng],
+                    [p.lat, p.lng]
+                );
+
+                if (dist <= 15) {
+                    console.log(`[QA] Captured ${id} at ${dist.toFixed(1)}m`);
+                    if (typeof confirmCatch === 'function') {
+                        confirmCatch(id, Date.now(), window.playerId);
+                    }
+                    showQACaptureToast(p.name || id);
+                }
+            });
+        });
+    }, 500);
+}
+
+function showQACaptureToast(thiefName) {
+    let old = document.getElementById('qa-capture-toast');
+    if (old) old.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'qa-capture-toast';
+    toast.style.cssText = `
+        position: fixed;
+        top: 18%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: rgba(37, 99, 235, 0.97);
+        color: white;
+        padding: 20px 40px;
+        border-radius: 15px;
+        font-size: 20px;
+        font-weight: 900;
+        z-index: 99999;
+        text-align: center;
+        pointer-events: none;
+        box-shadow: 0 0 30px rgba(37,99,235,0.8);
+    `;
+    toast.innerText = `⚡ ${thiefName} נתפס!`;
+    document.body.appendChild(toast);
+    if (navigator.vibrate) navigator.vibrate([200, 100, 200]);
+    setTimeout(() => { if (toast.parentNode) toast.parentNode.removeChild(toast); }, 3500);
+}
+
+// ==========================================
+// בדיקת ניצחון עצמאית ל-QA
+// 51%+ שטח כבוש = ניצחון גנבים (בשני החדרים)
+// ==========================================
+function startQAWinCheck(roomId, arenaData) {
+    if (window.qaWinCheckInterval) clearInterval(window.qaWinCheckInterval);
+
+    window.qaWinCheckInterval = setInterval(() => {
+        if (!window.db || !window.currentRoom) return;
+
+        window.db.ref(`game/${roomId}/capturedAreas`).once('value', snap => {
+            const areas = snap.val();
+            if (!areas) return;
+
+            let totalSqM = 0;
+            Object.values(areas).forEach(area => {
+                if (!area.points || area.points.length < 3) return;
+                try {
+                    const coords = area.points.map(p => [p[1], p[0]]);
+                    coords.push(coords[0]);
+                    totalSqM += turf.area(turf.polygon([coords]));
+                } catch(e) {}
+            });
+
+            const pct = (totalSqM / arenaData.totalArea) * 100;
+            console.log(`[QA] Captured area: ${pct.toFixed(1)}%`);
+
+            if (pct >= 51) {
+                console.log('[QA] Thieves win! Setting winner...');
+                window.db.ref(`game/${roomId}/winner`).transaction(current => {
+                    if (current) return; // כבר נקבע מנצח
+                    return 'thieves';
+                });
+                clearInterval(window.qaWinCheckInterval);
+                window.qaWinCheckInterval = null;
+            }
+        });
+    }, 3000);
 }
 
 // ==========================================
@@ -317,11 +417,8 @@ function startQABotEngine(roomId, arenaData, botRole) {
     ];
     const polygon = turf.polygon([polyCoords]);
 
-    // הליכה איטית: ~2-3 מטר לכל tick (tick כל 2 שניות)
-    // 0.000025 lat/lng ~ 2.5 מטר
+    // ~2.5 מטר לכל tick (כל 2 שניות) = הליכה איטית
     const BOT_STEP = 0.000025;
-
-    // כיווני הליכה לכל בוט (זוית אקראית שמשתנה מדי פעם)
     const botDirections = {};
 
     window.qaBotEngineInterval = setInterval(() => {
@@ -337,28 +434,24 @@ function startQABotEngine(roomId, arenaData, botRole) {
                 if (!id.startsWith('bot_')) return;
                 const b = players[id];
 
-                // שינוי כיוון אקראי מדי ~5 tick
                 if (!botDirections[id] || Math.random() < 0.2) {
-                    botDirections[id] = Math.random() * 2 * Math.PI; // זוית ברדיאנים
+                    botDirections[id] = Math.random() * 2 * Math.PI;
                 }
 
                 const angle = botDirections[id];
                 const nextLat = b.lat + Math.cos(angle) * BOT_STEP;
                 const nextLng = b.lng + Math.sin(angle) * BOT_STEP;
-
-                const nextPt = turf.point([nextLng, nextLat]);
+                const nextPt  = turf.point([nextLng, nextLat]);
 
                 if (turf.booleanPointInPolygon(nextPt, polygon)) {
                     botUpdates[`game/${roomId}/players/${id}/lat`] = nextLat;
                     botUpdates[`game/${roomId}/players/${id}/lng`] = nextLng;
                     botUpdates[`game/${roomId}/players/${id}/t`]   = Date.now();
 
-                    // עדכון שובל גנב-בוט ב-Firebase (לחדר 88888)
                     if (botRole === 'thief') {
                         updateBotThiefTrail(roomId, id, nextLat, nextLng);
                     }
                 } else {
-                    // הפוך כיוון
                     botDirections[id] = angle + Math.PI;
                 }
             });
@@ -373,15 +466,13 @@ function startQABotEngine(roomId, arenaData, botRole) {
 // ==========================================
 // שובל גנבי-בוט (חדר 88888)
 // ==========================================
-const _botTrails = {}; // id -> [{lat,lng}, ...]
+const _botTrails = {};
 
 function updateBotThiefTrail(roomId, botId, lat, lng) {
     if (!_botTrails[botId]) _botTrails[botId] = [];
-
     const trail = _botTrails[botId];
     trail.push([lat, lng]);
 
-    // שמירה ל-Firebase (כל 3 נקודות כדי לא להציף)
     if (trail.length % 3 === 0) {
         window.db.ref(`game/${roomId}/trails/${botId}`).set({
             path: trail,
@@ -391,46 +482,12 @@ function updateBotThiefTrail(roomId, botId, lat, lng) {
 }
 
 // ==========================================
-// Override: חשיפת גנבים תמיד בחדר 88888
-// ==========================================
-// נשמור פאטש על listenToOtherPlayers לאחר טעינת הסצנה
-// הלוגיקה ב-game-play.js מסתירה גנבים ממשתמש שוטר אלא אם יש flashUntil
-// במצב QA 88888 — נגדיר flashUntil מתמשך לכל גנב-בוט
-function qaKeepThievesVisible(roomId) {
-    if (window.playerRole !== 'cop' || roomId !== '88888') return;
-
-    setInterval(() => {
-        if (!window.db || !window.currentRoom) return;
-        window.db.ref(`game/${roomId}/players`).once('value', snap => {
-            const players = snap.val();
-            if (!players) return;
-            const updates = {};
-            Object.keys(players).forEach(id => {
-                if (id.startsWith('bot_thief')) {
-                    // flashUntil תמיד בעתיד הרחוק → גנב תמיד "מהבהב" (נראה)
-                    updates[`game/${roomId}/players/${id}/flashUntil`] = Date.now() + 10000;
-                }
-            });
-            if (Object.keys(updates).length > 0) window.db.ref().update(updates);
-        });
-    }, 5000);
-}
-
-// ==========================================
-// טייזר QA — בחדר 88888 בלבד, טווח 10 מטר
-// ==========================================
-// ה-triggerCapture הרגיל כבר קיים ועובד.
-// רק נוודא שה-checkGpsCatch בודק 10 מטר במצב QA:
-window.qaCaptureDist = 10; // מטר — משמש ב-checkGpsCatch אם מזוהה qaMode
-
-// ==========================================
 // ניקוי QA
 // ==========================================
 window.stopQAMode = function() {
-    if (window.qaBotEngineInterval) {
-        clearInterval(window.qaBotEngineInterval);
-        window.qaBotEngineInterval = null;
-    }
+    if (window.qaBotEngineInterval)    { clearInterval(window.qaBotEngineInterval);    window.qaBotEngineInterval    = null; }
+    if (window.qaCaptureCheckInterval) { clearInterval(window.qaCaptureCheckInterval); window.qaCaptureCheckInterval = null; }
+    if (window.qaWinCheckInterval)     { clearInterval(window.qaWinCheckInterval);     window.qaWinCheckInterval     = null; }
     const pad = document.getElementById('qa-arrow-pad');
     if (pad) pad.remove();
     if (window._realStartGpsTracking) {
