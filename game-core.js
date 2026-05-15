@@ -5,27 +5,29 @@
 // ==========================================
 window.playerMarkers = {};
 window.areaLayers = [];
-window.thiefPath = []; 
+window.thiefPath = [];
 window.trailLayer = null;
 window.map = null;
-window.taserVisualRing = null; 
+window.taserVisualRing = null;
 
 window.myLat = null;
 window.myLng = null;
 window.gpsWatchId = null;
 
-window.hasSeenThief = false; 
+window.hasSeenThief = false;
 window.gameStartTime = 0;
 window.isBriefingComplete = false;
 window.arenaData = null;
 window.policeStationCircle = null;
 window.arenaPolygonLayer = null;
 
-// משתנה גלובלי לשמירת ה-WakeLock הפעיל
 window.wakeLockSentinel = null;
-
-// שכבות שובלי גנבים אחרים (מפת id -> polyline)
 window.otherTrailLayers = {};
+
+// מצב משחק: 'territory' או 'timer'
+window.victoryMode = 'territory';
+window.timerMinutes = 10;
+window.gameTimerInterval = null;
 
 let lastFirebaseUpdate = 0;
 
@@ -46,7 +48,6 @@ document.addEventListener("visibilitychange", () => {
 async function reacquireWakeLock() {
     if (!('wakeLock' in navigator)) return;
     if (window.wakeLockSentinel && !window.wakeLockSentinel.released) return;
-
     try {
         window.wakeLockSentinel = await navigator.wakeLock.request('screen');
         console.log("WakeLock reacquired.");
@@ -63,13 +64,13 @@ async function reacquireWakeLock() {
 // ==========================================
 function enterGameScene() {
     console.log("Tactical Scene Initializing...");
-    
+
     document.getElementById('lobby-screen').style.display = 'none';
     document.getElementById('login-screen').style.display = 'none';
-    
+
     const floatingStats = document.getElementById('floating-stats');
     if (floatingStats) floatingStats.style.display = 'flex';
-    
+
     document.getElementById('map').style.display = 'block';
     document.getElementById('exit-btn').style.display = 'flex';
 
@@ -81,11 +82,11 @@ function enterGameScene() {
         window.map = null;
     }
 
-    const startLat = window.myLat || 32.0853; 
+    const startLat = window.myLat || 32.0853;
     const startLng = window.myLng || 34.7818;
 
-    window.map = L.map('map', { 
-        zoomControl: false, attributionControl: false, dragging: true, touchZoom: true, 
+    window.map = L.map('map', {
+        zoomControl: false, attributionControl: false, dragging: true, touchZoom: true,
         doubleClickZoom: false, scrollWheelZoom: false, boxZoom: false, keyboard: false
     }).setView([startLat, startLng], 18);
 
@@ -93,17 +94,30 @@ function enterGameScene() {
 
     reacquireWakeLock();
 
-    window.db.ref(`rooms/${window.currentRoom}/gameStartTime`).once('value', snap => {
-        window.gameStartTime = snap.val() || Date.now();
+    // טעינת הגדרות חדר (כולל victoryMode ו-timerMinutes)
+    window.db.ref(`rooms/${window.currentRoom}`).once('value', snap => {
+        const roomData = snap.val() || {};
+        window.victoryMode = roomData.victoryMode || 'territory';
+        window.timerMinutes = roomData.timerMinutes || 10;
+
+        // עדכון HUD לפי מצב משחק
+        updateHudForMode();
+
+        window.gameStartTime = roomData.gameStartTime || Date.now();
         if (typeof checkArenaStatus === 'function') checkArenaStatus();
+
+        // הפעלת טיימר אם מצב זמן
+        if (window.victoryMode === 'timer') {
+            startGameCountdownTimer();
+        }
     });
 
     startRealGpsTracking();
-    
+
     if (typeof listenToOtherPlayers === 'function') listenToOtherPlayers();
     if (typeof listenToCapturedAreas === 'function') listenToCapturedAreas();
-    if (typeof listenToVictory === 'function') listenToVictory(); 
-    if (typeof listenForCaptureSignals === 'function') listenForCaptureSignals(); 
+    if (typeof listenToVictory === 'function') listenToVictory();
+    if (typeof listenForCaptureSignals === 'function') listenForCaptureSignals();
     if (typeof listenToTreasures === 'function') listenToTreasures();
 
     if (typeof window.listenToOutOfBoundsAlert === 'function') window.listenToOutOfBoundsAlert();
@@ -113,7 +127,56 @@ function enterGameScene() {
 
     setInterval(() => {
         if (typeof checkOfflinePlayers === 'function') checkOfflinePlayers();
-    }, 10000); 
+    }, 10000);
+}
+
+// ==========================================
+// 2.3. עדכון HUD לפי מצב משחק
+// ==========================================
+function updateHudForMode() {
+    const areaStatItem = document.getElementById('stat-area-item');
+    const timerStatItem = document.getElementById('stat-timer-item');
+
+    if (window.victoryMode === 'timer') {
+        if (areaStatItem) areaStatItem.style.display = 'none';
+        if (timerStatItem) timerStatItem.style.display = 'inline';
+    } else {
+        if (areaStatItem) areaStatItem.style.display = 'inline';
+        if (timerStatItem) timerStatItem.style.display = 'none';
+    }
+}
+
+// ==========================================
+// 2.4. טיימר לאחור במצב "על זמן"
+// ==========================================
+function startGameCountdownTimer() {
+    if (window.gameTimerInterval) clearInterval(window.gameTimerInterval);
+
+    const totalSeconds = (window.timerMinutes || 10) * 60;
+    const endTime = (window.gameStartTime || Date.now()) + totalSeconds * 1000;
+
+    function tick() {
+        const remaining = Math.max(0, Math.ceil((endTime - Date.now()) / 1000));
+        const mm = String(Math.floor(remaining / 60)).padStart(2, '0');
+        const ss = String(remaining % 60).padStart(2, '0');
+
+        const el = document.getElementById('game-timer-text');
+        if (el) el.innerText = `${mm}:${ss}`;
+
+        if (remaining <= 0) {
+            clearInterval(window.gameTimerInterval);
+            // הגיע הזמן — בודק אם יש גנבים פעילים
+            if (window.isHost) {
+                window.db.ref(`game/${window.currentRoom}/winner`).transaction(current => {
+                    if (current) return; // כבר נקבע מנצח
+                    return 'thieves';
+                });
+            }
+        }
+    }
+
+    tick();
+    window.gameTimerInterval = setInterval(tick, 1000);
 }
 
 // ==========================================
@@ -130,7 +193,6 @@ function listenToOtherTrails() {
 
             const trailData = allTrails[id];
             if (!trailData || !trailData.path || trailData.path.length < 2) return;
-
             if (Date.now() - trailData.t > 300000) return;
 
             if (window.otherTrailLayers[id]) {
@@ -160,7 +222,7 @@ function listenToOtherTrails() {
 // ==========================================
 function panMap(direction) {
     if (!window.map) return;
-    const offset = 100; 
+    const offset = 100;
     switch (direction) {
         case 'up': window.map.panBy([0, -offset]); break;
         case 'down': window.map.panBy([0, offset]); break;
@@ -184,15 +246,15 @@ function startRealGpsTracking() {
     if (window.gpsWatchId !== null) {
         navigator.geolocation.clearWatch(window.gpsWatchId);
     }
-    
+
     window.gpsWatchId = navigator.geolocation.watchPosition((pos) => {
         window.myLat = pos.coords.latitude;
         window.myLng = pos.coords.longitude;
-        
+
         const gpsEl = document.getElementById('gps-status');
         if (gpsEl) {
             gpsEl.innerText = "GPS ✅";
-            gpsEl.style.color = "#10b981"; 
+            gpsEl.style.color = "#10b981";
         }
 
         if (window.map && !window.firstLoadDone) {
@@ -207,32 +269,31 @@ function startRealGpsTracking() {
             gpsEl.innerText = "GPS ❌";
             gpsEl.style.color = "#ef4444";
         }
-    }, { 
-        enableHighAccuracy: true, 
-        maximumAge: 0,            
-        timeout: 10000 
+    }, {
+        enableHighAccuracy: true,
+        maximumAge: 0,
+        timeout: 10000
     });
 }
 
 function updateRealPosition() {
-    if(!window.map || window.myLat === null) return;
-    
+    if (!window.map || window.myLat === null) return;
+
     const drawingEl = document.getElementById('drawing-container');
     const isDrawingMode = drawingEl && drawingEl.style.display === 'block';
-    
+
     if (!isDrawingMode) {
         window.map.panTo([window.myLat, window.myLng], { animate: true, duration: 0.25 });
     }
 
     if (window.currentRoom && window.playerId) {
-        
         const now = Date.now();
         if (now - lastFirebaseUpdate >= 500) {
-            window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({ 
-                lat: window.myLat, 
-                lng: window.myLng, 
+            window.db.ref(`game/${window.currentRoom}/players/${window.playerId}`).update({
+                lat: window.myLat,
+                lng: window.myLng,
                 t: now,
-                role: window.playerRole 
+                role: window.playerRole
             });
             lastFirebaseUpdate = now;
         }
@@ -250,7 +311,7 @@ function updateRealPosition() {
         if (window.playerRole === 'thief' && window.isBriefingComplete) {
             if (typeof updateThiefLogic === "function") updateThiefLogic(window.myLat, window.myLng);
         }
-        
+
         if (typeof checkTreasureProximity === 'function') {
             checkTreasureProximity(window.myLat, window.myLng);
         }

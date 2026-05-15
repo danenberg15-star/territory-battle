@@ -7,7 +7,6 @@
     <link rel="manifest" href="manifest.json">
     
     <script>
-        // מנגנון אגרסיבי להשתקת אזהרות רענון של הדפדפן
         const originalAddEventListener = window.addEventListener;
         window.killExitWarning = function() { window.onbeforeunload = null; };
         window.addEventListener = function(type, listener, options) {
@@ -24,57 +23,35 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <link rel="stylesheet" href="styles.css" />
     <style>
-        /* Base Styles */
-        body, html { 
-            margin: 0; padding: 0; height: 100%; width: 100%; 
-            overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            background-color: #0f172a; color: white; user-select: none; -webkit-user-select: none; 
-        }
+        body, html { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #0f172a; color: white; user-select: none; -webkit-user-select: none; }
         #map { height: 100%; width: 100%; position: absolute; top: 0; z-index: 1; display: none; }
-        
-        /* Drawing Layer */
         #drawing-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2500; display: none; background: rgba(15, 23, 42, 0.2); touch-action: none; }
         #drawing-canvas { width: 100%; height: 100%; cursor: crosshair; }
-        
-        /* Screens */
         .screen { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 2000; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #0f172a; padding: 20px; box-sizing: border-box; overflow-y: auto; }
         #lobby-screen { display: none; justify-content: flex-start; padding-top: 50px; }
-        
-        /* UI Elements */
         h1 { color: #38bdf8; font-size: 28px; margin-bottom: 20px; text-align: center; }
         input, select { width: 100%; max-width: 300px; padding: 12px; margin-bottom: 10px; border-radius: 8px; border: 1px solid #38bdf8; background: #1e293b; color: white; font-size: 16px; text-align: center; box-sizing: border-box; user-select: auto; }
         .btn { width: 100%; max-width: 300px; padding: 15px; border-radius: 8px; border: none; font-size: 18px; font-weight: bold; color: white; cursor: pointer; margin-bottom: 10px; transition: 0.2s; text-align: center; display: flex; align-items: center; justify-content: center; }
         .btn-blue { background: #1e40af; }
         .btn-red { background: #991b1b; }
         .btn-green { background: #10b981; font-size: 15px; padding: 15px; line-height: 1.4; max-width: 350px; width: 100%; margin: 15px 0 0 0; }
-        
-        /* Game Overlays */
         #floating-stats { position: absolute; top: 15px; left: 50%; transform: translateX(-50%); display: none; flex-direction: row; justify-content: center; gap: 12px; z-index: 4000; background: rgba(15, 23, 42, 0.75); backdrop-filter: blur(10px); padding: 11px 24px; border-radius: 24px; border: 1px solid rgba(56, 189, 248, 0.4); font-size: 14px; font-weight: bold; white-space: nowrap; }
         .exit-btn { position: absolute; top: 15px; left: 15px; z-index: 4100; background: rgba(220, 38, 38, 0.8); color: white; border: none; border-radius: 50%; width: 35px; height: 35px; font-weight: bold; display: none; align-items: center; justify-content: center; }
-        
-        /* Radar */
         #radar-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 2400; display: none; flex-direction: column; align-items: center; justify-content: center; pointer-events: none; background: rgba(239, 68, 68, 0.2); animation: radar-flash 0.6s infinite alternate; }
         @keyframes radar-flash { 0% { box-shadow: inset 0 0 30px rgba(239, 68, 68, 0.5); opacity: 0.4; } 100% { box-shadow: inset 0 0 150px rgba(239, 68, 68, 1); opacity: 1; } }
-        
-        /* Chat UI */
         #chat-container { position: absolute; top: 70px; width: 45%; max-width: 210px; z-index: 5000; display: none; flex-direction: column; pointer-events: auto; }
         #chat-messages { width: 100%; height: 120px; background: rgba(15, 23, 42, 0.45); backdrop-filter: blur(4px); border-radius: 12px; overflow-y: auto; padding: 8px; font-size: 12px; border: 2px solid rgba(56, 189, 248, 0.3); margin-bottom: 6px; box-sizing: border-box; }
-
-        /* Setup/Drawing UI */
         #setup-ui { position: absolute; bottom: 15px; left: 50%; transform: translateX(-50%); z-index: 3000; width: 95%; max-width: 450px; display: none; flex-direction: column; align-items: center; gap: 8px; background: rgba(15, 23, 42, 0.9); padding: 10px; border-radius: 12px; border: 1px solid #38bdf8; }
-        
-        /* Victory Screen */
         #victory-screen { display: none; z-index: 6000; padding: 0; background: black; justify-content: center; align-items: center; }
         #victory-video { position: absolute; width: 100%; height: 100%; object-fit: cover; display: none; }
         #victory-ui-overlay { position: relative; z-index: 2; text-align: center; display: none; background: rgba(15, 23, 42, 0.85); padding: 30px; border-radius: 20px; border: 2px solid #38bdf8; box-shadow: 0 0 20px rgba(0,0,0,0.8); }
-
-        /* Lobby Helper styles */
         .team-list { flex: 1; padding: 10px; background: rgba(255, 255, 255, 0.05); border-radius: 12px; min-height: 200px; }
         .room-code-box { background: #1e293b; padding: 10px 20px; border-radius: 12px; border: 2px dashed #38bdf8; color: #38bdf8; font-size: 20px; font-weight: bold; flex-grow: 1; text-align: center; }
         .btn-whatsapp-icon { background: #25D366; border: none; border-radius: 12px; width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; cursor: pointer; margin-left: 10px; }
-
-        /* Player entry in lobby */
         .player-entry { padding: 8px 12px; margin: 4px 0; background: rgba(255,255,255,0.05); border-radius: 8px; font-size: 14px; cursor: grab; border: 1px solid rgba(255,255,255,0.1); }
+
+        /* טיימר HUD */
+        #game-timer-text { color: #facc15; font-weight: bold; font-variant-numeric: tabular-nums; }
     </style>
 </head>
 <body>
@@ -98,7 +75,7 @@
         </div>
         <button class="ctrl-btn" onclick="panMap('down')">↓</button>
     </div>
-    
+
     <div id="zoom-controls" style="position:absolute; right:15px; bottom:calc(80px + 10vh); z-index:3000; display:none; flex-direction:column; gap:8px;">
         <button class="ctrl-btn" onclick="zoomMap(1)">+</button>
         <button class="ctrl-btn" onclick="zoomMap(-1)">-</button>
@@ -113,15 +90,19 @@
     </div>
 
     <button id="exit-btn" class="exit-btn" onclick="exitGame()">X</button>
-    
+
+    <!-- HUD עליון -->
     <div id="floating-stats">
         <div class="stat-item"><span id="gps-status">GPS ❌</span></div>
         <div class="stat-item">|</div>
         <div class="stat-item"><span id="players-count">שחקנים: 0</span></div>
         <div class="stat-item">|</div>
-        <div class="stat-item">שטח: <span id="capture-progress-text" style="color:#ef4444; font-weight:bold;">0%</span></div>
+        <!-- מצב כיבוש שטח -->
+        <div class="stat-item" id="stat-area-item">שטח: <span id="capture-progress-text" style="color:#ef4444; font-weight:bold;">0%</span></div>
+        <!-- מצב על זמן (מוסתר כברירת מחדל) -->
+        <div class="stat-item" id="stat-timer-item" style="display:none;">⏱️ <span id="game-timer-text">00:00</span></div>
     </div>
-    
+
     <div id="radar-overlay"></div>
 
     <div id="freeze-overlay" style="position:fixed; top:0; left:0; width:100%; height:100%; z-index:4500; background:rgba(15,23,42,0.85); backdrop-filter:blur(8px); display:none; flex-direction:column; align-items:center; justify-content:center;">
@@ -166,9 +147,7 @@
     </div>
 
     <div id="victory-screen" class="screen">
-        <video id="victory-video" playsinline>
-            <source src="cop_win.webm" type="video/webm">
-        </video>
+        <video id="victory-video" playsinline></video>
         <div id="victory-ui-overlay">
             <div id="default-trophy" style="font-size:80px; margin-bottom: 20px;">🏆</div>
             <h1 id="victory-title" style="margin-bottom: 20px;">ניצחון!</h1>
@@ -185,18 +164,14 @@
     <script src="audio.js"></script>
     <script src="territory.js"></script>
     <script src="firebase-init.js"></script>
-    
     <script src="login.js"></script>
     <script src="lobby.js"></script>
-    
     <script src="qa.js"></script>
     <script src="briefing.js"></script>
     <script src="thief-mechanics.js"></script>
     <script src="chat.js"></script>
     <script src="treasures.js"></script>
-    
     <script src="victory.js"></script>
-    
     <script src="bot-ai.js"></script>
     <script src="game-core.js"></script>
     <script src="game-arena.js"></script>

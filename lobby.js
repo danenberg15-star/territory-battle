@@ -5,7 +5,7 @@ let initialX = 0;
 let initialY = 0;
 
 // ==========================================
-// 1. UI Injection (Exact original design)
+// 1. UI Injection
 // ==========================================
 function renderLobbyScreenUI(roomId) {
     const lobbyContainer = document.getElementById('lobby-screen');
@@ -21,6 +21,40 @@ function renderLobbyScreenUI(roomId) {
                 </svg>
             </button>
         </div>
+
+        <!-- טוגל מצב משחק -->
+        <div id="game-mode-toggle-container" style="width:100%; max-width:350px; margin-bottom:14px;">
+            <div style="display:flex; background:rgba(30,41,59,0.9); border-radius:12px; border:1px solid rgba(56,189,248,0.3); overflow:hidden;">
+                <button id="mode-btn-territory" onclick="setLobbyGameMode('territory')"
+                    style="flex:1; padding:11px 6px; border:none; border-radius:12px 0 0 12px; font-size:13px; font-weight:bold; cursor:pointer; transition:0.2s; background:#1e40af; color:white;">
+                    🗺️ כיבוש שטח
+                </button>
+                <button id="mode-btn-timer" onclick="setLobbyGameMode('timer')"
+                    style="flex:1; padding:11px 6px; border:none; border-radius:0 12px 12px 0; font-size:13px; font-weight:bold; cursor:pointer; transition:0.2s; background:rgba(15,23,42,0.6); color:#94a3b8;">
+                    ⏱️ משחק על זמן
+                </button>
+            </div>
+        </div>
+
+        <!-- סלידר זמן משחק (מוסתר כברירת מחדל) -->
+        <div id="timer-duration-container" style="width:100%; max-width:350px; margin-bottom:14px; display:none;">
+            <div style="background:rgba(30,41,59,0.85); border-radius:12px; border:1px solid rgba(56,189,248,0.25); padding:14px 18px;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                    <span style="font-size:13px; color:#94a3b8; font-weight:bold;">⏱️ זמן משחק</span>
+                    <span id="timer-duration-label" style="font-size:18px; font-weight:900; color:#38bdf8;">10 דקות</span>
+                </div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                    <button onclick="adjustTimerDuration(-1)"
+                        style="width:36px; height:36px; border-radius:50%; background:#1e293b; border:2px solid #38bdf8; color:#38bdf8; font-size:20px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;">−</button>
+                    <input type="range" id="timer-duration-slider" min="3" max="60" value="10" step="1"
+                        oninput="onTimerSliderChange(this.value)"
+                        style="flex:1; height:6px; accent-color:#38bdf8; cursor:pointer;" />
+                    <button onclick="adjustTimerDuration(1)"
+                        style="width:36px; height:36px; border-radius:50%; background:#1e293b; border:2px solid #38bdf8; color:#38bdf8; font-size:20px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;">+</button>
+                </div>
+            </div>
+        </div>
+
         <div style="display: flex; width: 100%; max-width: 350px; flex-grow: 1;">
             <div class="team-list" id="list-cops">
                 <div style="color:#3b82f6; font-weight:bold; text-align:center; margin-bottom: 10px;" id="lbl-cops-team">שוטרים 👮‍♂️</div>
@@ -33,8 +67,48 @@ function renderLobbyScreenUI(roomId) {
         </div>
         <button class="btn btn-green" id="btn-start-game" style="display:none;" onclick="startGame()">התחל משחק</button>
     `;
-    
+
+    // אתחול מצב ברירת מחדל
+    window._lobbyGameMode = 'territory';
+    window._lobbyTimerMinutes = 10;
+
     if (typeof setLanguage === 'function') setLanguage(currentLang);
+}
+
+// ==========================================
+// טוגל מצב משחק
+// ==========================================
+function setLobbyGameMode(mode) {
+    window._lobbyGameMode = mode;
+
+    const btnTerritory = document.getElementById('mode-btn-territory');
+    const btnTimer = document.getElementById('mode-btn-timer');
+    const timerContainer = document.getElementById('timer-duration-container');
+
+    if (mode === 'territory') {
+        if (btnTerritory) { btnTerritory.style.background = '#1e40af'; btnTerritory.style.color = 'white'; }
+        if (btnTimer) { btnTimer.style.background = 'rgba(15,23,42,0.6)'; btnTimer.style.color = '#94a3b8'; }
+        if (timerContainer) timerContainer.style.display = 'none';
+    } else {
+        if (btnTimer) { btnTimer.style.background = '#0f766e'; btnTimer.style.color = 'white'; }
+        if (btnTerritory) { btnTerritory.style.background = 'rgba(15,23,42,0.6)'; btnTerritory.style.color = '#94a3b8'; }
+        if (timerContainer) timerContainer.style.display = 'block';
+    }
+}
+
+function onTimerSliderChange(val) {
+    window._lobbyTimerMinutes = parseInt(val);
+    const label = document.getElementById('timer-duration-label');
+    if (label) label.innerText = `${val} דקות`;
+}
+
+function adjustTimerDuration(delta) {
+    const slider = document.getElementById('timer-duration-slider');
+    if (!slider) return;
+    let val = parseInt(slider.value) + delta;
+    val = Math.max(3, Math.min(60, val));
+    slider.value = val;
+    onTimerSliderChange(val);
 }
 
 // ==========================================
@@ -45,20 +119,25 @@ function joinRoomLogic(roomId) {
 
     document.getElementById('login-screen').style.display = 'none';
     document.getElementById('lobby-screen').style.display = 'flex';
-    
+
     window.db.ref(`rooms/${roomId}`).on('value', snap => {
         const roomData = snap.val();
         if (!roomData) return;
-        
+
         isHost = (roomData.host === playerId);
         const startBtn = document.getElementById('btn-start-game');
         if (isHost && roomData.status !== 'playing' && startBtn) {
             startBtn.style.display = 'block';
         }
-        
+
+        // רק המנהל רואה את כפתורי הטוגל
+        const toggleContainer = document.getElementById('game-mode-toggle-container');
+        const timerContainer = document.getElementById('timer-duration-container');
+        if (toggleContainer) toggleContainer.style.display = isHost ? 'block' : 'none';
+
         if (roomData.status === 'playing') {
-            window.db.ref(`rooms/${roomId}`).off(); 
-            window.isHost = isHost; 
+            window.db.ref(`rooms/${roomId}`).off();
+            window.isHost = isHost;
             window.playerRole = roomData.players[playerId]?.role || 'thief';
             window.currentRoom = roomId;
             window.playerId = playerId;
@@ -84,7 +163,7 @@ function renderLobbyPlayers(players, gameMode) {
         const pDiv = document.createElement('div');
         pDiv.className = 'player-entry';
         pDiv.innerText = p.name + (id === playerId ? " (אתה)" : "");
-        
+
         if (gameMode !== 'single' && !id.startsWith('bot_')) {
             pDiv.draggable = true;
             pDiv.setAttribute('data-id', id);
@@ -124,7 +203,7 @@ function handleTouchEnd(e) {
     const touch = e.changedTouches[0];
     activeTouchElement.style.transform = "";
     activeTouchElement.style.zIndex = "";
-    
+
     const dropTarget = document.elementFromPoint(touch.clientX, touch.clientY);
     const copsList = document.getElementById('list-cops');
     const thievesList = document.getElementById('list-thieves');
@@ -153,14 +232,21 @@ function startGame() {
                 role: roomData.players[id].role,
                 name: roomData.players[id].name,
                 t: Date.now(),
-                lat: 0, 
+                lat: 0,
                 lng: 0
             };
         });
 
+        const lobbyMode = window._lobbyGameMode || 'territory';
+        const lobbyTimer = window._lobbyTimerMinutes || 10;
+
         const updates = {};
         updates[`rooms/${currentRoom}/status`] = 'playing';
         updates[`rooms/${currentRoom}/gameStartTime`] = Date.now();
+        updates[`rooms/${currentRoom}/victoryMode`] = lobbyMode;
+        if (lobbyMode === 'timer') {
+            updates[`rooms/${currentRoom}/timerMinutes`] = lobbyTimer;
+        }
         updates[`game/${currentRoom}/players`] = gamePlayers;
 
         window.db.ref().update(updates);
@@ -169,8 +255,8 @@ function startGame() {
 
 function shareWhatsApp() {
     const link = `${window.location.origin}${window.location.pathname}?room=${currentRoom}`;
-    const text = currentLang === 'he' ? 
-        `בואו לשחק איתי ב-Territory Battle! כנסו לקישור: ${link}` : 
+    const text = currentLang === 'he' ?
+        `בואו לשחק איתי ב-Territory Battle! כנסו לקישור: ${link}` :
         `Come play Territory Battle with me! Join here: ${link}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank');
 }
