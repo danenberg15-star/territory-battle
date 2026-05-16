@@ -30,7 +30,7 @@ function showVictoryScreen(winnerRole) {
 
     } else if (winnerRole === 'thieves') {
         // סרטון ניצחון גנבים
-        video.src = 'thieves_win.MP4';
+        video.src = 'thieves_win.mp4';
         video.style.display = 'block';
         uiOverlay.style.display = 'none';
 

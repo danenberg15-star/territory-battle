@@ -46,7 +46,7 @@ function renderLobbyScreenUI(roomId) {
                 <div style="display:flex; align-items:center; gap:12px;">
                     <button onclick="adjustTimerDuration(-1)"
                         style="width:36px; height:36px; border-radius:50%; background:#1e293b; border:2px solid #38bdf8; color:#38bdf8; font-size:20px; font-weight:bold; cursor:pointer; display:flex; align-items:center; justify-content:center; flex-shrink:0;">−</button>
-                    <input type="range" id="timer-duration-slider" min="3" max="60" value="10" step="1"
+                    <input type="range" id="timer-duration-slider" min="1" max="60" value="10" step="1"
                         oninput="onTimerSliderChange(this.value)"
                         style="flex:1; height:6px; accent-color:#38bdf8; cursor:pointer;" />
                     <button onclick="adjustTimerDuration(1)"
@@ -106,7 +106,7 @@ function adjustTimerDuration(delta) {
     const slider = document.getElementById('timer-duration-slider');
     if (!slider) return;
     let val = parseInt(slider.value) + delta;
-    val = Math.max(3, Math.min(60, val));
+    val = Math.max(1, Math.min(60, val));
     slider.value = val;
     onTimerSliderChange(val);
 }
