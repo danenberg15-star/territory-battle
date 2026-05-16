@@ -18,6 +18,7 @@ function listenToBriefing() {
         const overlay = document.getElementById('briefing-overlay');
         const timerText = document.getElementById('briefing-timer-text');
         const statusText = document.getElementById('briefing-status');
+        const iconEl = document.getElementById('briefing-icon');
 
         if (!overlay || !timerText || !statusText) return;
 
@@ -29,17 +30,34 @@ function listenToBriefing() {
             // עיצוב הטיימר (הוספת 0 מוביל אם צריך)
             timerText.innerText = `00:${b.timeLeft < 10 ? '0' : ''}${b.timeLeft}`;
             
-            // עדכון הודעת הסטטוס בהתאם למצב
-            if (b.active) {
+            // עדכון סטטוס והודעות בהתאם לתפקיד השחקן
+            if (window.playerRole === 'thief') {
+                // הודעה לגנבים
+                if (iconEl) iconEl.innerText = '🏃';
                 statusText.innerText = window.currentLang === 'he'
-                    ? "תדריך מתבצע... הישארו בתחנה!"
-                    : "Briefing in progress... Stay in station!";
-                timerText.style.color = "#10b981";
-            } else {
-                statusText.innerText = window.currentLang === 'he'
-                    ? "ממתין לכל השוטרים בתחנה..."
-                    : "Waiting for all cops in station...";
-                timerText.style.color = "#facc15";
+                    ? "תברחו! המשחק יתחיל אחרי שהשוטרים יהיו 30 שניות בתחנת המשטרה"
+                    : "Run! The game starts after cops spend 30 seconds at the police station";
+                
+                if (b.active) {
+                    timerText.classList.add('active');
+                } else {
+                    timerText.classList.remove('active');
+                }
+            } else if (window.playerRole === 'cop' || window.playerRole === 'snitch') {
+                // הודעה לשוטרים
+                if (iconEl) iconEl.innerText = '🚔';
+                
+                if (b.active) {
+                    statusText.innerText = window.currentLang === 'he'
+                        ? "הישארו בתחנה! המשחק יתחיל בקרוב..."
+                        : "Stay in the station! Game starting soon...";
+                    timerText.classList.add('active');
+                } else {
+                    statusText.innerText = window.currentLang === 'he'
+                        ? "לכו לתחנת המשטרה המסומנת בעיגול כחול, המשחק יתחיל אחרי שתהיו שם 30 שניות"
+                        : "Go to the police station marked with a blue circle, the game starts after you're there for 30 seconds";
+                    timerText.classList.remove('active');
+                }
             }
         }
     });
@@ -65,11 +83,13 @@ function manageBriefingLogic() {
             if (b.complete) return;
 
             if (allCopsReady) {
+                // כל השוטרים בתחנה - מתחילים או ממשיכים את הטיימר
                 if (!b.active) {
                     window.db.ref(`game/${window.currentRoom}/briefing`).update({ active: true, timeLeft: 30 });
                     startHostBriefingTimer();
                 }
             } else {
+                // לפחות שוטר אחד יצא - עוצרים ומאפסים את הטיימר
                 if (b.active || b.timeLeft !== 30) {
                     stopHostBriefingTimer();
                     window.db.ref(`game/${window.currentRoom}/briefing`).update({ active: false, timeLeft: 30 });
